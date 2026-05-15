@@ -635,7 +635,7 @@ function render() {
     const tb = quotaWeeks.reduce((s,w) => s + (personWeekCount[b][w] || 0), 0);
     return tb - ta;
   });
-  document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황 (오버홀 · ' + quotaWeeks.length + '개 주차 · 기본 주간목표 ' + DEFAULT_WEEKLY_QUOTA + '건)';
+  document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황 (오버홀 · ' + quotaWeeks.length + '개 주차 · 기본 주간목표 ' + quotaConfig.default + '건)';
   const qTbl = document.getElementById('quotaTable');
   const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
   const qHdr = document.createElement('tr');
