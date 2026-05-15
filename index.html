@@ -162,8 +162,8 @@
     </div>
 
     <div class="grid">
-      <div class="card"><h3>부서별 작업건수 (건수 많은 순)</h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
-      <div class="card"><h3>담당자 TOP 10 (작업건수 기준)</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
+      <div class="card"><h3>부서별 순위</h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
+      <div class="card"><h3>담당자 TOP 10</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
     </div>
 
     <div class="grid">
@@ -543,7 +543,7 @@ function render() {
   });
 
   const personTb = document.querySelector('#personTable tbody'); personTb.innerHTML = '';
-  [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).count - personGroup.map.get(a).count).forEach(k => {
+  [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).time - personGroup.map.get(a).time).forEach(k => {
     const o = personGroup.map.get(k);
     const tr = document.createElement('tr');
     tr.innerHTML = '<td>'+k+'</td><td class="num">'+o.count+'</td><td class="num">'+o.오버홀+'</td><td class="num">'+o.수리+'</td><td class="num">'+o.리페어+'</td><td class="num">'+o.time.toLocaleString()+'</td>';
