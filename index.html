@@ -269,6 +269,32 @@
   </div>
 </div>
 
+<!-- 정량 목표 설정 모달 -->
+<div id="quotaModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>정량 목표 설정</h2>
+    <div class="sub">담당자별 주간 오버홀 목표를 설정합니다. 변경 후 저장하면 정량 목표 달성 현황표에 즉시 반영됩니다. 브라우저에 자동 저장되며 다음에 접속 시 그대로 유지됩니다.</div>
+    <div class="field-row">
+      <label>기본 주간 목표 (등록 안 된 사람):</label>
+      <input type="number" id="quotaDefaultInput" min="0" value="3">
+      <span style="font-size:12px;color:#718096">건/주</span>
+    </div>
+    <table class="qtable">
+      <thead><tr><th>담당자</th><th style="text-align:right">주간 목표</th><th></th></tr></thead>
+      <tbody id="quotaConfigBody"></tbody>
+    </table>
+    <div class="add-row">
+      <input type="text" id="newPersonName" placeholder="담당자 이름">
+      <input type="number" id="newPersonQuota" placeholder="목표" min="0">
+      <button class="btn-add" id="addPersonBtn">+ 추가</button>
+    </div>
+    <div class="actions">
+      <button class="cancel" id="closeQuotaBtn">취소</button>
+      <button class="save" id="saveQuotaBtn">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQU9um9z8bbHSMpIs1B-kP6FZ1sSCR1HoUIaN7IG8zGaQMGaAAVWa-SjXZaiKiSPxStK0KR_hitGKRA/pub?output=csv&gid=0&single=true';
 const HEADER_ROW_MARKER = '번호';
@@ -834,31 +860,5 @@ function applyQuotaFilters(rows) {
 
 loadData();
 </script>
-
-<!-- 정량 목표 설정 모달 -->
-<div id="quotaModal" class="modal-overlay hidden">
-  <div class="modal">
-    <h2>정량 목표 설정</h2>
-    <div class="sub">담당자별 주간 오버홀 목표를 설정합니다. 변경 후 저장하면 정량 목표 달성 현황표에 즉시 반영됩니다. 브라우저에 자동 저장되며 다음에 접속 시 그대로 유지됩니다.</div>
-    <div class="field-row">
-      <label>기본 주간 목표 (등록 안 된 사람):</label>
-      <input type="number" id="quotaDefaultInput" min="0" value="3">
-      <span style="font-size:12px;color:#718096">건/주</span>
-    </div>
-    <table class="qtable">
-      <thead><tr><th>담당자</th><th style="text-align:right">주간 목표</th><th></th></tr></thead>
-      <tbody id="quotaConfigBody"></tbody>
-    </table>
-    <div class="add-row">
-      <input type="text" id="newPersonName" placeholder="담당자 이름">
-      <input type="number" id="newPersonQuota" placeholder="목표" min="0">
-      <button class="btn-add" id="addPersonBtn">+ 추가</button>
-    </div>
-    <div class="actions">
-      <button class="cancel" id="closeQuotaBtn">취소</button>
-      <button class="save" id="saveQuotaBtn">저장</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
