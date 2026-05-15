@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<meta name="theme-color" content="#2b6cb0">
+<title>오버홀·수리·리페어 통계 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #f5f7fa; color: #222; -webkit-text-size-adjust: 100%; }
+  header { background: linear-gradient(135deg,#2c5282,#2b6cb0); color: #fff; padding: 18px 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header .meta { font-size: 12px; opacity: 0.9; }
+  header .updated { background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 5px; font-size: 12px; }
+  .container { max-width: 1500px; margin: 0 auto; padding: 20px; }
+  .status { background: #fff; padding: 10px 16px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; color: #4a5568; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .status.error { color: #c53030; background: #fff5f5; border-left: 4px solid #e53e3e; }
+  .status.loading { color: #2b6cb0; background: #ebf8ff; }
+  .filters { background: #fff; padding: 14px 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .ms-field { font-size: 12px; color: #555; display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+  .ms { position: relative; }
+  .ms-trigger { padding: 6px 10px; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 13px; min-width: 130px; max-width: 220px; background: #fff; cursor: pointer; text-align: left; height: 36px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ms-trigger:hover { border-color: #2b6cb0; }
+  .ms-trigger.active { border-color: #2b6cb0; background: #ebf8ff; color: #2c5282; font-weight: 600; }
+  .ms-trigger::after { content: ' ▾'; font-size: 10px; color: #718096; }
+  .ms-menu { position: absolute; top: calc(100% + 2px); left: 0; background: #fff; border: 1px solid #cbd5e0; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); padding: 6px; z-index: 100; max-height: 320px; overflow-y: auto; min-width: 200px; }
+  .ms-menu.hidden { display: none; }
+  .ms-menu .ms-actions { display: flex; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid #edf2f7; margin-bottom: 6px; }
+  .ms-menu .ms-actions button { font-size: 11px; padding: 5px 8px; background: #edf2f7; border: none; border-radius: 3px; cursor: pointer; flex: 1; }
+  .ms-menu .ms-actions button:hover { background: #cbd5e0; }
+  .ms-menu label { display: flex; align-items: center; padding: 8px 6px; font-size: 13px; cursor: pointer; gap: 8px; user-select: none; }
+  .ms-menu label:hover { background: #edf2f7; border-radius: 3px; }
+  .ms-menu input[type="checkbox"] { margin: 0; cursor: pointer; width: 18px; height: 18px; }
+  .filters button.btn { padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; height: 36px; border: none; }
+  .btn.reset { background: #e2e8f0; color: #2d3748; }
+  .btn.reset:hover { background: #cbd5e0; }
+  .btn.refresh { background: #2b6cb0; color: #fff; font-weight: 600; }
+  .btn.refresh:hover { background: #2c5282; }
+  .btn.refresh:disabled { background: #a0aec0; cursor: not-allowed; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: #fff; padding: 14px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid #2b6cb0; }
+  .kpi .label { font-size: 11px; color: #718096; margin-bottom: 4px; }
+  .kpi .value { font-size: 24px; font-weight: 700; color: #2d3748; }
+  .kpi .unit { font-size: 12px; color: #a0aec0; margin-left: 3px; font-weight: normal; }
+  .kpi.overhaul { border-left-color: #38a169; }
+  .kpi.repair { border-left-color: #d69e2e; }
+  .kpi.refurbish { border-left-color: #3182ce; }
+  .kpi.time { border-left-color: #805ad5; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid.full { grid-template-columns: 1fr; }
+  .card { background: #fff; padding: 16px 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .card h3 { margin: 0 0 10px; font-size: 14px; color: #2d3748; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 380px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table th, table td { padding: 6px 8px; border-bottom: 1px solid #edf2f7; text-align: center; }
+  table th { background: #f7fafc; font-weight: 600; color: #4a5568; position: sticky; top: 0; }
+  table td.num { text-align: right; }
+  .scroll { max-height: 380px; overflow: auto; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; }
+  .badge-overhaul { background: #38a169; }
+  .badge-repair { background: #d69e2e; }
+  .badge-refurbish { background: #3182ce; }
+  .badge-etc { background: #a0aec0; }
+  .hidden { display: none; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ddd; border-top-color: #2b6cb0; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* === 태블릿 (≤900px) === */
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    header { padding: 14px 16px; }
+    header h1 { font-size: 18px; }
+    .container { padding: 12px; }
+  }
+
+  /* === 모바일 (≤600px) === */
+  @media (max-width: 600px) {
+    header { padding: 12px 14px; flex-direction: column; align-items: flex-start; gap: 6px; }
+    header h1 { font-size: 16px; }
+    header .meta { font-size: 11px; }
+    header .updated { padding: 4px 10px; font-size: 11px; }
+    .container { padding: 10px; }
+
+    .filters { padding: 10px; gap: 8px; }
+    .ms-field { flex: 1 1 calc(50% - 4px); min-width: 0; font-size: 11px; }
+    .ms-trigger { min-width: 0; width: 100%; max-width: none; font-size: 12px; height: 38px; padding: 6px 8px; }
+    .ms-menu { min-width: 180px; max-height: 280px; left: 0; right: auto; }
+    .ms-menu label { padding: 10px 6px; font-size: 14px; }
+    .ms-menu input[type="checkbox"] { width: 20px; height: 20px; }
+    .filters button.btn { flex: 1 1 calc(50% - 4px); height: 38px; font-size: 13px; }
+
+    .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kpi { padding: 10px 12px; }
+    .kpi .label { font-size: 10px; }
+    .kpi .value { font-size: 18px; }
+    .kpi .unit { font-size: 10px; }
+
+    .card { padding: 12px 12px; }
+    .card h3 { font-size: 13px; margin-bottom: 8px; }
+    .chart-wrap { height: 260px; }
+    .chart-wrap.tall { height: 300px; }
+
+    table { font-size: 11px; }
+    table th, table td { padding: 4px 6px; }
+    .scroll { max-height: 320px; -webkit-overflow-scrolling: touch; }
+  }
+
+  /* === 작은 모바일 (≤380px) === */
+  @media (max-width: 380px) {
+    .ms-field { flex: 1 1 100%; }
+    .filters button.btn { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>오버홀 · 수리 · 리페어 통계</h1>
+    <div class="meta" id="subtitle">로딩 중...</div>
+  </div>
+  <div class="updated" id="updatedAt">--</div>
+</header>
+
+<div class="container">
+  <div class="status" id="status">데이터를 불러오는 중...</div>
+
+  <div id="mainContent" class="hidden">
+    <div class="filters">
+      <div class="ms-field">년도<div class="ms" data-field="년"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <div class="ms-field">월<div class="ms" data-field="월"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <div class="ms-field">주차<div class="ms" data-field="주차별"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <div class="ms-field">부서<div class="ms" data-field="부서명"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <div class="ms-field">담당자<div class="ms" data-field="담당자"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <div class="ms-field">작업유형<div class="ms" data-field="카테고리"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
+      <button class="btn reset" id="resetBtn">초기화</button>
+      <button class="btn refresh" id="refreshBtn">새로고침</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">총 작업 건수</div><div class="value"><span id="kpiCount">0</span><span class="unit">건</span></div></div>
+      <div class="kpi time"><div class="label">총 소요시간</div><div class="value"><span id="kpiTime">0</span><span class="unit">분</span></div></div>
+      <div class="kpi overhaul"><div class="label">오버홀</div><div class="value"><span id="kpiOverhaul">0</span><span class="unit">건</span></div></div>
+      <div class="kpi repair"><div class="label">수리</div><div class="value"><span id="kpiRepair">0</span><span class="unit">건</span></div></div>
+      <div class="kpi refurbish"><div class="label">리페어</div><div class="value"><span id="kpiRefurbish">0</span><span class="unit">건</span></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h3>작업유형별 비중</h3><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></div>
+      <div class="card"><h3>년도별 작업유형 비교</h3><div class="chart-wrap"><canvas id="yearCategoryChart"></canvas></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h3>월별 추이 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="monthChart"></canvas></div></div>
+      <div class="card"><h3>월별 오버홀 기종 분포 (TOP 10)</h3><div class="chart-wrap tall"><canvas id="monthModelChart"></canvas></div></div>
+    </div>
+
+    <div class="grid full">
+      <div class="card"><h3>주차별 추이 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="weekChart"></canvas></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h3>부서별 작업량 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
+      <div class="card"><h3>담당자 TOP 15 (작업건수 기준)</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h3>오버홀 품목별 분포</h3><div class="chart-wrap"><canvas id="overhaulItemChart"></canvas></div></div>
+      <div class="card"><h3>수리/리페어 품목별 분포</h3><div class="chart-wrap"><canvas id="repairItemChart"></canvas></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>부서별 상세 통계</h3>
+        <div class="scroll">
+          <table id="deptTable">
+            <thead><tr><th>부서</th><th>건수</th><th>오버홀</th><th>수리</th><th>리페어</th><th>소요시간(분)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3>담당자별 상세 통계</h3>
+        <div class="scroll">
+          <table id="personTable">
+            <thead><tr><th>담당자</th><th>건수</th><th>오버홀</th><th>수리</th><th>리페어</th><th>소요시간(분)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid full">
+      <div class="card">
+        <h3 id="modelTableTitle">기종별 오버홀 통계</h3>
+        <div class="scroll">
+          <table id="modelTable">
+            <thead><tr><th>모델명</th><th>총 작업수</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid full">
+      <div class="card">
+        <h3>원본 데이터 (필터 적용)</h3>
+        <div class="scroll">
+          <table id="rawTable">
+            <thead><tr><th>번호</th><th>날짜</th><th>년</th><th>월</th><th>주차</th><th>담당자</th><th>부서</th><th>오버홀품목</th><th>수리품목</th><th>유형</th><th>소요시간</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQU9um9z8bbHSMpIs1B-kP6FZ1sSCR1HoUIaN7IG8zGaQMGaAAVWa-SjXZaiKiSPxStK0KR_hitGKRA/pub?output=csv&gid=0&single=true';
+const HEADER_ROW_MARKER = '번호';
+
+const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '#3182ce', '기기폐기': '#e53e3e', '부품정리': '#805ad5', '기타': '#a0aec0' };
+const ALL_CATS = ['오버홀','수리','리페어','기기폐기','부품정리','기타'];
+const DEPT_ORDER = ['CSS', '강북A', '강서B', '강남C', '경기D', '외부인력'];
+function sortByDept(a, b) {
+  const ia = DEPT_ORDER.indexOf(a), ib = DEPT_ORDER.indexOf(b);
+  if (ia === -1 && ib === -1) return a.localeCompare(b);
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+}
+const palette = ['#3182ce','#38a169','#d69e2e','#805ad5','#dd6b20','#e53e3e','#319795','#d53f8c','#2c5282','#718096','#4299e1','#48bb78','#ed8936','#9f7aea','#f56565'];
+
+let RAW_DATA = [];
+const charts = {};
+const FILTER_FIELDS = ['년','월','주차별','부서명','담당자','카테고리'];
+const filterState = {};
+FILTER_FIELDS.forEach(f => filterState[f] = new Set());
+
+const isMobile = () => window.matchMedia('(max-width: 600px)').matches;
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else { inQuotes = false; } }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') {}
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function processRows(allRows) {
+  let headerIdx = -1;
+  for (let i = 0; i < allRows.length; i++) {
+    if (allRows[i][0] && allRows[i][0].trim() === HEADER_ROW_MARKER) { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) throw new Error('헤더(번호 열)를 찾을 수 없습니다');
+  const headers = allRows[headerIdx].map(h => h.trim());
+  const data = [];
+  for (let i = headerIdx + 1; i < allRows.length; i++) {
+    const cols = allRows[i];
+    if (!cols || cols.length < 16) continue;
+    if (!/^\d+$/.test((cols[0] || '').trim())) continue;
+    const r = {};
+    for (let j = 0; j < headers.length && j < cols.length; j++) r[headers[j]] = (cols[j] || '').trim();
+    r.오버홀품목 = (r.오버홀품목 || '').replace(/\s+/g, '');
+    r.수리품목 = (r.수리품목 || '').replace(/\s+/g, '');
+    r.소요시간 = Number(r.소요시간) || 0;
+    r.오버홀포인트 = Number(r.오버홀포인트) || 0;
+    r.수리포인트 = Number(r.수리포인트) || 0;
+    const cats = [];
+    if (/^오버홀/.test(r.오버홀품목)) cats.push('오버홀');
+    if (/^수리/.test(r.수리품목) || r.수리품목 === '재수리') cats.push('수리');
+    if (r.수리품목 === '부품제조') cats.push('리페어');
+    if (r.오버홀품목 === '기기폐기' || r.오버홀품목 === '부품정리') cats.push(r.오버홀품목);
+    if (cats.length === 0) cats.push('기타');
+    r.카테고리목록 = cats;
+    data.push(r);
+  }
+  return data;
+}
+
+async function loadData() {
+  const status = document.getElementById('status');
+  const btn = document.getElementById('refreshBtn');
+  status.className = 'status loading';
+  status.innerHTML = '<span class="spinner"></span>Google 시트에서 최신 데이터를 가져오는 중...';
+  if (btn) btn.disabled = true;
+  try {
+    const url = CSV_URL + '&_=' + Date.now();
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    RAW_DATA = processRows(parseCSV(text));
+    if (RAW_DATA.length === 0) throw new Error('파싱된 데이터가 0건입니다');
+    document.getElementById('mainContent').classList.remove('hidden');
+    document.getElementById('updatedAt').textContent = '업데이트: ' + new Date().toLocaleString('ko-KR', { hour12: false });
+    status.className = 'status';
+    status.textContent = '✓ ' + RAW_DATA.length.toLocaleString() + '건 로드 (시트 캐시 TTL ~5분)';
+    populateFilters();
+    render();
+  } catch (e) {
+    status.className = 'status error';
+    status.textContent = '✗ 데이터 로드 실패: ' + e.message;
+    console.error(e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function makeChart(id, cfg) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart(document.getElementById(id), cfg); }
+
+function badge(cat) {
+  const cls = { '오버홀':'overhaul','수리':'repair','리페어':'refurbish','기기폐기':'etc','부품정리':'etc','기타':'etc' }[cat] || 'etc';
+  return '<span class="badge badge-' + cls + '">' + cat + '</span>';
+}
+
+function updateTrigger(field) {
+  const ms = document.querySelector('.ms[data-field="' + field + '"]');
+  const trigger = ms.querySelector('.ms-trigger');
+  const s = filterState[field];
+  if (s.size === 0) { trigger.textContent = '전체'; trigger.classList.remove('active'); }
+  else if (s.size === 1) { trigger.textContent = [...s][0]; trigger.classList.add('active'); }
+  else if (s.size <= 2) { trigger.textContent = [...s].join(', '); trigger.classList.add('active'); }
+  else { trigger.textContent = s.size + '개 선택'; trigger.classList.add('active'); }
+}
+
+function buildMenu(field, values) {
+  const ms = document.querySelector('.ms[data-field="' + field + '"]');
+  const menu = ms.querySelector('.ms-menu');
+  menu.innerHTML = '';
+  const actions = document.createElement('div'); actions.className = 'ms-actions';
+  const allBtn = document.createElement('button'); allBtn.type = 'button'; allBtn.textContent = '전체선택';
+  allBtn.onclick = (e) => { e.stopPropagation(); filterState[field] = new Set(values); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateTrigger(field); render(); };
+  const noneBtn = document.createElement('button'); noneBtn.type = 'button'; noneBtn.textContent = '전체해제';
+  noneBtn.onclick = (e) => { e.stopPropagation(); filterState[field].clear(); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateTrigger(field); render(); };
+  actions.appendChild(allBtn); actions.appendChild(noneBtn);
+  menu.appendChild(actions);
+  values.forEach(v => {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = v; cb.checked = filterState[field].has(v);
+    cb.onclick = (e) => e.stopPropagation();
+    cb.onchange = () => { if (cb.checked) filterState[field].add(v); else filterState[field].delete(v); updateTrigger(field); render(); };
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(' ' + v));
+    lbl.onclick = (e) => { if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); e.stopPropagation(); } };
+    menu.appendChild(lbl);
+  });
+}
+
+function populateFilters() {
+  const fieldDefs = { '년': null, '월': null, '주차별': null, '부서명': null, '담당자': null, '카테고리': ['오버홀','수리','리페어','기기폐기','부품정리','기타'] };
+  for (const [field, fixed] of Object.entries(fieldDefs)) {
+    let vals = fixed ? fixed : [...new Set(RAW_DATA.map(r => r[field]).filter(v => v))];
+    if (!fixed) {
+      if (field === '월') vals.sort((a,b)=>parseInt(a)-parseInt(b));
+      else if (field === '주차별') vals.sort(sortByWeek);
+      else if (field === '부서명') vals.sort(sortByDept);
+      else vals.sort();
+    }
+    buildMenu(field, vals);
+    updateTrigger(field);
+  }
+  document.querySelectorAll('.ms-trigger').forEach(t => {
+    t.onclick = (e) => {
+      e.stopPropagation();
+      const menu = t.nextElementSibling;
+      const wasHidden = menu.classList.contains('hidden');
+      document.querySelectorAll('.ms-menu').forEach(m => m.classList.add('hidden'));
+      if (wasHidden) menu.classList.remove('hidden');
+    };
+  });
+  document.addEventListener('click', () => { document.querySelectorAll('.ms-menu').forEach(m => m.classList.add('hidden')); });
+  document.getElementById('resetBtn').onclick = () => {
+    FILTER_FIELDS.forEach(f => {
+      filterState[f].clear();
+      const ms = document.querySelector('.ms[data-field="' + f + '"]');
+      ms.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      updateTrigger(f);
+    });
+    render();
+  };
+  document.getElementById('refreshBtn').onclick = loadData;
+}
+
+function applyFilters(data) {
+  return data.filter(r => {
+    for (const f of ['년','월','주차별','부서명','담당자']) {
+      if (filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
+    }
+    if (filterState.카테고리.size > 0 && !r.카테고리목록.some(c => filterState.카테고리.has(c))) return false;
+    return true;
+  });
+}
+
+function sortByWeek(a, b) {
+  const pa = a.match(/(\d+)월(\d+)주차/), pb = b.match(/(\d+)월(\d+)주차/);
+  if (!pa || !pb) return a.localeCompare(b);
+  return (parseInt(pa[1])*10 + parseInt(pa[2])) - (parseInt(pb[1])*10 + parseInt(pb[2]));
+}
+
+function countByCategory(rows) {
+  const c = {}; ALL_CATS.forEach(cat => c[cat] = 0);
+  rows.forEach(r => r.카테고리목록.forEach(cat => { if (c[cat] !== undefined) c[cat]++; }));
+  return c;
+}
+
+function groupByCategory(rows, keyField, sortFn) {
+  const m = new Map();
+  rows.forEach(r => {
+    const k = r[keyField] || '(미지정)';
+    if (!m.has(k)) { const z = { count: 0, time: 0 }; ALL_CATS.forEach(c => z[c] = 0); m.set(k, z); }
+    const o = m.get(k);
+    o.count++; o.time += r.소요시간;
+    r.카테고리목록.forEach(c => { if (o[c] !== undefined) o[c]++; });
+  });
+  let keys = [...m.keys()];
+  if (sortFn) keys.sort(sortFn); else keys.sort((a,b) => m.get(b).count - m.get(a).count);
+  return { map: m, keys };
+}
+
+function stackedDatasets(keys, map, cats) {
+  return cats.map(cat => ({ label: cat, data: keys.map(k => map.get(k)[cat] || 0), backgroundColor: CAT_COLORS[cat], stack: 'a' }));
+}
+
+function render() {
+  const data = applyFilters(RAW_DATA);
+  const mobile = isMobile();
+
+  document.getElementById('kpiCount').textContent = data.length.toLocaleString();
+  document.getElementById('kpiTime').textContent = data.reduce((s,r)=>s+r.소요시간,0).toLocaleString();
+  const cc = countByCategory(data);
+  document.getElementById('kpiOverhaul').textContent = cc.오버홀.toLocaleString();
+  document.getElementById('kpiRepair').textContent = cc.수리.toLocaleString();
+  document.getElementById('kpiRefurbish').textContent = cc.리페어.toLocaleString();
+
+  const legendOpt = { display: !mobile, position: mobile ? 'bottom' : 'top', labels: { boxWidth: 12, font: { size: mobile ? 10 : 12 } } };
+
+  const catKeys = ALL_CATS.filter(c => cc[c] > 0);
+  makeChart('categoryChart', { type: 'doughnut',
+    data: { labels: catKeys, datasets: [{ data: catKeys.map(c => cc[c]), backgroundColor: catKeys.map(c => CAT_COLORS[c]) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: mobile ? 'bottom' : 'right', labels: { font: { size: mobile ? 10 : 12 }, boxWidth: 12 } } } } });
+
+  const yearGroup = groupByCategory(data, '년', (a,b)=>a.localeCompare(b));
+  makeChart('yearCategoryChart', { type: 'bar',
+    data: { labels: yearGroup.keys, datasets: stackedDatasets(yearGroup.keys, yearGroup.map, ALL_CATS) },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const monthGroup = groupByCategory(data, '월', (a,b)=>parseInt(a)-parseInt(b));
+  makeChart('monthChart', { type: 'bar',
+    data: { labels: monthGroup.keys, datasets: stackedDatasets(monthGroup.keys, monthGroup.map, ALL_CATS) },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const overhaulRows = data.filter(r => /^오버홀/.test(r.오버홀품목) && r.모델명 && r.모델명.trim());
+  const modelTotals = {};
+  overhaulRows.forEach(r => { const m = r.모델명.trim(); modelTotals[m] = (modelTotals[m] || 0) + 1; });
+  const topModels = Object.keys(modelTotals).sort((a,b)=>modelTotals[b]-modelTotals[a]).slice(0, 10);
+  const modelMonths = [...new Set(overhaulRows.map(r => r.월))].sort((a,b)=>parseInt(a)-parseInt(b));
+  const modelMonthMatrix = {};
+  modelMonths.forEach(mo => { modelMonthMatrix[mo] = {}; topModels.forEach(t => modelMonthMatrix[mo][t] = 0); modelMonthMatrix[mo]['기타'] = 0; });
+  overhaulRows.forEach(r => {
+    const mo = r.월; if (!modelMonthMatrix[mo]) return;
+    const m = r.모델명.trim();
+    if (topModels.includes(m)) modelMonthMatrix[mo][m]++; else modelMonthMatrix[mo]['기타']++;
+  });
+  const hasEtc = modelMonths.some(mo => modelMonthMatrix[mo]['기타'] > 0);
+  const modelLabels = hasEtc ? [...topModels, '기타'] : topModels;
+  makeChart('monthModelChart', { type: 'bar',
+    data: { labels: modelMonths, datasets: modelLabels.map((mname, i) => ({
+      label: mname, data: modelMonths.map(mo => modelMonthMatrix[mo][mname] || 0),
+      backgroundColor: mname === '기타' ? '#a0aec0' : palette[i % palette.length], stack: 'm'
+    })) },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const modelTableTitle = document.getElementById('modelTableTitle');
+  modelTableTitle.textContent = '기종별 오버홀 통계 — 총 ' + Object.keys(modelTotals).length + '개 모델 (' + overhaulRows.length + '건 기준)';
+  const allModelsSorted = Object.keys(modelTotals).sort((a,b)=>modelTotals[b]-modelTotals[a]);
+  const modelMonthCounts = {};
+  allModelsSorted.forEach(m => { modelMonthCounts[m] = {}; modelMonths.forEach(mo => modelMonthCounts[m][mo] = 0); });
+  overhaulRows.forEach(r => { const m = r.모델명.trim(); if (modelMonthCounts[m]) modelMonthCounts[m][r.월] = (modelMonthCounts[m][r.월] || 0) + 1; });
+  const modelTbl = document.getElementById('modelTable');
+  const thead = modelTbl.querySelector('thead'); thead.innerHTML = '';
+  const hdrRow = document.createElement('tr');
+  hdrRow.innerHTML = '<th>모델명</th><th>총</th>' + modelMonths.map(mo => '<th>' + mo + '</th>').join('');
+  thead.appendChild(hdrRow);
+  const modelTb = modelTbl.querySelector('tbody'); modelTb.innerHTML = '';
+  allModelsSorted.forEach(m => {
+    const tr = document.createElement('tr');
+    const monthCells = modelMonths.map(mo => '<td class="num">' + (modelMonthCounts[m][mo] || '') + '</td>').join('');
+    tr.innerHTML = '<td style="text-align:left">' + m + '</td><td class="num"><b>' + modelTotals[m] + '</b></td>' + monthCells;
+    modelTb.appendChild(tr);
+  });
+
+  const weekGroup = groupByCategory(data, '주차별', sortByWeek);
+  makeChart('weekChart', { type: 'bar',
+    data: { labels: weekGroup.keys, datasets: stackedDatasets(weekGroup.keys, weekGroup.map, ALL_CATS) },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 9 : 11 }, autoSkip: false, maxRotation: 60, minRotation: 45 } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const deptGroup = groupByCategory(data, '부서명', sortByDept);
+  makeChart('deptChart', { type: 'bar',
+    data: { labels: deptGroup.keys, datasets: stackedDatasets(deptGroup.keys, deptGroup.map, ALL_CATS) },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const personGroup = groupByCategory(data, '담당자', null);
+  const top15 = [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).count - personGroup.map.get(a).count).slice(0, mobile ? 10 : 15);
+  makeChart('personChart', { type: 'bar',
+    data: { labels: top15, datasets: stackedDatasets(top15, personGroup.map, ALL_CATS) },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const oCount = {};
+  data.filter(r => r.오버홀품목).forEach(r => oCount[r.오버홀품목] = (oCount[r.오버홀품목] || 0) + 1);
+  const oLabels = Object.keys(oCount).sort((a,b)=>oCount[b]-oCount[a]);
+  makeChart('overhaulItemChart', { type: 'bar',
+    data: { labels: oLabels, datasets: [{ label: '건수', data: oLabels.map(k => oCount[k]), backgroundColor: oLabels.map((_,i) => palette[i % palette.length]) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const rCount = {};
+  data.filter(r => r.수리품목).forEach(r => rCount[r.수리품목] = (rCount[r.수리품목] || 0) + 1);
+  const rLabels = Object.keys(rCount).sort((a,b)=>rCount[b]-rCount[a]);
+  makeChart('repairItemChart', { type: 'bar',
+    data: { labels: rLabels, datasets: [{ label: '건수', data: rLabels.map(k => rCount[k]), backgroundColor: rLabels.map(k => k === '부품제조' ? '#3182ce' : '#d69e2e') }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+
+  const deptTb = document.querySelector('#deptTable tbody'); deptTb.innerHTML = '';
+  deptGroup.keys.forEach(k => {
+    const o = deptGroup.map.get(k);
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+k+'</td><td class="num">'+o.count+'</td><td class="num">'+o.오버홀+'</td><td class="num">'+o.수리+'</td><td class="num">'+o.리페어+'</td><td class="num">'+o.time.toLocaleString()+'</td>';
+    deptTb.appendChild(tr);
+  });
+
+  const personTb = document.querySelector('#personTable tbody'); personTb.innerHTML = '';
+  [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).count - personGroup.map.get(a).count).forEach(k => {
+    const o = personGroup.map.get(k);
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+k+'</td><td class="num">'+o.count+'</td><td class="num">'+o.오버홀+'</td><td class="num">'+o.수리+'</td><td class="num">'+o.리페어+'</td><td class="num">'+o.time.toLocaleString()+'</td>';
+    personTb.appendChild(tr);
+  });
+
+  const rawTb = document.querySelector('#rawTable tbody'); rawTb.innerHTML = '';
+  data.forEach(r => {
+    const tr = document.createElement('tr');
+    const cats = r.카테고리목록.map(badge).join(' ');
+    tr.innerHTML = '<td>'+r.번호+'</td><td>'+r.날짜+'</td><td>'+r.년+'</td><td>'+r.월+'</td><td>'+r.주차별+'</td><td>'+r.담당자+'</td><td>'+r.부서명+'</td><td>'+(r.오버홀품목||'')+'</td><td>'+(r.수리품목||'')+'</td><td>'+cats+'</td><td class="num">'+r.소요시간+'</td>';
+    rawTb.appendChild(tr);
+  });
+
+  document.getElementById('subtitle').textContent = '총 ' + RAW_DATA.length.toLocaleString() + '건 중 ' + data.length.toLocaleString() + '건';
+}
+
+// Re-render on viewport change (mobile <-> desktop switch)
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (RAW_DATA.length) render(); }, 250);
+});
+
+loadData();
+</script>
+</body>
+</html>
