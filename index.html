@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#2b6cb0">
 <title>오버홀·수리·리페어 통계 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
@@ -194,6 +195,18 @@
 
     <div class="grid full">
       <div class="card">
+        <h3 id="quotaTitle">정량 목표 달성 현황 (오버홀 기준 · 필터된 주차 단위)</h3>
+        <div class="scroll">
+          <table id="quotaTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid full">
+      <div class="card">
         <h3 id="modelTableTitle">기종별 오버홀 통계</h3>
         <div class="scroll">
           <table id="modelTable">
@@ -225,6 +238,19 @@ const HEADER_ROW_MARKER = '번호';
 const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '#3182ce', '기기폐기': '#e53e3e', '부품정리': '#805ad5', '기타': '#a0aec0' };
 const ALL_CATS = ['오버홀','수리','리페어','기기폐기','부품정리','기타'];
 const DEPT_ORDER = ['CSS', '강북A', '강서B', '강남C', '경기D', '외부인력'];
+
+// === 정량 목표 (주간 오버홀 건수 기준) ===
+// 시트의 부서명 컬럼이 '퇴사자'인 행은 자동으로 제외됩니다.
+// 아래에 담당자별 주간 목표를 입력하세요. 명단에 없는 사람은 DEFAULT 값 적용.
+const PERSON_WEEKLY_QUOTA = {
+  // '엄재현': 8,
+  // '안수복': 5,
+  // 예시 — 실제 목표치로 바꿔서 입력해 주세요
+};
+const DEFAULT_WEEKLY_QUOTA = 3;
+function quotaOf(person) { return PERSON_WEEKLY_QUOTA[person] ?? DEFAULT_WEEKLY_QUOTA; }
+
+if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
 function sortByDept(a, b) {
   const ia = DEPT_ORDER.indexOf(a), ib = DEPT_ORDER.indexOf(b);
   if (ia === -1 && ib === -1) return a.localeCompare(b);
@@ -288,6 +314,8 @@ function processRows(allRows) {
     if (r.오버홀품목 === '기기폐기' || r.오버홀품목 === '부품정리') cats.push(r.오버홀품목);
     if (cats.length === 0) cats.push('기타');
     r.카테고리목록 = cats;
+    // 부서명이 '퇴사자'인 행은 통계에서 제외
+    if (r.부서명 === '퇴사자') continue;
     data.push(r);
   }
   return data;
@@ -450,19 +478,32 @@ function render() {
   const legendOpt = { display: !mobile, position: mobile ? 'bottom' : 'top', labels: { boxWidth: 12, font: { size: mobile ? 10 : 12 } } };
 
   const catKeys = ALL_CATS.filter(c => cc[c] > 0);
+  const catTotal = catKeys.reduce((s,c) => s + cc[c], 0);
   makeChart('categoryChart', { type: 'doughnut',
-    data: { labels: catKeys, datasets: [{ data: catKeys.map(c => cc[c]), backgroundColor: catKeys.map(c => CAT_COLORS[c]) }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: mobile ? 'bottom' : 'right', labels: { font: { size: mobile ? 10 : 12 }, boxWidth: 12 } } } } });
+    data: { labels: catKeys, datasets: [{ data: catKeys.map(c => cc[c]), backgroundColor: catKeys.map(c => CAT_COLORS[c]), borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: {
+      legend: { position: mobile ? 'bottom' : 'right', labels: { font: { size: mobile ? 10 : 12 }, boxWidth: 12,
+        generateLabels: (chart) => chart.data.labels.map((label, i) => {
+          const v = chart.data.datasets[0].data[i];
+          const pct = catTotal > 0 ? (v / catTotal * 100).toFixed(1) : 0;
+          return { text: label + ' (' + pct + '%, ' + v + '건)', fillStyle: chart.data.datasets[0].backgroundColor[i], strokeStyle: '#fff', lineWidth: 1, index: i };
+        }) } },
+      datalabels: {
+        display: true,
+        formatter: (value) => { const pct = catTotal > 0 ? (value / catTotal * 100) : 0; return pct >= 3 ? pct.toFixed(1) + '%' : ''; },
+        color: '#fff', font: { weight: 'bold', size: mobile ? 11 : 13 }, textStrokeColor: 'rgba(0,0,0,0.4)', textStrokeWidth: 2
+      }
+    } } });
 
   const yearGroup = groupByCategory(data, '년', (a,b)=>a.localeCompare(b));
   makeChart('yearCategoryChart', { type: 'bar',
     data: { labels: yearGroup.keys, datasets: stackedDatasets(yearGroup.keys, yearGroup.map, ALL_CATS) },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const monthGroup = groupByCategory(data, '월', (a,b)=>parseInt(a)-parseInt(b));
   makeChart('monthChart', { type: 'bar',
     data: { labels: monthGroup.keys, datasets: stackedDatasets(monthGroup.keys, monthGroup.map, ALL_CATS) },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const overhaulRows = data.filter(r => /^오버홀/.test(r.오버홀품목) && r.모델명 && r.모델명.trim());
   const modelTotals = {};
@@ -483,7 +524,7 @@ function render() {
       label: mname, data: modelMonths.map(mo => modelMonthMatrix[mo][mname] || 0),
       backgroundColor: mname === '기타' ? '#a0aec0' : palette[i % palette.length], stack: 'm'
     })) },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const modelTableTitle = document.getElementById('modelTableTitle');
   modelTableTitle.textContent = '기종별 오버홀 통계 — 총 ' + Object.keys(modelTotals).length + '개 모델 (' + overhaulRows.length + '건 기준)';
@@ -504,38 +545,77 @@ function render() {
     modelTb.appendChild(tr);
   });
 
+  // === 정량 목표 달성 현황 (오버홀만 카운트, 주차별) ===
+  const overhaulOnly = data.filter(r => r.카테고리목록.includes('오버홀'));
+  const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
+  const quotaPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))];
+  const personWeekCount = {};
+  quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
+  overhaulOnly.forEach(r => {
+    if (r.담당자 && r.주차별 && personWeekCount[r.담당자]) {
+      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + 1;
+    }
+  });
+  const quotaPersonsSorted = [...quotaPersons].sort((a,b) => {
+    const ta = quotaWeeks.reduce((s,w) => s + (personWeekCount[a][w] || 0), 0);
+    const tb = quotaWeeks.reduce((s,w) => s + (personWeekCount[b][w] || 0), 0);
+    return tb - ta;
+  });
+  document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황 (오버홀 · ' + quotaWeeks.length + '개 주차 · 기본 주간목표 ' + DEFAULT_WEEKLY_QUOTA + '건)';
+  const qTbl = document.getElementById('quotaTable');
+  const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
+  const qHdr = document.createElement('tr');
+  qHdr.innerHTML = '<th>담당자</th><th>주간 목표</th>' + quotaWeeks.map(w => '<th>' + w + '</th>').join('') + '<th>총 실적</th><th>총 목표</th><th>달성률</th>';
+  qThead.appendChild(qHdr);
+  const qBody = qTbl.querySelector('tbody'); qBody.innerHTML = '';
+  quotaPersonsSorted.forEach(p => {
+    const tr = document.createElement('tr');
+    const q = quotaOf(p);
+    const cells = quotaWeeks.map(w => {
+      const v = personWeekCount[p][w] || 0;
+      const cls = v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"');
+      return '<td class="num" ' + cls + '>' + v + '</td>';
+    }).join('');
+    const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
+    const target = q * quotaWeeks.length;
+    const pct = target > 0 ? Math.round(total / target * 100) : 0;
+    const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
+    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num"><b>' + total + '</b></td><td class="num">' + target + '</td><td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
+    qBody.appendChild(tr);
+  });
+
   const weekGroup = groupByCategory(data, '주차별', sortByWeek);
   makeChart('weekChart', { type: 'bar',
     data: { labels: weekGroup.keys, datasets: stackedDatasets(weekGroup.keys, weekGroup.map, ALL_CATS) },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 9 : 11 }, autoSkip: false, maxRotation: 60, minRotation: 45 } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 9 : 11 }, autoSkip: false, maxRotation: 60, minRotation: 45 } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const deptGroup = groupByCategory(data, '부서명');
   const sumCatsDept = (m, k) => ALL_CATS.reduce((s, c) => s + (m.get(k)[c] || 0), 0);
   deptGroup.keys.sort((a,b) => sumCatsDept(deptGroup.map, b) - sumCatsDept(deptGroup.map, a));
   makeChart('deptChart', { type: 'bar',
     data: { labels: deptGroup.keys, datasets: stackedDatasets(deptGroup.keys, deptGroup.map, ALL_CATS) },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const personGroup = groupByCategory(data, '담당자', null);
   const sumCats = (m, k) => ALL_CATS.reduce((s, c) => s + (m.get(k)[c] || 0), 0);
   const topN = [...personGroup.keys].sort((a,b)=> sumCats(personGroup.map, b) - sumCats(personGroup.map, a)).slice(0, 10);
   makeChart('personChart', { type: 'bar',
     data: { labels: topN, datasets: stackedDatasets(topN, personGroup.map, ALL_CATS) },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const oCount = {};
   data.filter(r => r.오버홀품목).forEach(r => oCount[r.오버홀품목] = (oCount[r.오버홀품목] || 0) + 1);
   const oLabels = Object.keys(oCount).sort((a,b)=>oCount[b]-oCount[a]);
   makeChart('overhaulItemChart', { type: 'bar',
     data: { labels: oLabels, datasets: [{ label: '건수', data: oLabels.map(k => oCount[k]), backgroundColor: oLabels.map((_,i) => palette[i % palette.length]) }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const rCount = {};
   data.filter(r => r.수리품목).forEach(r => rCount[r.수리품목] = (rCount[r.수리품목] || 0) + 1);
   const rLabels = Object.keys(rCount).sort((a,b)=>rCount[b]-rCount[a]);
   makeChart('repairItemChart', { type: 'bar',
     data: { labels: rLabels, datasets: [{ label: '건수', data: rLabels.map(k => rCount[k]), backgroundColor: rLabels.map(k => k === '부품제조' ? '#3182ce' : '#d69e2e') }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } }, scales: { x: { ticks: { font: { size: mobile ? 9 : 11 } } }, y: { beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const deptTb = document.querySelector('#deptTable tbody'); deptTb.innerHTML = '';
   deptGroup.keys.forEach(k => {
