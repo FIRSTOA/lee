@@ -163,7 +163,7 @@
 
     <div class="grid">
       <div class="card"><h3>부서별 작업량 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
-      <div class="card"><h3>담당자 TOP 15 (소요시간 기준)</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
+      <div class="card"><h3>담당자 TOP 15 (작업건수 기준)</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
     </div>
 
     <div class="grid">
@@ -515,7 +515,7 @@ function render() {
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const personGroup = groupByCategory(data, '담당자', null);
-  const top15 = [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).time - personGroup.map.get(a).time).slice(0, mobile ? 10 : 15);
+  const top15 = [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).count - personGroup.map.get(a).count).slice(0, mobile ? 10 : 15);
   makeChart('personChart', { type: 'bar',
     data: { labels: top15, datasets: stackedDatasets(top15, personGroup.map, ALL_CATS) },
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
