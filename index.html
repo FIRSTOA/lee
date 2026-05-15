@@ -510,12 +510,15 @@ function render() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 9 : 11 }, autoSkip: false, maxRotation: 60, minRotation: 45 } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const deptGroup = groupByCategory(data, '부서명');
+  const sumCatsDept = (m, k) => ALL_CATS.reduce((s, c) => s + (m.get(k)[c] || 0), 0);
+  deptGroup.keys.sort((a,b) => sumCatsDept(deptGroup.map, b) - sumCatsDept(deptGroup.map, a));
   makeChart('deptChart', { type: 'bar',
     data: { labels: deptGroup.keys, datasets: stackedDatasets(deptGroup.keys, deptGroup.map, ALL_CATS) },
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
   const personGroup = groupByCategory(data, '담당자', null);
-  const topN = [...personGroup.keys].sort((a,b)=> personGroup.map.get(b).count - personGroup.map.get(a).count).slice(0, 10);
+  const sumCats = (m, k) => ALL_CATS.reduce((s, c) => s + (m.get(k)[c] || 0), 0);
+  const topN = [...personGroup.keys].sort((a,b)=> sumCats(personGroup.map, b) - sumCats(personGroup.map, a)).slice(0, 10);
   makeChart('personChart', { type: 'bar',
     data: { labels: topN, datasets: stackedDatasets(topN, personGroup.map, ALL_CATS) },
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: legendOpt }, scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
