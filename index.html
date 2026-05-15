@@ -7,6 +7,7 @@
 <title>오버홀·수리·리페어 통계 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
@@ -51,8 +52,22 @@
   .kpi.time { border-left-color: #805ad5; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid.full { grid-template-columns: 1fr; }
-  .card { background: #fff; padding: 16px 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-  .card h3 { margin: 0 0 10px; font-size: 14px; color: #2d3748; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; }
+  .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dashboard-grid .card.full-width { grid-column: 1 / -1; }
+  .card { background: #fff; padding: 16px 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative; }
+  .card h3 { margin: 0 0 10px; font-size: 14px; color: #2d3748; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card h3 .title-text { flex: 1; min-width: 0; }
+  .card h3 .card-controls { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+  .card h3 .card-controls button { background: transparent; border: 1px solid transparent; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 14px; color: #a0aec0; line-height: 1; }
+  .card h3 .card-controls .drag-handle { cursor: grab; user-select: none; }
+  .card h3 .card-controls .drag-handle:active { cursor: grabbing; }
+  .card h3 .card-controls button:hover { background: #edf2f7; color: #4a5568; border-color: #cbd5e0; }
+  .card h3 .card-controls .hide-btn:hover { background: #fed7d7; color: #c53030; border-color: #feb2b2; }
+  .card.dragging { opacity: 0.5; }
+  .card.drag-ghost { background: #ebf8ff !important; border: 2px dashed #2b6cb0; opacity: 0.8; }
+  .card.hidden { display: none; }
+  .btn.layout { background: #2c5282; color: #fff; }
+  .btn.layout:hover { background: #2a4365; }
   .chart-wrap { position: relative; height: 320px; }
   .chart-wrap.tall { height: 380px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -169,6 +184,7 @@
       <button class="btn reset" id="resetBtn">초기화</button>
       <button class="btn refresh" id="refreshBtn">새로고침</button>
       <button class="btn settings" id="quotaSettingsBtn">⚙ 정량 목표 설정</button>
+      <button class="btn layout" id="layoutBtn">🎨 차트 표시 설정</button>
     </div>
 
     <div class="kpis">
@@ -179,33 +195,18 @@
       <div class="kpi refurbish"><div class="label">리페어</div><div class="value"><span id="kpiRefurbish">0</span><span class="unit">건</span></div></div>
     </div>
 
-    <div class="grid">
-      <div class="card"><h3>작업유형별 비중</h3><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></div>
-      <div class="card"><h3>년도별 작업유형 비교</h3><div class="chart-wrap"><canvas id="yearCategoryChart"></canvas></div></div>
-    </div>
-
-    <div class="grid">
-      <div class="card"><h3>월별 추이 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="monthChart"></canvas></div></div>
-      <div class="card"><h3>월별 오버홀 기종 분포 (TOP 10)</h3><div class="chart-wrap tall"><canvas id="monthModelChart"></canvas></div></div>
-    </div>
-
-    <div class="grid full">
-      <div class="card"><h3>주차별 추이 (작업유형 누적)</h3><div class="chart-wrap tall"><canvas id="weekChart"></canvas></div></div>
-    </div>
-
-    <div class="grid">
-      <div class="card"><h3>부서별 순위</h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
-      <div class="card"><h3>담당자 TOP 10</h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
-    </div>
-
-    <div class="grid">
-      <div class="card"><h3>오버홀 품목별 분포</h3><div class="chart-wrap"><canvas id="overhaulItemChart"></canvas></div></div>
-      <div class="card"><h3>수리/리페어 품목별 분포</h3><div class="chart-wrap"><canvas id="repairItemChart"></canvas></div></div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3>부서별 상세 통계</h3>
+    <div class="dashboard-grid" id="dashboardGrid">
+      <div class="card" data-card-id="category" data-card-name="작업유형별 비중"><h3><span class="title-text">작업유형별 비중</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></div>
+      <div class="card" data-card-id="yearCategory" data-card-name="년도별 작업유형 비교"><h3><span class="title-text">년도별 작업유형 비교</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap"><canvas id="yearCategoryChart"></canvas></div></div>
+      <div class="card" data-card-id="month" data-card-name="월별 추이"><h3><span class="title-text">월별 추이 (작업유형 누적)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap tall"><canvas id="monthChart"></canvas></div></div>
+      <div class="card" data-card-id="monthModel" data-card-name="월별 오버홀 기종 분포"><h3><span class="title-text">월별 오버홀 기종 분포 (TOP 10)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap tall"><canvas id="monthModelChart"></canvas></div></div>
+      <div class="card full-width" data-card-id="week" data-card-name="주차별 추이"><h3><span class="title-text">주차별 추이 (작업유형 누적)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap tall"><canvas id="weekChart"></canvas></div></div>
+      <div class="card" data-card-id="dept" data-card-name="부서별 순위"><h3><span class="title-text">부서별 순위</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap tall"><canvas id="deptChart"></canvas></div></div>
+      <div class="card" data-card-id="person" data-card-name="담당자 TOP 10"><h3><span class="title-text">담당자 TOP 10</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap tall"><canvas id="personChart"></canvas></div></div>
+      <div class="card" data-card-id="overhaulItem" data-card-name="오버홀 품목별 분포"><h3><span class="title-text">오버홀 품목별 분포</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap"><canvas id="overhaulItemChart"></canvas></div></div>
+      <div class="card" data-card-id="repairItem" data-card-name="수리/리페어 품목별 분포"><h3><span class="title-text">수리/리페어 품목별 분포</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3><div class="chart-wrap"><canvas id="repairItemChart"></canvas></div></div>
+      <div class="card" data-card-id="deptTable" data-card-name="부서별 상세 통계">
+        <h3><span class="title-text">부서별 상세 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
         <div class="scroll">
           <table id="deptTable">
             <thead><tr><th>부서</th><th>건수</th><th>오버홀</th><th>수리</th><th>리페어</th><th>소요시간(분)</th></tr></thead>
@@ -213,8 +214,8 @@
           </table>
         </div>
       </div>
-      <div class="card">
-        <h3>담당자별 상세 통계</h3>
+      <div class="card" data-card-id="personTable" data-card-name="담당자별 상세 통계">
+        <h3><span class="title-text">담당자별 상세 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
         <div class="scroll">
           <table id="personTable">
             <thead><tr><th>담당자</th><th>건수</th><th>오버홀</th><th>수리</th><th>리페어</th><th>소요시간(분)</th></tr></thead>
@@ -222,11 +223,8 @@
           </table>
         </div>
       </div>
-    </div>
-
-    <div class="grid full">
-      <div class="card">
-        <h3 id="quotaTitle">정량 목표 달성 현황 (오버홀 기준)</h3>
+      <div class="card full-width" data-card-id="quotaTable" data-card-name="정량 목표 달성 현황">
+        <h3><span class="title-text" id="quotaTitle">정량 목표 달성 현황 (오버홀 기준)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
         <div class="quota-filters">
           <div class="ms-field">년도<div class="ms" data-qfield="년"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
           <div class="ms-field">월<div class="ms" data-qfield="월"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
@@ -241,11 +239,8 @@
           </table>
         </div>
       </div>
-    </div>
-
-    <div class="grid full">
-      <div class="card">
-        <h3 id="modelTableTitle">기종별 오버홀 통계</h3>
+      <div class="card full-width" data-card-id="modelTable" data-card-name="기종별 오버홀 통계">
+        <h3><span class="title-text" id="modelTableTitle">기종별 오버홀 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
         <div class="scroll">
           <table id="modelTable">
             <thead><tr><th>모델명</th><th>총 작업수</th></tr></thead>
@@ -253,11 +248,8 @@
           </table>
         </div>
       </div>
-    </div>
-
-    <div class="grid full">
-      <div class="card">
-        <h3>원본 데이터 (필터 적용)</h3>
+      <div class="card full-width" data-card-id="rawTable" data-card-name="원본 데이터">
+        <h3><span class="title-text">원본 데이터 (필터 적용)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
         <div class="scroll">
           <table id="rawTable">
             <thead><tr><th>번호</th><th>날짜</th><th>년</th><th>월</th><th>주차</th><th>담당자</th><th>부서</th><th>오버홀품목</th><th>수리품목</th><th>유형</th><th>소요시간</th></tr></thead>
@@ -265,6 +257,23 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 차트 표시 설정 모달 -->
+<div id="layoutModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>차트 표시 설정</h2>
+    <div class="sub">보이고 싶은 차트만 체크하세요. 카드의 ☰ 아이콘을 끌어서 순서를 바꿀 수 있습니다. 설정은 브라우저에 자동 저장됩니다.</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn-add" id="showAllBtn" style="background:#38a169;color:#fff;padding:6px 14px;border:none;border-radius:5px;cursor:pointer;font-size:13px">전체 표시</button>
+      <button class="btn-add" id="hideAllBtn" style="background:#e53e3e;color:#fff;padding:6px 14px;border:none;border-radius:5px;cursor:pointer;font-size:13px">전체 숨김</button>
+      <button class="btn-add" id="resetLayoutBtn" style="background:#718096;color:#fff;padding:6px 14px;border:none;border-radius:5px;cursor:pointer;font-size:13px">순서 초기화</button>
+    </div>
+    <div id="layoutCardList" style="display:flex;flex-direction:column;gap:4px"></div>
+    <div class="actions">
+      <button class="cancel" id="closeLayoutBtn">닫기</button>
     </div>
   </div>
 </div>
@@ -322,6 +331,93 @@ const quotaFilterState = {};
 QUOTA_FILTER_FIELDS.forEach(f => quotaFilterState[f] = new Set());
 
 if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+
+// === 카드 레이아웃 (표시/순서) — localStorage 저장 ===
+const LAYOUT_STORAGE_KEY = 'overhaul_layout_v1';
+function loadLayout() {
+  try { const s = localStorage.getItem(LAYOUT_STORAGE_KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return { hidden: [], order: [] };
+}
+function saveLayout(l) { localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(l)); }
+let layoutConfig = loadLayout();
+
+function applyLayout() {
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+  const cards = Array.from(grid.querySelectorAll(':scope > .card'));
+  // 순서 적용
+  if (layoutConfig.order && layoutConfig.order.length > 0) {
+    const byId = {};
+    cards.forEach(c => { byId[c.dataset.cardId] = c; });
+    layoutConfig.order.forEach(id => { if (byId[id]) grid.appendChild(byId[id]); });
+    // 새로 추가된(저장 안 된) 카드는 그대로 끝에
+    cards.forEach(c => { if (!layoutConfig.order.includes(c.dataset.cardId)) grid.appendChild(c); });
+  }
+  // 숨김 적용
+  cards.forEach(c => {
+    if (layoutConfig.hidden.includes(c.dataset.cardId)) c.classList.add('hidden');
+    else c.classList.remove('hidden');
+  });
+}
+
+function initCardControls() {
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+  // 숨김 버튼
+  grid.querySelectorAll('.hide-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const card = btn.closest('.card');
+      const id = card.dataset.cardId;
+      if (!layoutConfig.hidden.includes(id)) layoutConfig.hidden.push(id);
+      card.classList.add('hidden');
+      saveLayout(layoutConfig);
+    };
+  });
+  // SortableJS 초기화
+  if (typeof Sortable !== 'undefined') {
+    Sortable.create(grid, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'drag-ghost',
+      dragClass: 'dragging',
+      onEnd: () => {
+        const newOrder = Array.from(grid.querySelectorAll(':scope > .card')).map(c => c.dataset.cardId);
+        layoutConfig.order = newOrder;
+        saveLayout(layoutConfig);
+      }
+    });
+  }
+}
+
+function openLayoutModal() {
+  const grid = document.getElementById('dashboardGrid');
+  const cards = Array.from(grid.querySelectorAll(':scope > .card'));
+  const list = document.getElementById('layoutCardList');
+  list.innerHTML = '';
+  cards.forEach(card => {
+    const id = card.dataset.cardId;
+    const name = card.dataset.cardName;
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;padding:8px 10px;background:#f7fafc;border-radius:5px;cursor:pointer;font-size:13px;gap:8px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = !layoutConfig.hidden.includes(id);
+    cb.onchange = () => {
+      if (cb.checked) {
+        layoutConfig.hidden = layoutConfig.hidden.filter(x => x !== id);
+        card.classList.remove('hidden');
+      } else {
+        if (!layoutConfig.hidden.includes(id)) layoutConfig.hidden.push(id);
+        card.classList.add('hidden');
+      }
+      saveLayout(layoutConfig);
+    };
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(name));
+    list.appendChild(row);
+  });
+  document.getElementById('layoutModal').classList.remove('hidden');
+}
 function sortByDept(a, b) {
   const ia = DEPT_ORDER.indexOf(a), ib = DEPT_ORDER.indexOf(b);
   if (ia === -1 && ib === -1) return a.localeCompare(b);
@@ -762,6 +858,25 @@ function renderQuotaConfigTable(tmp) {
 }
 
 document.getElementById('quotaSettingsBtn').onclick = openQuotaModal;
+document.getElementById('layoutBtn').onclick = openLayoutModal;
+document.getElementById('closeLayoutBtn').onclick = () => document.getElementById('layoutModal').classList.add('hidden');
+document.getElementById('layoutModal').onclick = (e) => { if (e.target.id === 'layoutModal') document.getElementById('layoutModal').classList.add('hidden'); };
+document.getElementById('showAllBtn').onclick = () => {
+  layoutConfig.hidden = []; saveLayout(layoutConfig);
+  document.querySelectorAll('#dashboardGrid > .card').forEach(c => c.classList.remove('hidden'));
+  openLayoutModal();
+};
+document.getElementById('hideAllBtn').onclick = () => {
+  const ids = Array.from(document.querySelectorAll('#dashboardGrid > .card')).map(c => c.dataset.cardId);
+  layoutConfig.hidden = ids; saveLayout(layoutConfig);
+  document.querySelectorAll('#dashboardGrid > .card').forEach(c => c.classList.add('hidden'));
+  openLayoutModal();
+};
+document.getElementById('resetLayoutBtn').onclick = () => {
+  if (!confirm('카드 순서를 초기 상태로 되돌립니다. 진행할까요?')) return;
+  layoutConfig.order = []; saveLayout(layoutConfig);
+  location.reload();
+};
 document.getElementById('closeQuotaBtn').onclick = closeQuotaModal;
 quotaModal.onclick = (e) => { if (e.target === quotaModal) closeQuotaModal(); };
 document.getElementById('addPersonBtn').onclick = () => {
@@ -857,6 +972,10 @@ function applyQuotaFilters(rows) {
     return true;
   });
 }
+
+// 카드 레이아웃 적용 (저장된 순서 + 숨김 상태)
+applyLayout();
+initCardControls();
 
 loadData();
 </script>
