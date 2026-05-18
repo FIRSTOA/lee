@@ -357,7 +357,7 @@
 
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQU9um9z8bbHSMpIs1B-kP6FZ1sSCR1HoUIaN7IG8zGaQMGaAAVWa-SjXZaiKiSPxStK0KR_hitGKRA/pub?output=csv&gid=0&single=true';
-const HEADER_ROW_MARKER = '번호';
+const HEADER_ROW_MARKERS = ['번호', '1열'];  // 컬럼 A 헤더가 둘 중 하나면 데이터 시작 행으로 인식
 
 const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '#3182ce', '기기폐기': '#e53e3e', '부품정리': '#805ad5', '기타': '#a0aec0' };
 const ALL_CATS = ['오버홀','수리','리페어','기기폐기','부품정리','기타'];
@@ -536,11 +536,24 @@ function parseCSV(text) {
 
 function processRows(allRows) {
   let headerIdx = -1;
+  // 1차: 컬럼 A 값이 알려진 마커(번호/1열) 중 하나면 헤더
   for (let i = 0; i < allRows.length; i++) {
-    if (allRows[i][0] && allRows[i][0].trim() === HEADER_ROW_MARKER) { headerIdx = i; break; }
+    const c0 = (allRows[i][0] || '').trim();
+    if (HEADER_ROW_MARKERS.includes(c0)) { headerIdx = i; break; }
   }
-  if (headerIdx < 0) throw new Error('헤더(번호 열)를 찾을 수 없습니다');
+  // 2차: 마커로 못 찾으면 "날짜" + "담당자" 둘 다 포함된 행을 헤더로 판정
+  if (headerIdx < 0) {
+    for (let i = 0; i < allRows.length; i++) {
+      const trimmed = (allRows[i] || []).map(c => (c || '').trim());
+      if (trimmed.includes('날짜') && trimmed.includes('담당자')) { headerIdx = i; break; }
+    }
+  }
+  if (headerIdx < 0) throw new Error('헤더 행을 찾을 수 없습니다 (1열 ~ 날짜 ~ 담당자 칸 확인)');
   const headers = allRows[headerIdx].map(h => h.trim());
+  // 표준 헤더 이름으로 변환 ('1열' → '번호')
+  for (let j = 0; j < headers.length; j++) {
+    if (headers[j] === '1열') headers[j] = '번호';
+  }
   const data = [];
   for (let i = headerIdx + 1; i < allRows.length; i++) {
     const cols = allRows[i];
