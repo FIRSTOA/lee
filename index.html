@@ -141,6 +141,19 @@
     .card.expanded .scroll { display: block; }
     /* 카드 사이 간격 줄임 */
     .dashboard-grid { gap: 8px; }
+    /* 터치 영역 키우기 (드래그/숨김 버튼) */
+    .card h3 .card-controls button { min-width: 32px; min-height: 32px; font-size: 18px; padding: 4px 8px; }
+    .card h3 .card-controls { gap: 6px; }
+    /* 정량 목표 표에 가로 스와이프 안내 */
+    .card[data-card-id="quotaTable"] .scroll { overflow-x: auto; position: relative; }
+    .card[data-card-id="quotaTable"] .scroll::before {
+      content: '← 좌우로 스와이프 →'; display: block; text-align: center;
+      font-size: 11px; color: #a0aec0; padding: 4px 0; background: #f7fafc;
+      border-bottom: 1px solid #edf2f7; position: sticky; top: 0; z-index: 5;
+    }
+    /* 필터 드롭다운: 화면 밖으로 나가지 않게 보정 */
+    .ms-menu { left: 0; right: auto; max-width: calc(100vw - 30px); }
+    .quota-filters .ms-menu { left: 0; max-width: calc(100vw - 60px); }
   }
 
   /* === 모바일 (≤600px) === */
@@ -174,6 +187,19 @@
     table { font-size: 11px; }
     table th, table td { padding: 4px 6px; }
     .scroll { max-height: 320px; -webkit-overflow-scrolling: touch; overflow-x: auto; }
+  }
+
+  /* 모바일에서 모달 풀스크린 가까이 */
+  @media (max-width: 600px) {
+    .modal-overlay { padding: 10px; }
+    .modal { padding: 16px; max-height: 95vh; }
+    .modal h2 { font-size: 16px; }
+    .modal .field-row { flex-wrap: wrap; }
+    .modal input[type="text"] { width: 100%; }
+    .modal input[type="number"] { width: 100px; }
+    .modal .add-row { flex-wrap: wrap; }
+    .modal .qtable td input[type="number"] { width: 70px; }
+    .modal .actions button { flex: 1; min-width: 0; }
   }
 
   /* === 작은 모바일 (≤380px) === */
@@ -696,7 +722,7 @@ function render() {
   document.getElementById('kpiRepair').textContent = cc.수리.toLocaleString();
   document.getElementById('kpiRefurbish').textContent = cc.리페어.toLocaleString();
 
-  const legendOpt = { display: !mobile, position: mobile ? 'bottom' : 'top', labels: { boxWidth: 12, font: { size: mobile ? 10 : 12 } } };
+  const legendOpt = { display: true, position: mobile ? 'bottom' : 'top', labels: { boxWidth: 10, padding: mobile ? 6 : 10, font: { size: mobile ? 10 : 12 } } };
 
   const catKeys = ALL_CATS.filter(c => cc[c] > 0);
   const catTotal = catKeys.reduce((s,c) => s + cc[c], 0);
