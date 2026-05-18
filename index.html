@@ -117,9 +117,30 @@
   /* === 태블릿 (≤900px) === */
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .dashboard-grid .card.full-width { grid-column: auto; }
     header { padding: 14px 16px; }
     header h1 { font-size: 18px; }
     .container { padding: 12px; }
+  }
+
+  /* === 모바일 아코디언 (≤768px) === */
+  @media (max-width: 768px) {
+    /* 카드 헤더 탭 영역 강조 */
+    .card h3 { cursor: pointer; user-select: none; padding: 4px 0 8px; margin-bottom: 0; border-bottom: 1px solid #edf2f7; }
+    .card h3 .title-text { display: flex; align-items: center; gap: 6px; }
+    .card h3 .title-text::before {
+      content: '▶'; font-size: 10px; color: #2b6cb0; transition: transform 0.2s;
+      display: inline-block; flex-shrink: 0;
+    }
+    .card.expanded h3 .title-text::before { transform: rotate(90deg); }
+    /* 펼침/접힘: h3가 아닌 모든 자식 숨김. expanded일 때만 표시 */
+    .card > *:not(h3) { display: none; }
+    .card.expanded > *:not(h3) { display: block; margin-top: 10px; }
+    .card.expanded .quota-filters { display: flex; }
+    .card.expanded .scroll { display: block; }
+    /* 카드 사이 간격 줄임 */
+    .dashboard-grid { gap: 8px; }
   }
 
   /* === 모바일 (≤600px) === */
@@ -144,20 +165,24 @@
     .kpi .value { font-size: 18px; }
     .kpi .unit { font-size: 10px; }
 
-    .card { padding: 12px 12px; }
-    .card h3 { font-size: 13px; margin-bottom: 8px; }
-    .chart-wrap { height: 260px; }
-    .chart-wrap.tall { height: 300px; }
+    .card { padding: 10px 12px; }
+    .card h3 { font-size: 13px; }
+    .card.expanded .chart-wrap { height: 280px; }
+    .card.expanded .chart-wrap.tall { height: 320px; }
+    .card h3 .card-controls button { padding: 4px 8px; font-size: 16px; }
 
     table { font-size: 11px; }
     table th, table td { padding: 4px 6px; }
-    .scroll { max-height: 320px; -webkit-overflow-scrolling: touch; }
+    .scroll { max-height: 320px; -webkit-overflow-scrolling: touch; overflow-x: auto; }
   }
 
   /* === 작은 모바일 (≤380px) === */
   @media (max-width: 380px) {
     .ms-field { flex: 1 1 100%; }
     .filters button.btn { flex: 1 1 100%; }
+    .card.expanded .chart-wrap { height: 240px; }
+    .card.expanded .chart-wrap.tall { height: 280px; }
+    .card h3 { font-size: 12px; }
   }
 </style>
 </head>
@@ -363,7 +388,7 @@ function applyLayout() {
 function initCardControls() {
   const grid = document.getElementById('dashboardGrid');
   if (!grid) return;
-  // 숨김 버튼
+  // 숨김 버튼 (이벤트 전파 차단해서 아코디언 안 열리게)
   grid.querySelectorAll('.hide-btn').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
@@ -374,13 +399,41 @@ function initCardControls() {
       saveLayout(layoutConfig);
     };
   });
-  // SortableJS 초기화
+  // 드래그 핸들 — 클릭만으로 아코디언 안 열리게
+  grid.querySelectorAll('.drag-handle').forEach(btn => {
+    btn.onclick = (e) => e.stopPropagation();
+  });
+  // 모바일 아코디언: h3 탭 → expand/collapse 토글
+  grid.querySelectorAll(':scope > .card').forEach(card => {
+    const h3 = card.querySelector('h3');
+    if (!h3) return;
+    h3.addEventListener('click', (e) => {
+      // 컨트롤 버튼 클릭이면 무시 (위에서 stopPropagation 해뒀지만 안전장치)
+      if (e.target.closest('.card-controls')) return;
+      // 모바일에서만 작동
+      if (!window.matchMedia('(max-width: 768px)').matches) return;
+      card.classList.toggle('expanded');
+      // 펼친 직후 차트 리사이즈 (안 그러면 0크기로 그려짐)
+      if (card.classList.contains('expanded')) {
+        setTimeout(() => {
+          const canvas = card.querySelector('canvas');
+          if (canvas && canvas.id && charts[canvas.id]) {
+            try { charts[canvas.id].resize(); } catch (err) {}
+          }
+        }, 100);
+      }
+    });
+  });
+  // SortableJS 초기화 (PC + 모바일 둘 다)
   if (typeof Sortable !== 'undefined') {
     Sortable.create(grid, {
       handle: '.drag-handle',
       animation: 150,
       ghostClass: 'drag-ghost',
       dragClass: 'dragging',
+      delay: 150,           // 모바일 long-press 약간의 지연
+      delayOnTouchOnly: true,
+      touchStartThreshold: 5,
       onEnd: () => {
         const newOrder = Array.from(grid.querySelectorAll(':scope > .card')).map(c => c.dataset.cardId);
         layoutConfig.order = newOrder;
