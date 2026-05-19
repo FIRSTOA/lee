@@ -372,7 +372,7 @@
         <span class="photo-tag">사진 1</span>
       </div>
       <label class="photo-slot" id="slot-overhaul-list">
-        <input type="file" accept="image/*" capture="environment" data-slot="overhaul-list">
+        <input type="file" accept="image/*" data-slot="overhaul-list">
         <div class="placeholder-icon">📋</div>
         <div class="placeholder-text">탭하여 사진 촬영/선택</div>
         <div class="placeholder-sub">오버홀 리스트를 찍어주세요</div>
@@ -384,7 +384,7 @@
         <span class="photo-tag">사진 2</span>
       </div>
       <label class="photo-slot" id="slot-color-chart">
-        <input type="file" accept="image/*" capture="environment" data-slot="color-chart">
+        <input type="file" accept="image/*" data-slot="color-chart">
         <div class="placeholder-icon">🎨</div>
         <div class="placeholder-text">탭하여 사진 촬영/선택</div>
         <div class="placeholder-sub">4색 색상표를 찍어주세요</div>
@@ -1326,7 +1326,7 @@ document.querySelectorAll('.photo-slot input[type="file"]').forEach(input => {
       photoData[slot] = { file, dataUrl: compressed, size: size, name: file.name };
       const sizeKB = (size / 1024).toFixed(0);
       slotEl.innerHTML = `
-        <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+        <input type="file" accept="image/*" data-slot="${slot}">
         <img src="${compressed}" alt="${slot}">
         <button class="remove-photo" data-remove="${slot}">×</button>
         <div class="file-info">${sizeKB}KB</div>
@@ -1351,7 +1351,7 @@ function resetPhotoSlot(slot) {
   const labelText = slot === 'overhaul-list' ? '오버홀 리스트를 찍어주세요' : '4색 색상표를 찍어주세요';
   const icon = slot === 'overhaul-list' ? '📋' : '🎨';
   slotEl.innerHTML = `
-    <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+    <input type="file" accept="image/*" data-slot="${slot}">
     <div class="placeholder-icon">${icon}</div>
     <div class="placeholder-text">탭하여 사진 촬영/선택</div>
     <div class="placeholder-sub">${labelText}</div>
@@ -1375,7 +1375,7 @@ function handlePhotoChange(e) {
     photoData[slot] = { file, dataUrl: compressed, size: size, name: file.name };
     const sizeKB = (size / 1024).toFixed(0);
     slotEl.innerHTML = `
-      <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+      <input type="file" accept="image/*" data-slot="${slot}">
       <img src="${compressed}" alt="${slot}">
       <button class="remove-photo" data-remove="${slot}">×</button>
       <div class="file-info">${sizeKB}KB</div>
