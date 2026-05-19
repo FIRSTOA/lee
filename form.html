@@ -158,6 +158,87 @@
   .toast.success { background: #38a169; }
 
   .warning-box { background: #fff5f5; border-left: 3px solid #e53e3e; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #742a2a; margin: 10px 0; }
+
+  /* ============ 모바일 (~600px) ============ */
+  @media (max-width: 600px) {
+    /* 헤더 — 버튼이 제목 옆이 아닌 아래로 자동 배치 */
+    header { padding: 14px 12px 16px; position: static !important; text-align: center; }
+    header h1 { font-size: 18px; }
+    header p { font-size: 11px; }
+    #header-actions {
+      position: static !important;
+      margin-top: 10px;
+      justify-content: center !important;
+      flex-wrap: wrap;
+    }
+    #stats-link, #admin-login-link, #log-btn {
+      padding: 6px 10px !important;
+      font-size: 11px !important;
+    }
+    #user-bar { justify-content: center !important; text-align: center; }
+    #user-info-text { word-break: break-all; }
+
+    /* 컨테이너 좌우 패딩 축소 */
+    .container { padding: 10px 10px 110px; max-width: 100%; }
+    .form-card { padding: 14px; }
+
+    /* iOS 자동 줌 방지 (input 글자 16px 이상) */
+    .field input, .field select { font-size: 16px; padding: 11px 12px; }
+
+    /* 부서 칩 그리드: 좁은 화면이면 2열로 */
+    .dept-grid { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+    .dept-grid .chip { padding: 9px 4px; font-size: 11px; }
+
+    /* 오버홀/수리 칩 패딩 축소 */
+    .chip { padding: 7px 12px; font-size: 12px; }
+
+    /* 시간 입력 */
+    .time-input-wrap input { font-size: 17px; }
+    .time-display { font-size: 12px; min-width: 70px; padding: 7px 8px; }
+    .quick-time button { padding: 12px 6px; font-size: 13px; }
+
+    /* 사진 슬롯 */
+    .photo-slot { padding: 18px 12px; }
+    .photo-slot .placeholder-icon { font-size: 28px; }
+    .photo-slot img { max-height: 160px; }
+
+    /* 하단 고정 버튼바 */
+    .footer-bar { max-width: 100%; padding: 10px 12px; }
+    .footer-bar .btn { padding: 13px; font-size: 14px; }
+
+    /* 모달 — 화면 거의 꽉 채우기 */
+    .modal { max-width: 100% !important; max-height: 92vh; margin: 0; border-radius: 10px; }
+    .modal-overlay { padding: 8px; }
+
+    /* 자동완성 드롭다운 약간 작게 */
+    .autocomplete-item { padding: 10px 12px; font-size: 13px; }
+    .autocomplete-dropdown { max-height: 220px; }
+
+    /* 수정 모드 배너 */
+    #edit-mode-bar { padding: 8px 10px; font-size: 12px; }
+    #edit-mode-bar button { padding: 4px 9px !important; font-size: 11px !important; }
+  }
+
+  /* ============ 작은 폰 (~380px, iPhone SE 등) ============ */
+  @media (max-width: 380px) {
+    header h1 { font-size: 16px; }
+    header p { font-size: 10px; }
+    #stats-link, #admin-login-link, #log-btn {
+      padding: 5px 8px !important;
+      font-size: 10px !important;
+    }
+    .dept-grid { grid-template-columns: repeat(2, 1fr); }
+    .row-2 { grid-template-columns: 1fr; }
+    .form-card { padding: 12px; }
+    .quick-time { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ============ 가로 모드 / 아주 작은 높이 ============ */
+  @media (max-height: 500px) and (orientation: landscape) {
+    header { padding: 8px 12px; }
+    header h1 { font-size: 16px; margin-bottom: 0; }
+    header p { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -173,7 +254,7 @@
     <span id="user-info-text">로그인됨</span>
     <button id="logout-btn" type="button" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">로그아웃</button>
   </div>
-  <div style="position:absolute;right:14px;top:14px;display:flex;gap:6px;align-items:center">
+  <div id="header-actions" style="position:absolute;right:14px;top:14px;display:flex;gap:6px;align-items:center">
     <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
     <a href="login.html" id="admin-login-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">🔐 관리자 로그인</a>
     <button type="button" id="log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 저장 로그</button>
