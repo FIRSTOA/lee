@@ -1427,17 +1427,27 @@ function computeAutoFields(d) {
 
 function validate(d) {
   const errors = [];
+  // 부품제조(수리 칩) 또는 부품정리(오버홀 칩) 선택 시 시리얼·사진 완화
+  const isPartsTask = d.overhaul === '부품정리' || d.repair === '부품제조';
+
   if (!d.date) errors.push({ field: 'f-date', msg: '날짜를 선택하세요' });
   if (!d.person) errors.push({ field: 'f-person', msg: '담당자를 입력하세요' });
   if (!d.dept) errors.push({ field: 'dept-grid', msg: '부서를 선택하세요' });
   if (!d.model) errors.push({ field: 'f-model', msg: '모델명을 입력하세요' });
-  if (!d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요' });
+  if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요' });
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
   // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
   if (!editingRow) {
-    if (!photoData['overhaul-list']) errors.push({ field: 'slot-overhaul-list', msg: '오버홀 리스트 사진을 첨부하세요' });
-    if (!photoData['color-chart']) errors.push({ field: 'slot-color-chart', msg: '4색 색상표 사진을 첨부하세요' });
+    if (isPartsTask) {
+      // 부품제조/부품정리 — 두 사진 중 하나만 있어도 통과
+      if (!photoData['overhaul-list'] && !photoData['color-chart']) {
+        errors.push({ field: 'slot-overhaul-list', msg: '사진 1장 이상 첨부하세요 (오버홀 리스트 또는 4색 색상표)' });
+      }
+    } else {
+      if (!photoData['overhaul-list']) errors.push({ field: 'slot-overhaul-list', msg: '오버홀 리스트 사진을 첨부하세요' });
+      if (!photoData['color-chart']) errors.push({ field: 'slot-color-chart', msg: '4색 색상표 사진을 첨부하세요' });
+    }
   }
   return errors;
 }
