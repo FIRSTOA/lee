@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#805ad5">
+<title>관리자 - 오버홀 시스템</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; min-height: 100vh; }
+  header { background: linear-gradient(135deg, #805ad5, #6b46c1); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  header h1 { margin: 0; font-size: 20px; }
+  header .right { display: flex; gap: 8px; align-items: center; }
+  header .user { font-size: 12px; opacity: 0.9; }
+  header button { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 6px 14px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+  header button:hover { background: rgba(255,255,255,0.3); }
+
+  .layout { display: flex; min-height: calc(100vh - 70px); }
+  .sidebar { width: 220px; background: #fff; border-right: 1px solid #e2e8f0; padding: 20px 0; flex-shrink: 0; box-shadow: 1px 0 3px rgba(0,0,0,0.03); }
+  .sidebar .nav-section { font-size: 11px; font-weight: 700; color: #a0aec0; padding: 0 20px 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sidebar .nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; cursor: pointer; font-size: 14px; color: #4a5568; border-left: 3px solid transparent; transition: all 0.15s; }
+  .sidebar .nav-item:hover { background: #f7fafc; color: #2d3748; }
+  .sidebar .nav-item.active { background: #faf5ff; color: #805ad5; border-left-color: #805ad5; font-weight: 600; }
+  .sidebar .nav-item .icon { font-size: 16px; }
+
+  .content { flex: 1; padding: 24px; max-width: 1200px; overflow-x: auto; transition: max-width 0.2s; }
+  .content.wide { max-width: none; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .panel-title { font-size: 20px; font-weight: 700; color: #2d3748; margin: 0 0 18px; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
+  .panel-title.clickable { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .panel-title.clickable:hover { color: #805ad5; }
+  .panel-title.clickable .ext-icon { font-size: 14px; opacity: 0.6; }
+  .panel-title.clickable:hover .ext-icon { opacity: 1; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: #fff; padding: 14px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid #805ad5; }
+  .stat-card .label { font-size: 11px; color: #718096; }
+  .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .stat-card.pending { border-left-color: #d69e2e; }
+  .stat-card.locked { border-left-color: #e53e3e; }
+  .stat-card.approved { border-left-color: #38a169; }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+  .filter-row input, .filter-row select { padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 13px; }
+  .filter-row .btn-refresh { background: #805ad5; color: #fff; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+
+  .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { background: #f7fafc; }
+  th { padding: 12px 10px; text-align: left; font-weight: 600; color: #4a5568; border-bottom: 2px solid #edf2f7; font-size: 12px; }
+  td { padding: 10px; border-bottom: 1px solid #edf2f7; }
+  tr:hover { background: #f7fafc; }
+
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .badge.approved { background: #c6f6d5; color: #22543d; }
+  .badge.pending { background: #fef3c7; color: #92400e; }
+  .badge.locked { background: #fed7d7; color: #742a2a; }
+  .badge.rejected { background: #e2e8f0; color: #4a5568; }
+  .badge.admin { background: #ddd6fe; color: #5b21b6; }
+  .badge.user { background: #dbeafe; color: #1e40af; }
+  .badge.viewer { background: #fce7f3; color: #9d174d; }
+
+  .actions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .actions button { padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; font-weight: 600; }
+  .btn-approve { background: #38a169; color: #fff; }
+  .btn-approve:hover { background: #2f855a; }
+  .btn-reject { background: #ed8936; color: #fff; }
+  .btn-unlock { background: #3182ce; color: #fff; }
+  .btn-unlock:hover { background: #2c5282; }
+  .btn-changepw { background: #d69e2e; color: #fff; }
+  .btn-delete { background: #e53e3e; color: #fff; }
+  .btn-delete:hover { background: #c53030; }
+  .btn-setrole { background: #805ad5; color: #fff; }
+
+  /* 모달 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.hidden { display: none; }
+  .modal { background: #fff; border-radius: 10px; max-width: 400px; width: 100%; padding: 0; max-height: 90vh; overflow-y: auto; }
+  .modal-header { background: linear-gradient(135deg, #805ad5, #6b46c1); color: #fff; padding: 16px 20px; border-radius: 10px 10px 0 0; }
+  .modal-header h2 { margin: 0; font-size: 16px; }
+  .modal-body { padding: 20px; }
+  .modal-body .field { margin-bottom: 14px; }
+  .modal-body label { display: block; font-size: 12px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
+  .modal-body input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 14px; }
+  .modal-actions { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid #edf2f7; }
+  .modal-actions button { flex: 1; padding: 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .modal-actions .cancel { background: #e2e8f0; color: #2d3748; }
+  .modal-actions .confirm { background: #805ad5; color: #fff; }
+
+  /* 토스트 */
+  .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #2d3748; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .toast.success { background: #38a169; }
+  .toast.error { background: #e53e3e; }
+
+  .loading { text-align: center; padding: 40px; color: #a0aec0; font-size: 13px; }
+  .empty { text-align: center; padding: 40px; color: #a0aec0; font-size: 13px; }
+
+  /* 부서 관리 패널 내부 */
+  .dept-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 16px; }
+  .dept-card h3 { margin: 0 0 12px; font-size: 14px; color: #4a5568; }
+
+  /* 통계 iframe */
+  .stats-frame-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+  .stats-frame-wrap iframe { width: 100%; height: calc(100vh - 160px); border: none; display: block; }
+  #panel-stats { width: 100%; }
+
+  @media (max-width: 768px) {
+    header { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; display: flex; overflow-x: auto; padding: 0; border-right: none; border-bottom: 1px solid #e2e8f0; }
+    .sidebar .nav-section { display: none; }
+    .sidebar .nav-item { flex-shrink: 0; padding: 12px 16px; border-left: none; border-bottom: 3px solid transparent; }
+    .sidebar .nav-item.active { border-left: none; border-bottom-color: #805ad5; }
+    .content { padding: 12px; }
+    .stats-frame-wrap iframe { height: calc(100vh - 200px); }
+    table { font-size: 11px; }
+    th, td { padding: 6px 4px; }
+    .actions button { font-size: 10px; padding: 3px 6px; }
+    .table-card { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>관리자 페이지</h1>
+    <div class="user" id="user-info">로딩 중...</div>
+  </div>
+  <div class="right">
+    <button id="save-config-btn">💾 저장 경로 설정</button>
+    <button id="change-own-pw-btn">내 비밀번호 변경</button>
+    <button id="logout-btn">로그아웃</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="nav-section">관리 메뉴</div>
+    <div class="nav-item active" data-panel="users"><span class="icon">👤</span><span>가입관리</span></div>
+    <div class="nav-item" data-panel="depts"><span class="icon">🏢</span><span>부서 관리</span></div>
+    <div class="nav-item" data-panel="stats"><span class="icon">📊</span><span>통계</span></div>
+  </aside>
+
+  <main class="content">
+    <!-- 가입관리 패널 -->
+    <div id="panel-users" class="panel active">
+      <h2 class="panel-title">가입관리</h2>
+      <div class="stats">
+        <div class="stat-card approved"><div class="label">승인됨</div><div class="value" id="stat-approved">0</div></div>
+        <div class="stat-card pending"><div class="label">승인 대기</div><div class="value" id="stat-pending">0</div></div>
+        <div class="stat-card locked"><div class="label">잠금</div><div class="value" id="stat-locked">0</div></div>
+        <div class="stat-card"><div class="label">전체</div><div class="value" id="stat-total">0</div></div>
+      </div>
+
+      <div class="filter-row">
+        <input type="text" id="search-input" placeholder="이름·이메일·부서로 검색">
+        <select id="filter-status">
+          <option value="">모든 상태</option>
+          <option value="approved">승인됨</option>
+          <option value="pending">대기</option>
+          <option value="locked">잠금</option>
+          <option value="rejected">거부</option>
+        </select>
+        <button class="btn-refresh" id="refresh-btn">새로고침</button>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>이메일</th>
+              <th>부서</th>
+              <th>권한</th>
+              <th>상태</th>
+              <th>가입일</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body">
+            <tr><td colspan="7" class="loading">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 부서 관리 패널 (담당자 명단) -->
+    <div id="panel-depts" class="panel">
+      <h2 class="panel-title">부서 관리 · 담당자 명단</h2>
+      <div class="dept-card">
+        <h3>담당자 추가</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px">
+          <input type="text" id="new-person-name" placeholder="이름" style="padding:9px 12px;border:1px solid #cbd5e0;border-radius:5px;font-size:14px">
+          <select id="new-person-dept" style="padding:9px 12px;border:1px solid #cbd5e0;border-radius:5px;font-size:14px;background:#fff">
+            <option value="">부서 (선택)</option>
+            <option>CSS</option>
+            <option>강북A</option>
+            <option>강서B</option>
+            <option>강남C</option>
+            <option>경기D</option>
+            <option>외부인력</option>
+          </select>
+          <button id="add-person-btn" style="background:#805ad5;color:#fff;border:none;padding:9px 18px;border-radius:5px;cursor:pointer;font-size:14px;font-weight:600">+ 추가</button>
+        </div>
+      </div>
+
+      <div class="dept-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">등록된 담당자</h3>
+          <button id="reset-persons-btn" style="background:#fed7d7;color:#c53030;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:12px">⟲ 기본 24명으로 초기화</button>
+        </div>
+        <div style="max-height:60vh;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#f7fafc">
+              <th style="padding:10px;text-align:left;border-bottom:2px solid #edf2f7;font-size:12px;color:#4a5568">이름</th>
+              <th style="padding:10px;text-align:left;border-bottom:2px solid #edf2f7;font-size:12px;color:#4a5568">부서</th>
+              <th style="padding:10px;border-bottom:2px solid #edf2f7"></th>
+            </tr></thead>
+            <tbody id="person-list-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 통계 패널 -->
+    <div id="panel-stats" class="panel">
+      <h2 class="panel-title clickable" id="stats-title" title="새 창에서 크게 보기">
+        통계 대시보드 <span class="ext-icon">↗</span>
+      </h2>
+      <div class="stats-frame-wrap">
+        <iframe id="stats-frame" src="about:blank" title="통계 대시보드"></iframe>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 저장 경로 설정 모달 -->
+<div id="save-config-modal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>💾 저장 경로 설정</h2>
+      <p style="margin:4px 0 0;font-size:12px;opacity:0.9">시트가 바뀌면 여기서 URL과 탭 이름을 변경하세요.</p>
+    </div>
+    <div class="modal-body">
+      <div style="background:#f7fafc;padding:12px;border-radius:8px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-bottom:8px">Apps Script 웹앱 URL</div>
+        <input type="text" id="cfg-script-url" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px;font-family:monospace">
+      </div>
+      <div style="background:#f7fafc;padding:12px;border-radius:8px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-bottom:8px">메인 시트 (통계용)</div>
+        <label style="font-size:11px;color:#4a5568;display:block;margin-bottom:4px">스프레드시트 URL 또는 ID</label>
+        <input type="text" id="cfg-main-sheet" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px;font-family:monospace;margin-bottom:8px">
+        <label style="font-size:11px;color:#4a5568;display:block;margin-bottom:4px">탭 이름</label>
+        <input type="text" id="cfg-main-tab" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px">
+      </div>
+      <div style="background:#f7fafc;padding:12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#805ad5;margin-bottom:8px">입고 시트</div>
+        <label style="font-size:11px;color:#4a5568;display:block;margin-bottom:4px">스프레드시트 URL 또는 ID</label>
+        <input type="text" id="cfg-stock-sheet" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px;font-family:monospace;margin-bottom:8px">
+        <label style="font-size:11px;color:#4a5568;display:block;margin-bottom:4px">탭 이름</label>
+        <input type="text" id="cfg-stock-tab" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-size:12px">
+      </div>
+      <button id="reset-config-default" style="background:#fed7d7;color:#c53030;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:11px;margin-top:10px">↺ 기본값 복원</button>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="close-save-config">취소</button>
+      <button class="confirm" id="save-save-config">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 비밀번호 변경 모달 -->
+<div id="pw-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pw-modal-title">비밀번호 변경</h2>
+    </div>
+    <div class="modal-body" id="pw-modal-body"></div>
+    <div class="modal-actions">
+      <button class="cancel" id="pw-cancel">취소</button>
+      <button class="confirm" id="pw-confirm">변경</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
+const SESSION_KEY = 'overhaul_session';
+
+let allUsers = [];
+let currentSession = null;
+
+function loadSession() {
+  try {
+    const s = localStorage.getItem(SESSION_KEY);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (obj.expiresAt && new Date(obj.expiresAt).getTime() < Date.now()) { localStorage.removeItem(SESSION_KEY); return null; }
+    return obj;
+  } catch (e) { return null; }
+}
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+async function apiCall(action, payload) {
+  const body = { action, ...payload };
+  const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(body), redirect: 'follow' });
+  return await resp.json();
+}
+
+function statusBadge(status) {
+  const map = { approved: '승인됨', pending: '대기', locked: '잠금', rejected: '거부' };
+  return '<span class="badge ' + status + '">' + (map[status] || status) + '</span>';
+}
+function roleBadge(role) {
+  const label = role === 'admin' ? '관리자' : (role === 'viewer' ? '통계뷰어' : '사용자');
+  return '<span class="badge ' + role + '">' + label + '</span>';
+}
+function formatDate(s) {
+  if (!s) return '-';
+  try { const d = new Date(s); return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate(); } catch (e) { return s; }
+}
+
+function renderUsers() {
+  const search = document.getElementById('search-input').value.toLowerCase().trim();
+  const statusFilter = document.getElementById('filter-status').value;
+  let filtered = allUsers.slice();
+  if (search) filtered = filtered.filter(u => (u.name || '').toLowerCase().includes(search) || (u.email || '').toLowerCase().includes(search) || (u.dept || '').toLowerCase().includes(search));
+  if (statusFilter) filtered = filtered.filter(u => u.status === statusFilter);
+
+  const tbody = document.getElementById('user-table-body');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">해당하는 사용자가 없습니다</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(u => {
+    const actions = [];
+    if (u.status === 'pending') {
+      actions.push('<button class="btn-approve" data-act="approve" data-email="' + u.email + '">승인</button>');
+      actions.push('<button class="btn-reject" data-act="reject" data-email="' + u.email + '">거부</button>');
+    }
+    if (u.status === 'locked') {
+      actions.push('<button class="btn-unlock" data-act="unlock" data-email="' + u.email + '">잠금해제</button>');
+    }
+    if (u.status === 'rejected') {
+      actions.push('<button class="btn-approve" data-act="approve" data-email="' + u.email + '">재승인</button>');
+    }
+    actions.push('<button class="btn-changepw" data-act="changepw" data-email="' + u.email + '">비밀번호</button>');
+    // 본인 관리자는 권한 변경/삭제 불가 (자기 자신을 강등하면 잠길 위험)
+    if (u.email !== currentSession.user.email) {
+      // 3단계 권한: user / viewer / admin — 현재 권한이 아닌 두 가지로 변경 버튼 노출
+      const allRoles = [
+        { key: 'user', label: '사용자로' },
+        { key: 'viewer', label: '통계뷰어로' },
+        { key: 'admin', label: '관리자로' }
+      ];
+      allRoles.filter(r => r.key !== u.role).forEach(r => {
+        actions.push('<button class="btn-setrole" data-act="setrole" data-email="' + u.email + '" data-role="' + r.key + '">' + r.label + '</button>');
+      });
+      if (u.role !== 'admin') actions.push('<button class="btn-delete" data-act="delete" data-email="' + u.email + '">삭제</button>');
+    }
+    return '<tr>'
+      + '<td><b>' + (u.name || '-') + '</b></td>'
+      + '<td>' + u.email + '</td>'
+      + '<td>' + (u.dept || '<span style="color:#a0aec0">-</span>') + '</td>'
+      + '<td>' + roleBadge(u.role) + '</td>'
+      + '<td>' + statusBadge(u.status) + (u.failedAttempts ? ' <span style="color:#a0aec0;font-size:11px">(' + u.failedAttempts + '회 실패)</span>' : '') + '</td>'
+      + '<td>' + formatDate(u.createdAt) + '</td>'
+      + '<td><div class="actions">' + actions.join('') + '</div></td>'
+      + '</tr>';
+  }).join('');
+
+  // 버튼 이벤트 바인딩
+  tbody.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.onclick = () => handleAction(btn.dataset.act, btn.dataset.email, btn.dataset.role);
+  });
+}
+
+function updateStats() {
+  const stats = { approved: 0, pending: 0, locked: 0, total: allUsers.length };
+  allUsers.forEach(u => { if (stats[u.status] !== undefined) stats[u.status]++; });
+  document.getElementById('stat-approved').textContent = stats.approved;
+  document.getElementById('stat-pending').textContent = stats.pending;
+  document.getElementById('stat-locked').textContent = stats.locked;
+  document.getElementById('stat-total').textContent = stats.total;
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('user-table-body');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">로딩 중...</td></tr>';
+  try {
+    const r = await apiCall('adminListUsers', { token: currentSession.token });
+    if (r.ok) {
+      allUsers = r.users;
+      updateStats();
+      renderUsers();
+    } else {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">에러: ' + r.error + '</td></tr>';
+    }
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">네트워크 오류: ' + e.message + '</td></tr>';
+  }
+}
+
+async function handleAction(action, email, role) {
+  if (action === 'approve' || action === 'reject') {
+    const approve = action === 'approve';
+    if (!confirm((approve ? '승인' : '거부') + ': ' + email + ' ?')) return;
+    const r = await apiCall('adminApproveUser', { token: currentSession.token, email, approve });
+    if (r.ok) { showToast(approve ? '승인 완료' : '거부 처리', 'success'); loadUsers(); }
+    else showToast(r.error, 'error');
+  } else if (action === 'unlock') {
+    if (!confirm('잠금 해제: ' + email + ' ?')) return;
+    const r = await apiCall('adminUnlockUser', { token: currentSession.token, email });
+    if (r.ok) { showToast('잠금 해제 완료', 'success'); loadUsers(); }
+    else showToast(r.error, 'error');
+  } else if (action === 'delete') {
+    if (!confirm('정말 삭제하시겠습니까? ' + email + '\n복구 불가능합니다.')) return;
+    const r = await apiCall('adminDeleteUser', { token: currentSession.token, email });
+    if (r.ok) { showToast('삭제 완료', 'success'); loadUsers(); }
+    else showToast(r.error, 'error');
+  } else if (action === 'setrole') {
+    const roleLabel = role === 'admin' ? '관리자' : (role === 'viewer' ? '통계뷰어' : '사용자');
+    if (!confirm(email + '의 권한을 ' + roleLabel + '로 변경?')) return;
+    const r = await apiCall('adminSetRole', { token: currentSession.token, email, role });
+    if (r.ok) { showToast('권한 변경 완료', 'success'); loadUsers(); }
+    else showToast(r.error, 'error');
+  } else if (action === 'changepw') {
+    openPwModal(email);
+  }
+}
+
+function openPwModal(targetEmail) {
+  const isOwn = targetEmail === currentSession.user.email;
+  document.getElementById('pw-modal-title').textContent = isOwn ? '내 비밀번호 변경' : (targetEmail + ' 비밀번호 변경');
+  const body = document.getElementById('pw-modal-body');
+  body.innerHTML = isOwn
+    ? '<div class="field"><label>현재 비밀번호</label><input type="password" id="pw-old"></div>'
+      + '<div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" id="pw-new"></div>'
+      + '<div class="field"><label>새 비밀번호 확인</label><input type="password" id="pw-new2"></div>'
+    : '<div style="background:#fffaf0;padding:10px;border-left:3px solid #d69e2e;border-radius:5px;font-size:12px;color:#744210;margin-bottom:12px">관리자 권한으로 ' + targetEmail + '의 비밀번호를 직접 변경합니다.</div>'
+      + '<div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" id="pw-new"></div>'
+      + '<div class="field"><label>새 비밀번호 확인</label><input type="password" id="pw-new2"></div>';
+  document.getElementById('pw-modal').classList.remove('hidden');
+  document.getElementById('pw-confirm').onclick = async () => {
+    const newPw = document.getElementById('pw-new').value;
+    const newPw2 = document.getElementById('pw-new2').value;
+    if (newPw.length < 6) { showToast('비밀번호 6자 이상', 'error'); return; }
+    if (newPw !== newPw2) { showToast('비밀번호 확인 불일치', 'error'); return; }
+    if (isOwn) {
+      const oldPw = document.getElementById('pw-old').value;
+      if (!oldPw) { showToast('현재 비밀번호 입력', 'error'); return; }
+      const r = await apiCall('changeOwnPassword', { token: currentSession.token, oldPassword: oldPw, newPassword: newPw });
+      if (r.ok) { showToast('내 비밀번호 변경 완료', 'success'); document.getElementById('pw-modal').classList.add('hidden'); }
+      else showToast(r.error, 'error');
+    } else {
+      const r = await apiCall('adminChangePassword', { token: currentSession.token, email: targetEmail, newPassword: newPw });
+      if (r.ok) { showToast('비밀번호 변경 완료', 'success'); document.getElementById('pw-modal').classList.add('hidden'); loadUsers(); }
+      else showToast(r.error, 'error');
+    }
+  };
+}
+
+// 이벤트 바인딩
+document.getElementById('refresh-btn').onclick = loadUsers;
+document.getElementById('search-input').oninput = renderUsers;
+document.getElementById('filter-status').onchange = renderUsers;
+document.getElementById('change-own-pw-btn').onclick = () => openPwModal(currentSession.user.email);
+document.getElementById('pw-cancel').onclick = () => document.getElementById('pw-modal').classList.add('hidden');
+document.getElementById('pw-modal').onclick = (e) => { if (e.target.id === 'pw-modal') document.getElementById('pw-modal').classList.add('hidden'); };
+document.getElementById('logout-btn').onclick = () => {
+  clearSession();
+  window.location.href = 'login.html';
+};
+
+// === 저장 경로 설정 (localStorage) ===
+const SAVE_CONFIG_KEY = 'overhaul_save_config_v1';
+const DEFAULT_SAVE_CONFIG = {
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec',
+  mainSheet: '1_We_A06s3sk3roIlBcQwCKXRXnWxwrjDtwKC1S-Ku4c',
+  mainTab: '리스트(26년)',
+  stockSheet: '1_We_A06s3sk3roIlBcQwCKXRXnWxwrjDtwKC1S-Ku4c',
+  stockTab: '오버홀 완료 정보'
+};
+function loadSaveConfig() {
+  try { const s = localStorage.getItem(SAVE_CONFIG_KEY); if (s) return { ...DEFAULT_SAVE_CONFIG, ...JSON.parse(s) }; } catch (e) {}
+  return { ...DEFAULT_SAVE_CONFIG };
+}
+function saveSaveConfig(c) { localStorage.setItem(SAVE_CONFIG_KEY, JSON.stringify(c)); }
+function extractSheetId(input) {
+  if (!input) return '';
+  input = input.trim();
+  if (input.includes('/spreadsheets/d/e/')) {
+    return { error: '게시 URL은 사용할 수 없습니다. 시트를 열고 브라우저 주소창의 URL(편집용)을 복사해주세요.' };
+  }
+  const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(input)) return input;
+  return { error: '올바른 시트 URL 또는 ID를 입력해주세요.' };
+}
+let saveConfig = loadSaveConfig();
+
+const saveConfigModal = document.getElementById('save-config-modal');
+function fillSaveConfigInputs() {
+  document.getElementById('cfg-script-url').value = saveConfig.scriptUrl;
+  document.getElementById('cfg-main-sheet').value = saveConfig.mainSheet;
+  document.getElementById('cfg-main-tab').value = saveConfig.mainTab;
+  document.getElementById('cfg-stock-sheet').value = saveConfig.stockSheet;
+  document.getElementById('cfg-stock-tab').value = saveConfig.stockTab;
+}
+document.getElementById('save-config-btn').onclick = () => {
+  fillSaveConfigInputs();
+  saveConfigModal.classList.remove('hidden');
+};
+document.getElementById('close-save-config').onclick = () => saveConfigModal.classList.add('hidden');
+saveConfigModal.onclick = (e) => { if (e.target.id === 'save-config-modal') saveConfigModal.classList.add('hidden'); };
+document.getElementById('save-save-config').onclick = () => {
+  const mainResult = extractSheetId(document.getElementById('cfg-main-sheet').value.trim());
+  const stockResult = extractSheetId(document.getElementById('cfg-stock-sheet').value.trim());
+  if (mainResult && typeof mainResult === 'object' && mainResult.error) { alert('[메인 시트] ' + mainResult.error); return; }
+  if (stockResult && typeof stockResult === 'object' && stockResult.error) { alert('[입고 시트] ' + stockResult.error); return; }
+  const newCfg = {
+    scriptUrl: document.getElementById('cfg-script-url').value.trim(),
+    mainSheet: mainResult || '',
+    mainTab: document.getElementById('cfg-main-tab').value.trim(),
+    stockSheet: stockResult || '',
+    stockTab: document.getElementById('cfg-stock-tab').value.trim()
+  };
+  if (!newCfg.scriptUrl) { alert('Apps Script URL은 필수입니다'); return; }
+  if (!newCfg.mainSheet || !newCfg.mainTab) { alert('메인 시트 ID와 탭 이름은 필수입니다'); return; }
+  saveConfig = newCfg;
+  saveSaveConfig(saveConfig);
+  saveConfigModal.classList.add('hidden');
+  showToast('✅ 저장 경로 설정 저장됨. 입력 폼은 다음 새로고침 후 반영됩니다.', 'success');
+};
+document.getElementById('reset-config-default').onclick = () => {
+  if (!confirm('기본값으로 되돌리시겠습니까?')) return;
+  saveConfig = { ...DEFAULT_SAVE_CONFIG };
+  saveSaveConfig(saveConfig);
+  fillSaveConfigInputs();
+  showToast('기본값으로 복원되었습니다', 'success');
+};
+
+// === 담당자 관리 (localStorage) ===
+const PERSONS_STORAGE_KEY = 'overhaul_persons_v1';
+const DEFAULT_PERSONS = [
+  { name: '박옥주', dept: 'CSS' },{ name: '김정민', dept: 'CSS' },{ name: '심태현', dept: '강북A' },
+  { name: '정웅', dept: '강북A' },{ name: '권태혁', dept: '강서B' },{ name: '윤기준', dept: '강북A' },
+  { name: '조윤', dept: 'CSS' },{ name: '김대우', dept: '경기D' },{ name: '이홍진', dept: '강북A' },
+  { name: '이민구', dept: '강남C' },{ name: '한왕주', dept: '강남C' },{ name: '양승원', dept: '강북A' },
+  { name: '김종희', dept: '경기D' },{ name: '이호준', dept: '경기D' },{ name: '이의수', dept: 'CSS' },
+  { name: '안수복', dept: 'CSS' },{ name: '박영현', dept: 'CSS' },{ name: '정지훈', dept: 'CSS' },
+  { name: '김현군', dept: 'CSS' },{ name: '이혁주', dept: 'CSS' },{ name: '고태훈', dept: '강서B' },
+  { name: '허영재', dept: '강남C' },{ name: '엄재현', dept: '외부인력' },{ name: '유성용', dept: '강북A' }
+];
+function loadPersons() {
+  try { const s = localStorage.getItem(PERSONS_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) return a; } } catch (e) {}
+  return [...DEFAULT_PERSONS];
+}
+function savePersons(arr) { localStorage.setItem(PERSONS_STORAGE_KEY, JSON.stringify(arr)); }
+let personsData = loadPersons();
+
+function renderPersonList() {
+  const tbody = document.getElementById('person-list-body');
+  if (personsData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#a0aec0;padding:20px;font-size:12px">등록된 담당자가 없습니다</td></tr>';
+    return;
+  }
+  const sorted = [...personsData].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  tbody.innerHTML = sorted.map(p => {
+    const realIdx = personsData.findIndex(x => x.name === p.name);
+    return `<tr class="person-row" data-idx="${realIdx}" data-name="${p.name}" data-dept="${p.dept || ''}" style="cursor:pointer">
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#2b6cb0;font-weight:600">${p.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:${p.dept ? '#2d3748' : '#a0aec0'}">${p.dept || '(미지정)'}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;text-align:right">
+        <button class="del-person-btn" data-idx="${realIdx}" style="background:#fed7d7;color:#c53030;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.person-row').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.classList.contains('del-person-btn')) return;
+      document.getElementById('new-person-name').value = row.dataset.name;
+      document.getElementById('new-person-dept').value = row.dataset.dept;
+      tbody.querySelectorAll('.person-row').forEach(r => r.style.background = '');
+      row.style.background = '#ebf8ff';
+      document.getElementById('new-person-name').focus();
+    };
+    row.onmouseenter = () => { if (row.style.background !== 'rgb(235, 248, 255)') row.style.background = '#f7fafc'; };
+    row.onmouseleave = () => { if (row.style.background === 'rgb(247, 250, 252)') row.style.background = ''; };
+  });
+  tbody.querySelectorAll('.del-person-btn').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const idx = Number(b.dataset.idx);
+      if (!confirm(`'${personsData[idx].name}' 담당자를 삭제하시겠습니까?`)) return;
+      personsData.splice(idx, 1);
+      savePersons(personsData);
+      renderPersonList();
+    };
+  });
+}
+document.getElementById('add-person-btn').onclick = () => {
+  const name = document.getElementById('new-person-name').value.trim();
+  const dept = document.getElementById('new-person-dept').value;
+  if (!name) { alert('이름을 입력하세요'); return; }
+  if (personsData.some(p => p.name === name)) {
+    if (!confirm(`'${name}' 이미 등록되어 있습니다. 부서를 '${dept || '(미지정)'}'로 업데이트하시겠습니까?`)) return;
+    personsData = personsData.map(p => p.name === name ? { name, dept } : p);
+  } else {
+    personsData.push({ name, dept });
+  }
+  savePersons(personsData);
+  document.getElementById('new-person-name').value = '';
+  document.getElementById('new-person-dept').value = '';
+  renderPersonList();
+};
+document.getElementById('reset-persons-btn').onclick = () => {
+  if (!confirm('담당자 명단을 기본 24명(부서 포함)으로 되돌리시겠습니까?\n\n현재 추가/수정한 내용이 모두 사라집니다.')) return;
+  personsData = JSON.parse(JSON.stringify(DEFAULT_PERSONS));
+  savePersons(personsData);
+  renderPersonList();
+  showToast('✓ 기본 명단으로 초기화됨', 'success');
+};
+
+// === 사이드바 탭 전환 ===
+// 통계 대시보드: Vercel 배포본 (구글 시트 게시 CSV를 직접 읽으므로 별도 서버 불필요)
+const STATS_FRAME_SRC = '/';
+function activatePanel(name) {
+  document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.toggle('active', n.dataset.panel === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  document.querySelector('.content').classList.toggle('wide', name === 'stats');
+  if (name === 'depts') renderPersonList();
+  if (name === 'stats') {
+    const f = document.getElementById('stats-frame');
+    if (f.src !== STATS_FRAME_SRC) f.src = STATS_FRAME_SRC;
+  }
+}
+document.querySelectorAll('.sidebar .nav-item').forEach(n => {
+  n.onclick = () => activatePanel(n.dataset.panel);
+});
+document.getElementById('stats-title').onclick = () => {
+  window.open(STATS_FRAME_SRC, '_blank', 'noopener');
+};
+
+// 진입 시 인증 확인
+(async function init() {
+  const sess = loadSession();
+  if (!sess) { window.location.href = 'login.html'; return; }
+  try {
+    const r = await apiCall('validateToken', { token: sess.token });
+    if (!r.ok) { clearSession(); window.location.href = 'login.html'; return; }
+    if (r.user.role !== 'admin') {
+      alert('관리자만 접근 가능합니다.');
+      window.location.href = 'login.html';
+      return;
+    }
+    currentSession = { token: sess.token, user: r.user };
+    document.getElementById('user-info').textContent = r.user.name + ' (' + r.user.email + ')';
+    loadUsers();
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  }
+})();
+</script>
+</body>
+</html>

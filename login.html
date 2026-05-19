@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#2b6cb0">
+<title>오버홀 시스템 로그인</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #2c5282 0%, #2b6cb0 100%); color: #222; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #fff; border-radius: 12px; max-width: 420px; width: 100%; padding: 28px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .logo { text-align: center; margin-bottom: 24px; }
+  .logo h1 { margin: 0; font-size: 22px; color: #2b6cb0; font-weight: 700; }
+  .logo p { margin: 4px 0 0; font-size: 12px; color: #718096; }
+  .tabs { display: flex; border-bottom: 1px solid #edf2f7; margin-bottom: 20px; }
+  .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 600; color: #a0aec0; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab.active { color: #2b6cb0; border-bottom-color: #2b6cb0; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: #4a5568; margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+    font-size: 15px; background: #fff;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: #2b6cb0; box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.15); }
+  .field .req { color: #e53e3e; }
+  .btn { width: 100%; padding: 13px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: #2b6cb0; color: #fff; margin-top: 6px; }
+  .btn-primary:hover { background: #2c5282; }
+  .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+  .info-box { background: #ebf8ff; border-left: 3px solid #2b6cb0; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #2c5282; margin-bottom: 12px; }
+  .warn-box { background: #fffaf0; border-left: 3px solid #d69e2e; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #744210; margin-bottom: 12px; }
+  .error-box { background: #fff5f5; border-left: 3px solid #e53e3e; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #742a2a; margin-bottom: 12px; }
+  .success-box { background: #f0fff4; border-left: 3px solid #38a169; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #22543d; margin-bottom: 12px; }
+  .footer { text-align: center; font-size: 11px; color: #a0aec0; margin-top: 16px; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ddd; border-top-color: #2b6cb0; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>오버홀 시스템</h1>
+    <p>로그인 후 사용하세요</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="login">로그인</div>
+    <div class="tab" data-tab="signup">회원가입</div>
+  </div>
+
+  <div id="msg-area"></div>
+
+  <div class="panel active" id="panel-login">
+    <div class="field">
+      <label>이메일 / 아이디 <span class="req">*</span></label>
+      <input type="text" id="login-email" placeholder="아이디 또는 이메일" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>비밀번호 <span class="req">*</span></label>
+      <input type="password" id="login-password" placeholder="비밀번호" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="login-btn">로그인</button>
+  </div>
+
+  <div class="panel" id="panel-signup">
+    <div class="info-box">가입 후 관리자 승인이 필요합니다.</div>
+    <div class="field">
+      <label>이메일 / 아이디 <span class="req">*</span></label>
+      <input type="text" id="signup-email" placeholder="로그인에 사용할 아이디">
+    </div>
+    <div class="field">
+      <label>이름 <span class="req">*</span></label>
+      <input type="text" id="signup-name" placeholder="실명 (담당자 이름)">
+    </div>
+    <div class="field">
+      <label>부서</label>
+      <select id="signup-dept">
+        <option value="">선택 (나중에 설정 가능)</option>
+        <option>CSS</option>
+        <option>강북A</option>
+        <option>강서B</option>
+        <option>강남C</option>
+        <option>경기D</option>
+        <option>외부인력</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>비밀번호 <span class="req">*</span> <span style="font-weight:normal;color:#a0aec0;font-size:11px">(6자 이상)</span></label>
+      <input type="password" id="signup-password" placeholder="비밀번호">
+    </div>
+    <div class="field">
+      <label>비밀번호 확인 <span class="req">*</span></label>
+      <input type="password" id="signup-password2" placeholder="비밀번호 다시 입력">
+    </div>
+    <button class="btn btn-primary" id="signup-btn">가입 신청</button>
+  </div>
+
+  <div class="panel" id="panel-pending">
+    <div class="warn-box">
+      ⏳ <b>관리자 승인 대기 중</b><br>
+      관리자가 가입 신청을 검토하면 로그인이 가능합니다.<br>
+      잠시 후 다시 시도해주세요.
+    </div>
+    <button class="btn btn-primary" onclick="switchTab('login')">로그인 화면으로</button>
+  </div>
+
+  <div class="panel" id="panel-locked">
+    <div class="error-box">
+      🔒 <b>계정이 잠겼습니다</b><br>
+      비밀번호 5회 오류로 인해 계정이 잠겼습니다.<br>
+      관리자에게 잠금 해제를 요청하세요.
+    </div>
+    <button class="btn btn-primary" onclick="switchTab('login')">로그인 화면으로</button>
+  </div>
+
+  <div class="footer">© 2026 오버홀 시스템</div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
+const SESSION_KEY = 'overhaul_session';
+
+// 권한별 진입 URL — Vercel 배포 환경에서는 모두 같은 도메인의 상대 경로
+function destinationFor(role) {
+  if (role === 'admin') return 'admin.html';
+  if (role === 'viewer') return 'dashboard.html';
+  return 'form.html'; // user 또는 미지정 → 공용 폼
+}
+
+function showMsg(text, type = 'error') {
+  const area = document.getElementById('msg-area');
+  const cls = type === 'success' ? 'success-box' : (type === 'warn' ? 'warn-box' : 'error-box');
+  area.innerHTML = '<div class="' + cls + '">' + text + '</div>';
+  setTimeout(() => { if (area.innerHTML.includes(text)) area.innerHTML = ''; }, 5000);
+}
+function clearMsg() { document.getElementById('msg-area').innerHTML = ''; }
+
+function switchTab(tab) {
+  clearMsg();
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  if (tab === 'login' || tab === 'signup') {
+    document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+  }
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => switchTab(t.dataset.tab);
+});
+
+async function apiCall(action, payload) {
+  const body = { action, ...payload };
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    redirect: 'follow'
+  });
+  return await resp.json();
+}
+
+function saveSession(token, expiresAt, user) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiresAt, user }));
+}
+function loadSession() {
+  try {
+    const s = localStorage.getItem(SESSION_KEY);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (obj.expiresAt && new Date(obj.expiresAt).getTime() < Date.now()) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return obj;
+  } catch (e) { return null; }
+}
+function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+document.getElementById('login-btn').onclick = async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showMsg('이메일과 비밀번호를 입력하세요'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>로그인 중...';
+  try {
+    const r = await apiCall('login', { email, password });
+    if (r.ok) {
+      saveSession(r.token, r.expiresAt, r.user);
+      window.location.href = destinationFor(r.user.role);
+      return;
+    } else {
+      if (r.locked) switchTab('locked');
+      else if (r.pending) switchTab('pending');
+      else showMsg(r.error || '로그인 실패');
+    }
+  } catch (e) {
+    showMsg('네트워크 오류: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '로그인';
+  }
+};
+
+document.getElementById('signup-btn').onclick = async () => {
+  const email = document.getElementById('signup-email').value.trim();
+  const name = document.getElementById('signup-name').value.trim();
+  const dept = document.getElementById('signup-dept').value;
+  const password = document.getElementById('signup-password').value;
+  const password2 = document.getElementById('signup-password2').value;
+
+  if (!email || !name || !password) { showMsg('필수 항목을 입력하세요'); return; }
+  if (password.length < 6) { showMsg('비밀번호는 6자 이상이어야 합니다'); return; }
+  if (password !== password2) { showMsg('비밀번호가 일치하지 않습니다'); return; }
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>가입 중...';
+  try {
+    const r = await apiCall('register', { email, password, name, dept });
+    if (r.ok) {
+      switchTab('pending');
+      ['signup-email','signup-name','signup-dept','signup-password','signup-password2'].forEach(id => document.getElementById(id).value = '');
+    } else {
+      showMsg(r.error || '가입 실패');
+    }
+  } catch (e) {
+    showMsg('네트워크 오류: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '가입 신청';
+  }
+};
+
+// 이미 로그인되어 있으면 권한별 페이지로 자동 이동
+(async function init() {
+  const sess = loadSession();
+  if (!sess) return;
+  try {
+    const r = await apiCall('validateToken', { token: sess.token });
+    if (r.ok && r.user) {
+      window.location.href = destinationFor(r.user.role);
+    } else {
+      clearSession();
+    }
+  } catch (e) {}
+})();
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+});
+document.getElementById('signup-password2').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('signup-btn').click();
+});
+</script>
+</body>
+</html>

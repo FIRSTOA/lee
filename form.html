@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#2b6cb0">
+<title>오버홀/수리 입력 (테스트)</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; min-height: 100vh; -webkit-text-size-adjust: 100%; }
+  .status-bar { background: #fef3c7; color: #92400e; padding: 6px 10px; font-size: 11px; text-align: center; border-bottom: 1px solid #fde68a; }
+  header { background: linear-gradient(135deg,#2c5282,#2b6cb0); color: #fff; padding: 18px 20px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: 0.85; }
+  .container { padding: 14px; max-width: 480px; margin: 0 auto; padding-bottom: 100px; }
+
+  .form-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px; }
+  .section-title { font-size: 11px; font-weight: 700; color: #2b6cb0; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; gap: 6px; }
+  .section-title::before { content: ''; width: 4px; height: 14px; background: #2b6cb0; border-radius: 2px; }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #2d3748; margin-bottom: 6px; }
+  .field label .req { color: #e53e3e; margin-left: 2px; }
+  .field input, .field select {
+    width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+    font-size: 15px; background: #fff; color: #2d3748;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: #2b6cb0; box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.15); }
+  .field input.error, .field select.error { border-color: #e53e3e; box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15); }
+  .field input::placeholder { color: #a0aec0; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 8px 14px; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #fff; font-size: 13px; cursor: pointer; user-select: none; }
+  .chip:hover { border-color: #cbd5e0; }
+  .chip.selected { background: #2b6cb0; color: #fff; border-color: #2b6cb0; font-weight: 600; }
+  .chip.overhaul.selected { background: #38a169; border-color: #38a169; }
+  .chip.repair.selected { background: #d69e2e; border-color: #d69e2e; }
+  .chip.refurb.selected { background: #3182ce; border-color: #3182ce; }
+
+  .dept-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dept-grid .chip { padding: 10px 8px; text-align: center; font-size: 12px; }
+  .chips.error-border, .dept-grid.error-border { padding: 4px; border: 1.5px solid #e53e3e; border-radius: 8px; }
+
+  /* 섹션 제목 옆 설정 버튼 */
+  .section-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #edf2f7; }
+  .section-title-row .section-title { margin: 0; padding: 0; border: none; }
+  .section-config-btn {
+    background: #f0f4f8; border: 1px solid #cbd5e0; color: #4a5568;
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .section-config-btn:hover { background: #ebf8ff; border-color: #2b6cb0; color: #2b6cb0; }
+
+  /* 설정 모달 내 입력 그룹 */
+  .config-group { margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 8px; }
+  .config-group-title { font-size: 12px; font-weight: 700; color: #2b6cb0; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .config-group-title::before { content: ''; width: 3px; height: 12px; background: #2b6cb0; border-radius: 2px; }
+  .config-row { margin-bottom: 8px; }
+  .config-row:last-child { margin-bottom: 0; }
+  .config-row label { display: block; font-size: 11px; font-weight: 600; color: #4a5568; margin-bottom: 4px; }
+  .config-row input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 12px; font-family: monospace; background: #fff; }
+  .config-row .hint { font-size: 10px; color: #718096; margin-top: 2px; }
+  .config-row .hint code { background: #edf2f7; padding: 1px 4px; border-radius: 2px; font-size: 10px; }
+  .reset-default-btn { background: #fed7d7; color: #c53030; border: none; padding: 6px 12px; border-radius: 5px; font-size: 11px; cursor: pointer; margin-top: 4px; }
+
+  /* input 옆 인라인 버튼 */
+  .input-with-button { display: flex; gap: 6px; align-items: stretch; }
+  .input-with-button .autocomplete-wrap { flex: 1; }
+  .settings-btn-inline {
+    padding: 0 16px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+    background: #f7fafc; cursor: pointer; font-size: 18px; color: #4a5568;
+    flex-shrink: 0; min-width: 48px;
+  }
+  .settings-btn-inline:hover { background: #ebf8ff; border-color: #2b6cb0; color: #2b6cb0; }
+
+  /* 자동완성 */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-dropdown {
+    position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+    background: #fff; border: 1.5px solid #2b6cb0; border-radius: 8px;
+    max-height: 260px; overflow-y: auto; z-index: 50;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+  .autocomplete-dropdown.hidden { display: none; }
+  .autocomplete-item {
+    padding: 12px 14px; cursor: pointer;
+    border-bottom: 1px solid #f0f4f8; font-size: 14px; color: #2d3748;
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover, .autocomplete-item.active { background: #ebf8ff; }
+  .autocomplete-item .match { background: #fef3c7; font-weight: 700; color: #92400e; padding: 0 2px; border-radius: 2px; }
+  .autocomplete-empty { padding: 12px 14px; font-size: 12px; color: #a0aec0; text-align: center; font-style: italic; }
+
+  /* 시간 입력 */
+  .time-input-wrap { display: flex; gap: 8px; align-items: center; }
+  .time-input-wrap input { flex: 1; text-align: right; font-size: 18px; font-weight: 700; }
+  .time-display { padding: 8px 12px; background: #ebf8ff; color: #2c5282; border-radius: 6px; font-size: 13px; font-weight: 600; min-width: 80px; text-align: center; }
+  .quick-time { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .quick-time button {
+    padding: 14px 8px; border: 1.5px solid #e2e8f0; background: #fff; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer; color: #2d3748;
+    transition: all 0.1s;
+  }
+  .quick-time button:hover { background: #ebf8ff; border-color: #2b6cb0; color: #2b6cb0; }
+  .quick-time button:active { transform: scale(0.95); background: #2b6cb0; color: #fff; }
+  .time-helper { font-size: 11px; color: #718096; margin-top: 6px; padding: 6px 10px; background: #f7fafc; border-radius: 6px; }
+  .time-helper b { color: #2b6cb0; }
+  .clear-time { background: #fed7d7; color: #c53030; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-top: 6px; }
+
+  /* 사진 첨부 */
+  .photo-slot { display: block; width: 100%; border: 2px dashed #cbd5e0; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.15s; background: #f7fafc; }
+  .photo-slot.error { border-color: #e53e3e; background: #fff5f5; }
+  .photo-slot:hover { border-color: #2b6cb0; background: #ebf8ff; }
+  .photo-slot.has-photo { padding: 0; border-style: solid; border-color: #2b6cb0; overflow: hidden; position: relative; }
+  .photo-slot input[type="file"] { display: none; }
+  .photo-slot .placeholder-icon { font-size: 32px; margin-bottom: 4px; opacity: 0.5; }
+  .photo-slot .placeholder-text { font-size: 13px; color: #718096; font-weight: 600; }
+  .photo-slot .placeholder-sub { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+  .photo-slot img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+  .photo-slot .remove-photo { position: absolute; top: 6px; right: 6px; background: rgba(229, 62, 62, 0.9); color: #fff; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .photo-slot .file-info { position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,0.7); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 10px; }
+  .photo-label { font-weight: 600; font-size: 13px; color: #2d3748; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .photo-label .photo-tag { background: #2b6cb0; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+
+  .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 14px; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 8px rgba(0,0,0,0.04); display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
+  .footer-bar .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .footer-bar .btn-primary { background: #2b6cb0; color: #fff; }
+  .footer-bar .btn-primary:active { background: #2c5282; }
+  .footer-bar .btn-secondary { background: #edf2f7; color: #4a5568; }
+
+  /* 모달 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.hidden { display: none; }
+  .modal { background: #fff; border-radius: 12px; max-width: 400px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 0; }
+  .modal-header { background: linear-gradient(135deg,#38a169,#2f855a); color: #fff; padding: 16px 20px; border-radius: 12px 12px 0 0; }
+  .modal-header h2 { margin: 0; font-size: 16px; }
+  .modal-header p { margin: 4px 0 0; font-size: 12px; opacity: 0.9; }
+  .modal-body { padding: 16px 20px; }
+  .preview-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #edf2f7; font-size: 14px; gap: 10px; }
+  .preview-row:last-child { border-bottom: none; }
+  .preview-row .key { color: #718096; font-size: 12px; flex-shrink: 0; }
+  .preview-row .val { color: #2d3748; font-weight: 600; text-align: right; }
+  .preview-row .val.empty { color: #a0aec0; font-weight: normal; }
+  .preview-row .val .pt { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 4px; }
+  .modal-section-title { font-size: 11px; color: #2b6cb0; font-weight: 700; text-transform: uppercase; margin: 12px 0 4px; }
+  .modal-actions { padding: 12px 20px; border-top: 1px solid #edf2f7; display: flex; gap: 8px; }
+  .modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .modal-actions .confirm { background: #38a169; color: #fff; }
+  .modal-actions .cancel { background: #edf2f7; color: #4a5568; }
+  .preview-photo { width: 100%; max-height: 150px; object-fit: cover; border-radius: 8px; margin-top: 6px; border: 1px solid #e2e8f0; }
+
+  /* 토스트 */
+  .toast { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); background: #2d3748; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .toast.error { background: #e53e3e; }
+  .toast.success { background: #38a169; }
+
+  .warning-box { background: #fff5f5; border-left: 3px solid #e53e3e; padding: 10px 12px; border-radius: 6px; font-size: 12px; color: #742a2a; margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="status-bar" style="background:#c6f6d5;color:#22543d;border-color:#9ae6b4">✅ Step 5 — 시트 + Drive 연결 완료. 실제로 저장됩니다 (테스트)</div>
+<div id="edit-mode-bar" style="display:none;background:#fef3c7;color:#92400e;padding:10px 16px;border-bottom:2px solid #f59e0b;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;gap:8px">
+  <span id="edit-mode-text">✏️ 수정 모드 — 기존 저장 데이터를 변경합니다</span>
+  <button id="edit-mode-cancel" type="button" style="background:#fff;border:1px solid #f59e0b;color:#92400e;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap">취소</button>
+</div>
+<header style="position:relative">
+  <h1>오버홀 / 수리 입력</h1>
+  <p id="today-info">오늘 작업 내역을 빠르게 기록하세요</p>
+  <div id="user-bar" style="display:none;margin-top:8px;background:rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;font-size:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+    <span id="user-info-text">로그인됨</span>
+    <button id="logout-btn" type="button" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">로그아웃</button>
+  </div>
+  <div style="position:absolute;right:14px;top:14px;display:flex;gap:6px;align-items:center">
+    <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
+    <a href="login.html" id="admin-login-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">🔐 관리자 로그인</a>
+    <button type="button" id="log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 저장 로그</button>
+  </div>
+</header>
+<div class="container">
+
+  <div class="form-card">
+    <div class="section-title">기본 정보</div>
+    <div class="row-2">
+      <div class="field">
+        <label>날짜<span class="req">*</span></label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>담당자<span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="f-person" placeholder="이름 (자동완성)" autocomplete="off">
+          <div id="person-dropdown" class="autocomplete-dropdown hidden"></div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>부서<span class="req">*</span></label>
+      <div class="dept-grid" id="dept-grid">
+        <div class="chip" data-dept="CSS">CSS</div>
+        <div class="chip" data-dept="강북A">강북A</div>
+        <div class="chip" data-dept="강서B">강서B</div>
+        <div class="chip" data-dept="강남C">강남C</div>
+        <div class="chip" data-dept="경기D">경기D</div>
+        <div class="chip" data-dept="외부인력">외부인력</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">작업 대상</div>
+    <div class="field">
+      <label>입고처</label>
+      <input type="text" id="f-incoming" placeholder="예: 강남 OO지점, 본사 등">
+    </div>
+    <div class="field">
+      <label>모델명</label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="f-model" placeholder="예: 3220 입력 → 자동완성" autocomplete="off">
+        <div id="model-dropdown" class="autocomplete-dropdown hidden"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>시리얼 번호</label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="f-serial" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
+        <div id="serial-dropdown" class="autocomplete-dropdown hidden"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>부품명</label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="f-part" placeholder="예: 정 입력 → 정착기" autocomplete="off">
+        <div id="part-dropdown" class="autocomplete-dropdown hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">작업 항목 (최소 1개<span class="req">*</span>)</div>
+    <div class="field">
+      <label>오버홀</label>
+      <div class="chips" id="overhaul-chips">
+        <div class="chip overhaul" data-overhaul="오버홀1">오버홀1</div>
+        <div class="chip overhaul" data-overhaul="오버홀2">오버홀2</div>
+        <div class="chip overhaul" data-overhaul="오버홀3">오버홀3</div>
+        <div class="chip overhaul" data-overhaul="오버홀4">오버홀4</div>
+        <div class="chip overhaul" data-overhaul="오버홀5">오버홀5</div>
+        <div class="chip overhaul" data-overhaul="기기폐기">기기폐기</div>
+        <div class="chip overhaul" data-overhaul="부품정리">부품정리</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>수리</label>
+      <div class="chips" id="repair-chips">
+        <div class="chip repair" data-repair="수리1">수리1</div>
+        <div class="chip repair" data-repair="수리2">수리2</div>
+        <div class="chip repair" data-repair="수리3">수리3</div>
+        <div class="chip repair" data-repair="수리4">수리4</div>
+        <div class="chip repair" data-repair="수리5">수리5</div>
+        <div class="chip repair" data-repair="재수리">재수리</div>
+        <div class="chip refurb" data-repair="부품제조">부품제조 (리페어)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">소요 시간</div>
+    <div class="field">
+      <label>소요시간 (분)<span class="req">*</span></label>
+      <div class="time-input-wrap">
+        <input type="number" id="f-time" placeholder="0" min="0" inputmode="numeric">
+        <div class="time-display" id="time-display">0분</div>
+      </div>
+      <div class="quick-time">
+        <button data-add="5">+5분</button>
+        <button data-add="10">+10분</button>
+        <button data-add="60">+1시간</button>
+      </div>
+      <div class="time-helper">💡 <b>버튼을 여러 번 눌러서 누적</b>됩니다. 예: +5분 두 번 → 10분, +10분 두 번 → 20분</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">증빙 사진</div>
+    <div style="margin-bottom: 14px;">
+      <div class="photo-label">
+        <span>오버홀 리스트</span>
+        <span class="photo-tag">사진 1</span>
+      </div>
+      <label class="photo-slot" id="slot-overhaul-list">
+        <input type="file" accept="image/*" capture="environment" data-slot="overhaul-list">
+        <div class="placeholder-icon">📋</div>
+        <div class="placeholder-text">탭하여 사진 촬영/선택</div>
+        <div class="placeholder-sub">오버홀 리스트를 찍어주세요</div>
+      </label>
+    </div>
+    <div>
+      <div class="photo-label">
+        <span>4색 색상표</span>
+        <span class="photo-tag">사진 2</span>
+      </div>
+      <label class="photo-slot" id="slot-color-chart">
+        <input type="file" accept="image/*" capture="environment" data-slot="color-chart">
+        <div class="placeholder-icon">🎨</div>
+        <div class="placeholder-text">탭하여 사진 촬영/선택</div>
+        <div class="placeholder-sub">4색 색상표를 찍어주세요</div>
+      </label>
+    </div>
+  </div>
+
+  <div class="warning-box" style="background:#ebf8ff;border-color:#3182ce;color:#2c5282">
+    ℹ️ <strong>실제 시트에 저장됩니다.</strong> 사진은 Google Drive의 "오버홀사진" 폴더에 저장되고, 시트에는 사진 URL이 기록됩니다.
+  </div>
+
+</div>
+
+<div class="footer-bar">
+  <button class="btn btn-secondary" id="btn-reset">초기화</button>
+  <button class="btn btn-primary" id="btn-submit">미리보기</button>
+</div>
+
+<!-- 저장 로그 모달 -->
+<div id="log-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div style="background:linear-gradient(135deg,#3182ce,#2c5282);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2 style="margin:0;font-size:16px">📋 저장 로그</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.9">최근 저장 50건 (브라우저에 보관)</p>
+      </div>
+      <button id="clear-log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px">전체 삭제</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="log-list-wrap" style="max-height:60vh;overflow-y:auto"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="close-log">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 저장 경로 설정 모달 -->
+<div id="save-config-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div style="background:linear-gradient(135deg,#319795,#2c7a7b);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+      <h2 style="margin:0;font-size:16px">저장 경로 설정</h2>
+      <p style="margin:4px 0 0;font-size:12px;opacity:0.9">시트가 바뀌면 여기서 URL과 탭 이름을 변경하세요. 브라우저에 자동 저장됩니다.</p>
+    </div>
+    <div class="modal-body">
+      <div class="config-group">
+        <div class="config-group-title">Apps Script 웹앱</div>
+        <div class="config-row">
+          <label>Web App URL</label>
+          <input type="text" id="cfg-script-url" placeholder="https://script.google.com/macros/s/.../exec">
+          <div class="hint">Apps Script "배포 → 웹앱"에서 발급받은 URL</div>
+        </div>
+      </div>
+
+      <div class="config-group">
+        <div class="config-group-title">메인 시트 (통계용)</div>
+        <div class="config-row">
+          <label>스프레드시트 URL 또는 ID</label>
+          <input type="text" id="cfg-main-sheet" placeholder="시트 URL 전체 또는 ID만">
+          <div class="hint">⚠️ 시트의 <b>편집 URL</b>만 사용 가능 (게시 URL은 인식 안 됨)<br>예: <code>docs.google.com/spreadsheets/d/<b>ID</b>/edit</code><br>같은 파일 내 다른 탭으로 옮길 거면 ID는 그대로 두고 탭 이름만 변경</div>
+        </div>
+        <div class="config-row">
+          <label>탭 이름</label>
+          <input type="text" id="cfg-main-tab" placeholder="예: 리스트(26년)">
+        </div>
+      </div>
+
+      <div class="config-group">
+        <div class="config-group-title">입고 시트 (입고처/시리얼)</div>
+        <div class="config-row">
+          <label>스프레드시트 URL 또는 ID</label>
+          <input type="text" id="cfg-stock-sheet" placeholder="같은 파일이면 메인과 같은 ID">
+        </div>
+        <div class="config-row">
+          <label>탭 이름</label>
+          <input type="text" id="cfg-stock-tab" placeholder="예: 오버홀 완료 정보">
+        </div>
+      </div>
+
+      <button class="reset-default-btn" id="reset-config-default">↺ 기본값으로 되돌리기</button>
+
+      <div style="background:#fffaf0;border-left:3px solid #d69e2e;padding:10px;border-radius:6px;margin-top:12px;font-size:11px;color:#744210">
+        ⚠️ 시트 ID/탭 이름을 바꾸면 <b>Apps Script 코드 상단의 SHEET_ID, MAIN_TAB, STOCK_TAB도 같이 수정</b>해야 실제 저장됨. 이 화면은 폼이 보낼 정보를 정의하는 UI 단계입니다.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="close-save-config">취소</button>
+      <button class="confirm" id="save-save-config">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 담당자 관리 모달 -->
+<div id="person-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div style="background:linear-gradient(135deg,#805ad5,#6b46c1);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+      <h2 style="margin:0;font-size:16px">담당자 관리</h2>
+      <p style="margin:4px 0 0;font-size:12px;opacity:0.9">명단을 추가/삭제하세요. 브라우저에 자동 저장됩니다.</p>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;padding:10px;background:#ebf8ff;border-radius:8px;margin-bottom:12px">
+        <input type="text" id="new-person-name" placeholder="이름" style="padding:8px 10px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px">
+        <select id="new-person-dept" style="padding:8px 10px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;background:#fff">
+          <option value="">부서 (선택)</option>
+          <option>CSS</option>
+          <option>강북A</option>
+          <option>강서B</option>
+          <option>강남C</option>
+          <option>경기D</option>
+          <option>외부인력</option>
+        </select>
+        <button id="add-person-btn" style="background:#2b6cb0;color:#fff;border:none;padding:8px 14px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600">+ 추가</button>
+      </div>
+      <div style="text-align:right;margin-bottom:8px">
+        <button id="reset-persons-btn" style="background:#fed7d7;color:#c53030;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:11px">⟲ 기본 명단으로 초기화 (부서 자동 채움)</button>
+      </div>
+      <div id="person-list-wrap" style="max-height:50vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#f7fafc"><th style="padding:8px;text-align:left;border-bottom:1px solid #edf2f7">이름</th><th style="padding:8px;text-align:left;border-bottom:1px solid #edf2f7">부서</th><th style="padding:8px;border-bottom:1px solid #edf2f7"></th></tr></thead>
+          <tbody id="person-list-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="close-person-modal">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 미리보기 모달 -->
+<div id="preview-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>✓ 입력 확인</h2>
+      <p>아래 내용으로 저장하시겠습니까?</p>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+    <div class="modal-actions">
+      <button class="cancel" id="btn-cancel-preview">수정</button>
+      <button class="confirm" id="btn-confirm-preview">시트에 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === 수정 모드 상태 ===
+let editingRow = null;        // 수정 중인 시트 행 번호 (null = 새 저장 모드)
+let editingPhotosKept = true; // 수정 시 기존 사진 유지 여부 (사용자가 새 사진 첨부하면 false)
+let editingOriginal = null;   // 수정 시작 시점의 원본 데이터 (입고 시트 매칭용)
+
+function enterEditMode(row, formData) {
+  editingRow = row;
+  editingPhotosKept = true;
+  editingOriginal = JSON.parse(JSON.stringify(formData)); // 깊은 복사
+  // 폼 필드 채우기
+  document.getElementById('f-date').value = formData.date || '';
+  document.getElementById('f-person').value = formData.person || '';
+  document.getElementById('f-incoming').value = formData.incoming || '';
+  document.getElementById('f-model').value = formData.model || '';
+  document.getElementById('f-serial').value = formData.serial || '';
+  document.getElementById('f-part').value = formData.part || '';
+  document.getElementById('f-time').value = formData.time || '';
+  updateTimeDisplay();
+  // 부서 칩
+  document.querySelectorAll('.dept-grid .chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.dept === formData.dept);
+  });
+  // 오버홀/수리 칩
+  document.querySelectorAll('.chip[data-overhaul]').forEach(c => {
+    c.classList.toggle('selected', c.dataset.overhaul === formData.overhaul);
+  });
+  document.querySelectorAll('.chip[data-repair]').forEach(c => {
+    c.classList.toggle('selected', c.dataset.repair === formData.repair);
+  });
+  // 사진 슬롯: 비워두고 "기존 사진 유지" 표시
+  photoData['overhaul-list'] = null;
+  photoData['color-chart'] = null;
+  resetPhotoSlot('overhaul-list');
+  resetPhotoSlot('color-chart');
+  // 배너 표시
+  const bar = document.getElementById('edit-mode-bar');
+  const txt = document.getElementById('edit-mode-text');
+  txt.textContent = '✏️ 수정 모드 — 행 ' + row + ' (사진은 새로 첨부 시에만 교체)';
+  bar.style.display = 'flex';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function exitEditMode() {
+  editingRow = null;
+  editingPhotosKept = true;
+  editingOriginal = null;
+  document.getElementById('edit-mode-bar').style.display = 'none';
+}
+// 수정 모드 취소 버튼
+document.addEventListener('DOMContentLoaded', () => {
+  const cancelBtn = document.getElementById('edit-mode-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => {
+    if (editingRow && !confirm('수정을 취소하시겠습니까? 입력 중인 내용은 사라집니다.')) return;
+    exitEditMode();
+    // 폼 초기화는 reset 버튼과 동일하게
+    document.getElementById('f-date').valueAsDate = new Date();
+    ['f-person', 'f-incoming', 'f-model', 'f-serial', 'f-part', 'f-time'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    if (typeof updateTimeDisplay === 'function') updateTimeDisplay();
+    document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
+  };
+});
+
+// === 저장 로그 (localStorage 50개) ===
+const SAVE_LOG_KEY = 'overhaul_save_log_v1';
+function loadSaveLog() {
+  try { const s = localStorage.getItem(SAVE_LOG_KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return [];
+}
+function addSaveLog(entry) {
+  const arr = loadSaveLog();
+  arr.unshift(entry);
+  while (arr.length > 50) arr.pop();
+  localStorage.setItem(SAVE_LOG_KEY, JSON.stringify(arr));
+}
+function clearAllSaveLog() { localStorage.removeItem(SAVE_LOG_KEY); }
+
+// === 세션 확인 (선택) — 폼은 로그인 없이도 사용 가능. 세션이 있으면 자동 채움 ===
+const SESSION_KEY = 'overhaul_session';
+const AUTH_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
+function loadAuthSession() {
+  try {
+    const s = localStorage.getItem(SESSION_KEY);
+    if (!s) return null;
+    const obj = JSON.parse(s);
+    if (obj.expiresAt && new Date(obj.expiresAt).getTime() < Date.now()) { localStorage.removeItem(SESSION_KEY); return null; }
+    return obj;
+  } catch (e) { return null; }
+}
+function clearAuthSession() { localStorage.removeItem(SESSION_KEY); }
+const currentSession = loadAuthSession();
+
+// 헤더 표시: 세션 있으면 user-bar, 없으면 관리자 로그인 버튼
+window.addEventListener('DOMContentLoaded', () => {
+  const bar = document.getElementById('user-bar');
+  const adminLink = document.getElementById('admin-login-link');
+
+  if (!currentSession) {
+    // 비로그인 상태: 관리자 로그인 버튼만 표시 (이미 HTML에 있음). user-bar는 숨김.
+    return;
+  }
+
+  // 로그인 상태: user-bar 표시 + 관리자라면 관리자 페이지 바로가기로 변경
+  const u = currentSession.user;
+  if (bar) bar.style.display = 'flex';
+  const infoText = document.getElementById('user-info-text');
+  if (infoText) {
+    const roleLabel = u.role === 'admin' ? '관리자' : (u.role === 'viewer' ? '통계뷰어' : '사용자');
+    infoText.innerHTML = '👤 ' + u.name + ' (' + u.email + ') · ' + roleLabel;
+  }
+  if (adminLink) {
+    if (u.role === 'admin') { adminLink.textContent = '🛠 관리자 페이지'; adminLink.href = 'admin.html'; }
+    else if (u.role === 'viewer') { adminLink.textContent = '📊 통계 대시보드'; adminLink.href = 'dashboard.html'; }
+    else { adminLink.style.display = 'none'; }
+  }
+
+  // 담당자·부서 자동 채움 (수정 가능)
+  const personInput = document.getElementById('f-person');
+  if (personInput && u.name) personInput.value = u.name;
+  if (u.dept) {
+    document.querySelectorAll('.dept-grid .chip').forEach(c => {
+      if (c.dataset.dept === u.dept) c.classList.add('selected');
+    });
+  }
+
+  // 로그아웃 버튼
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.onclick = () => {
+    if (!confirm('로그아웃하시겠습니까?')) return;
+    clearAuthSession();
+    window.location.reload();
+  };
+});
+
+// === 저장 경로 설정 (localStorage) ===
+const SAVE_CONFIG_KEY = 'overhaul_save_config_v1';
+const DEFAULT_SAVE_CONFIG = {
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec',
+  mainSheet: '1_We_A06s3sk3roIlBcQwCKXRXnWxwrjDtwKC1S-Ku4c',
+  mainTab: '리스트(26년)',
+  stockSheet: '1_We_A06s3sk3roIlBcQwCKXRXnWxwrjDtwKC1S-Ku4c',
+  stockTab: '오버홀 완료 정보'
+};
+function loadSaveConfig() {
+  try { const s = localStorage.getItem(SAVE_CONFIG_KEY); if (s) return { ...DEFAULT_SAVE_CONFIG, ...JSON.parse(s) }; } catch (e) {}
+  return { ...DEFAULT_SAVE_CONFIG };
+}
+function saveSaveConfig(c) { localStorage.setItem(SAVE_CONFIG_KEY, JSON.stringify(c)); }
+function extractSheetId(input) {
+  if (!input) return '';
+  input = input.trim();
+  // 게시 URL 거부 (pubhtml, pub?output=...) — 시트 ID 추출 불가
+  if (input.includes('/spreadsheets/d/e/')) {
+    return { error: '게시 URL은 사용할 수 없습니다. 시트를 열고 브라우저 주소창의 URL(편집용)을 복사해주세요.' };
+  }
+  // 정상 편집 URL: /spreadsheets/d/SHEET_ID/edit
+  const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (m) return m[1];
+  // ID 직접 입력 (44자 정도)
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(input)) return input;
+  return { error: '올바른 시트 URL 또는 ID를 입력해주세요. (예: ' + input.substring(0, 15) + '... 형식이 인식되지 않음)' };
+}
+let saveConfig = loadSaveConfig();
+const APPS_SCRIPT_URL = saveConfig.scriptUrl;  // 호환용 (변경되면 다음 새로고침 후 반영)
+
+// === 모델명 자동완성 목록 ===
+const MODELS = [
+  'Apeos-3560','APEOS-C2060','APEOS-C2061','APEOS-C2450S','APEOS-C2560','Apeos-c2561','APEOS-C2567',
+  'Apeos-C3060','APEOS-C3061','APEOS-C3067','APEOS-C3070','APEOS-C3567','APEOS-C3570','APEOS-C4570',
+  'Apeos-c4571','APEOS-C5570','APEOS-C7070','APEOS-C8180',
+  'ApeosPort-3060','ApeosPort-C2060','ApeosPort-C2560','ApeosPort-C3070','ApeosPort-C3570','ApeosPort-C5570',
+  'ApeosPort-IV C2270(키슈)','ApeosPort-IV C3370(키슈)','APEOSPORT-IV C3373(키슈)','ApeosPort-IV C3375(키슈)',
+  'ApeosPort-IV C3376(키슈)','ApeosPort-IV C5570(키슈)','ApeosPort-IV C5575(키슈)',
+  'ApeosPort-IV C5580(헤라클래스)','ApeosPort-IV C6680(헤라클래스)',
+  'ApeosPort-V C2275(세이토)','ApeosPort-V C2276(세이토)','ApeosPort-V C3373(세이토)','ApeosPort-V C3375(세이토)',
+  'ApeosPort-V C3376(세이토)','ApeosPort-V C4475(세이토)','ApeosPort-V C5575(세이토)','ApeosPort-V C5576(세이토)',
+  'ApeosPort-V C5580(헤라클래스)','ApeosPort-V C5585(헤라클래스)','ApeosPort-V C6680(헤라클래스)','ApeosPort-V3560',
+  'ApeosPort-VI C2271(베니)','ApeosPort-VI C3371(베니)','ApeosPort-VI C4471(베니)','ApeosPort-VI C5571(베니)',
+  'ApeosPort-VII C2273(보탄)','ApeosPort-VII C3373(보탄)','ApeosPort-VII C3375(보탄)','ApeosPort-VII C4473(보탄)','ApeosPort-VII C5573(보탄)',
+  'BIZHUB-025DNI','BIZHUB-028DN','BIZHUB-128DN','BIZHUB-136DN',
+  'CLX-6260FR','CLX-9201NA','CLX-9251NA','CLX-9301NA','CM115W',
+  'D320','D321','D400','D410','D411','D420','D422','D430','D450','D451','D452','D470',
+  'DGWOX-4100','DocuCentre SC2022',
+  'DocuCentre-V C2263(마블)','DocuCentre-V C2265(마블)','DocuCentre-V C2276(세이토)','DocuCentre-V C3375(세이토)','DocuCentre-V3065',
+  'DocuPrint-C5005D','DocuPrint-CM305DF','DocuPrint-CM415AP','DocuPrint-P255dw','DocuPrint CM305',
+  'ECOSYS-M5521CDN','ECOSYS-M5521CDW','ECOSYS-M5526CDN','ECOSYS-MA2100CFX','ECOSYS-P5021cdn','ECOSYS-PA2100CX',
+  'ES5473','HL-L2360DN','HL-L2365DW','HL-L5100DN',
+  'HP DesignJet T790(24형)','HP-477DW','HP-7740','HP-8600','HP-8610','HP-8710','HP-8720','HP-8730','HP-9010','HP-T530','HP-T650',
+  'IM-C2000','IM-C2010','IR-ADV C3525',
+  'MB2390','MF3091(N502)','MFC-8900CDW','MFC-L5700DN','MFC-L8900CDN',
+  'MP-2554','MP-C2003','MP-C2004','MX410',
+  'N501','N502','N600','N601',
+  'SCX-6545X','SCX-8123NA','SCX-8128NA',
+  'SL-C1860FW','SL-C2470FR',
+  'SL-K3250NR','SL-K4250LX','SL-K4250RX','SL-K4255LX','SL-K4255RX','SL-K4300LX','SL-K4305LX','SL-K4350LX','SL-K4355LX','SL-K6350LX',
+  'SL-K703GX','SL-K730GX','SL-K7400LX','SL-K7500LX','SL-K7600GX','SL-K7600LX','SL-K7600LXR','SL-K9600LX',
+  'SL-M2027','SL-M3870FW','SL-M3890FW',
+  'SL-X3220NR','SL-X3280NR','SL-X4220RX','SL-X4225RX','SL-X4250LX','SL-X4255LX','SL-X4255RX','SL-X4300LX','SL-X4305LX',
+  'SL-X5230NR','SL-X6250LX','SL-X6300LX','SL-X7400LX','SL-X7400LXR','SL-X7500LX','SL-X7600LX','SL-X7600LXR','SL-X9400LX','SL-X9600LX',
+  'ACM3CA','A600','AX34N302NWWD','KS7305','KS1270C'
+];
+
+// === 부품명 자동완성 목록 ===
+const PARTS = ['정착기','드럼','현상기','급지부','공청기','문서세단기','전사벨트'];
+
+// === 담당자 명단 (localStorage 저장, 추가/삭제 가능) ===
+const PERSONS_STORAGE_KEY = 'overhaul_persons_v1';
+const DEFAULT_PERSONS = [
+  { name: '박옥주', dept: 'CSS' },{ name: '김정민', dept: 'CSS' },{ name: '심태현', dept: '강북A' },
+  { name: '정웅', dept: '강북A' },{ name: '권태혁', dept: '강서B' },{ name: '윤기준', dept: '강북A' },
+  { name: '조윤', dept: 'CSS' },{ name: '김대우', dept: '경기D' },{ name: '이홍진', dept: '강북A' },
+  { name: '이민구', dept: '강남C' },{ name: '한왕주', dept: '강남C' },{ name: '양승원', dept: '강북A' },
+  { name: '김종희', dept: '경기D' },{ name: '이호준', dept: '경기D' },{ name: '이의수', dept: 'CSS' },
+  { name: '안수복', dept: 'CSS' },{ name: '박영현', dept: 'CSS' },{ name: '정지훈', dept: 'CSS' },
+  { name: '김현군', dept: 'CSS' },{ name: '이혁주', dept: 'CSS' },{ name: '고태훈', dept: '강서B' },
+  { name: '허영재', dept: '강남C' },{ name: '엄재현', dept: '외부인력' },{ name: '유성용', dept: '강북A' }
+];
+function loadPersons() {
+  try { const s = localStorage.getItem(PERSONS_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) return a; } } catch (e) {}
+  return [...DEFAULT_PERSONS];
+}
+function savePersons(arr) { localStorage.setItem(PERSONS_STORAGE_KEY, JSON.stringify(arr)); }
+let personsData = loadPersons();
+
+// === 자동완성 셋업 ===
+function setupAutocomplete(inputId, dropdownId, dataList) {
+  const input = document.getElementById(inputId);
+  const dropdown = document.getElementById(dropdownId);
+
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function render(items, query) {
+    if (items.length === 0) {
+      dropdown.innerHTML = '<div class="autocomplete-empty">목록에 없음 (직접 입력하시면 그대로 사용됩니다)</div>';
+      dropdown.classList.remove('hidden');
+      return;
+    }
+    const q = query.toLowerCase();
+    dropdown.innerHTML = items.map(item => {
+      const lower = item.toLowerCase();
+      const idx = lower.indexOf(q);
+      let html;
+      if (idx >= 0) {
+        html = escapeHtml(item.substring(0, idx)) +
+               '<span class="match">' + escapeHtml(item.substring(idx, idx + q.length)) + '</span>' +
+               escapeHtml(item.substring(idx + q.length));
+      } else {
+        html = escapeHtml(item);
+      }
+      return '<div class="autocomplete-item" data-value="' + escapeHtml(item) + '">' + html + '</div>';
+    }).join('');
+    dropdown.classList.remove('hidden');
+    dropdown.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.onmousedown = (e) => {
+        e.preventDefault(); // blur 막아서 dropdown 닫히기 전에 처리
+        input.value = el.dataset.value;
+        dropdown.classList.add('hidden');
+      };
+    });
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    if (!q) { dropdown.classList.add('hidden'); return; }
+    const filtered = dataList.filter(x => x.toLowerCase().includes(q.toLowerCase()));
+    render(filtered.slice(0, 50), q);
+  });
+
+  input.addEventListener('focus', () => {
+    const q = input.value.trim();
+    if (q) {
+      const filtered = dataList.filter(x => x.toLowerCase().includes(q.toLowerCase()));
+      render(filtered.slice(0, 50), q);
+    }
+  });
+
+  // 외부 클릭 시 닫기
+  input.addEventListener('blur', () => {
+    setTimeout(() => dropdown.classList.add('hidden'), 150);
+  });
+
+  // 키보드 네비게이션
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { dropdown.classList.add('hidden'); return; }
+    if (dropdown.classList.contains('hidden')) return;
+    const items = dropdown.querySelectorAll('.autocomplete-item');
+    if (items.length === 0) return;
+    const current = dropdown.querySelector('.autocomplete-item.active');
+    const currentIdx = current ? [...items].indexOf(current) : -1;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = (currentIdx + 1) % items.length;
+      items.forEach(i => i.classList.remove('active'));
+      items[next].classList.add('active');
+      items[next].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = currentIdx <= 0 ? items.length - 1 : currentIdx - 1;
+      items.forEach(i => i.classList.remove('active'));
+      items[prev].classList.add('active');
+      items[prev].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const activeItem = current || items[0];
+      if (activeItem && activeItem.dataset.value) {
+        input.value = activeItem.dataset.value;
+        dropdown.classList.add('hidden');
+      }
+    }
+  });
+}
+
+setupAutocomplete('f-model', 'model-dropdown', MODELS);
+setupAutocomplete('f-part', 'part-dropdown', PARTS);
+
+// === 시리얼 자동완성 (시트에서 기존 기록 fetch, 부분 일치) ===
+let _serialCache = null;     // [{serial, model, dept, person, date}]
+let _serialCacheAt = 0;
+const SERIAL_CACHE_TTL = 5 * 60 * 1000;
+let _serialFetching = null;
+function serialCacheClear() { _serialCache = null; _serialCacheAt = 0; }
+async function fetchSerials(force) {
+  if (!force && _serialCache && (Date.now() - _serialCacheAt) < SERIAL_CACHE_TTL) return _serialCache;
+  if (_serialFetching) return _serialFetching;
+  _serialFetching = (async () => {
+    try {
+      const resp = await fetch(saveConfig.scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'listSerials',
+          _config: { mainSheet: saveConfig.mainSheet, mainTab: saveConfig.mainTab }
+        }),
+        redirect: 'follow'
+      });
+      const r = await resp.json();
+      if (r.ok && Array.isArray(r.items)) {
+        _serialCache = r.items;
+        _serialCacheAt = Date.now();
+        return _serialCache;
+      }
+    } catch (e) { /* 네트워크 실패 시 자동완성 비활성 — 수동 입력 가능 */ }
+    _serialCache = [];
+    _serialCacheAt = Date.now();
+    return _serialCache;
+  })();
+  try { return await _serialFetching; } finally { _serialFetching = null; }
+}
+function setupSerialAutocomplete() {
+  const input = document.getElementById('f-serial');
+  const dropdown = document.getElementById('serial-dropdown');
+  if (!input || !dropdown) return;
+  function escH(s) { return (s || '').toString().replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function render(items, q) {
+    if (items.length === 0) { dropdown.classList.add('hidden'); return; }
+    const ql = q.toLowerCase();
+    dropdown.innerHTML = items.slice(0, 30).map(it => {
+      const s = it.serial || '';
+      const idx = s.toLowerCase().indexOf(ql);
+      let serialHtml = escH(s);
+      if (idx >= 0) {
+        serialHtml = escH(s.substring(0, idx)) +
+                     '<span class="match">' + escH(s.substring(idx, idx + q.length)) + '</span>' +
+                     escH(s.substring(idx + q.length));
+      }
+      const meta = [it.model, it.person, it.date].filter(Boolean).join(' · ');
+      return '<div class="autocomplete-item" data-serial="' + escH(s) + '" data-model="' + escH(it.model || '') + '" data-dept="' + escH(it.dept || '') + '">'
+        + '<div style="font-family:monospace;font-size:13px;color:#2d3748">' + serialHtml + '</div>'
+        + (meta ? '<div style="font-size:11px;color:#718096;margin-top:2px">' + escH(meta) + '</div>' : '')
+        + '</div>';
+    }).join('');
+    dropdown.classList.remove('hidden');
+    dropdown.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.onmousedown = (e) => {
+        e.preventDefault();
+        input.value = el.dataset.serial;
+        // 모델이 비어있으면 자동 채움
+        const modelInput = document.getElementById('f-model');
+        if (modelInput && !modelInput.value && el.dataset.model) modelInput.value = el.dataset.model;
+        // 부서가 미선택이면 자동 선택
+        const deptSelected = document.querySelector('.dept-grid .chip.selected');
+        if (!deptSelected && el.dataset.dept) {
+          document.querySelectorAll('.dept-grid .chip').forEach(c => {
+            if (c.dataset.dept === el.dataset.dept) c.classList.add('selected');
+          });
+        }
+        dropdown.classList.add('hidden');
+      };
+    });
+  }
+  async function update() {
+    const q = input.value.trim();
+    if (q.length < 1) { dropdown.classList.add('hidden'); return; }
+    const list = await fetchSerials(false);
+    const ql = q.toLowerCase();
+    const matched = list.filter(x => (x.serial || '').toLowerCase().includes(ql));
+    render(matched, q);
+  }
+  input.addEventListener('input', update);
+  input.addEventListener('focus', () => { if (input.value.trim()) update(); });
+  input.addEventListener('blur', () => setTimeout(() => dropdown.classList.add('hidden'), 150));
+}
+setupSerialAutocomplete();
+
+// === 담당자 자동완성 (이름+부서 표시, 선택 시 부서도 자동 선택) ===
+function setupPersonAutocomplete() {
+  const input = document.getElementById('f-person');
+  const dropdown = document.getElementById('person-dropdown');
+  function escHtml(s) { return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function render(items, query) {
+    if (items.length === 0) {
+      dropdown.innerHTML = '<div class="autocomplete-empty">목록에 없음 (직접 입력하시면 그대로 사용됩니다)</div>';
+      dropdown.classList.remove('hidden');
+      return;
+    }
+    const q = query.toLowerCase();
+    dropdown.innerHTML = items.map(p => {
+      const lower = p.name.toLowerCase();
+      const idx = lower.indexOf(q);
+      let nameHtml;
+      if (idx >= 0 && q) {
+        nameHtml = escHtml(p.name.substring(0, idx)) +
+                   '<span class="match">' + escHtml(p.name.substring(idx, idx + q.length)) + '</span>' +
+                   escHtml(p.name.substring(idx + q.length));
+      } else {
+        nameHtml = escHtml(p.name);
+      }
+      const deptBadge = p.dept ? ' <span style="color:#718096;font-size:12px;margin-left:4px">· ' + escHtml(p.dept) + '</span>' : '';
+      return '<div class="autocomplete-item" data-name="' + escHtml(p.name) + '" data-dept="' + escHtml(p.dept || '') + '">' + nameHtml + deptBadge + '</div>';
+    }).join('');
+    dropdown.classList.remove('hidden');
+    dropdown.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.onmousedown = (e) => {
+        e.preventDefault();
+        input.value = el.dataset.name;
+        const dept = el.dataset.dept;
+        // 부서 자동 선택 (저장된 경우만)
+        if (dept) {
+          document.querySelectorAll('.dept-grid .chip').forEach(c => {
+            if (c.dataset.dept === dept) c.classList.add('selected');
+            else c.classList.remove('selected');
+          });
+          document.getElementById('dept-grid').classList.remove('error-border');
+        }
+        dropdown.classList.add('hidden');
+      };
+    });
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    if (!q) { dropdown.classList.add('hidden'); return; }
+    const filtered = personsData.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+    render(filtered, q);
+  });
+  input.addEventListener('focus', () => {
+    const q = input.value.trim();
+    if (q) {
+      const filtered = personsData.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+      render(filtered, q);
+    }
+  });
+  input.addEventListener('blur', () => { setTimeout(() => dropdown.classList.add('hidden'), 150); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { dropdown.classList.add('hidden'); return; }
+    if (dropdown.classList.contains('hidden')) return;
+    const items = dropdown.querySelectorAll('.autocomplete-item');
+    if (items.length === 0) return;
+    const current = dropdown.querySelector('.autocomplete-item.active');
+    const currentIdx = current ? [...items].indexOf(current) : -1;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = (currentIdx + 1) % items.length;
+      items.forEach(i => i.classList.remove('active'));
+      items[next].classList.add('active');
+      items[next].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = currentIdx <= 0 ? items.length - 1 : currentIdx - 1;
+      items.forEach(i => i.classList.remove('active'));
+      items[prev].classList.add('active');
+      items[prev].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const activeItem = current || items[0];
+      if (activeItem && activeItem.dataset.name) {
+        input.value = activeItem.dataset.name;
+        const dept = activeItem.dataset.dept;
+        if (dept) {
+          document.querySelectorAll('.dept-grid .chip').forEach(c => {
+            if (c.dataset.dept === dept) c.classList.add('selected');
+            else c.classList.remove('selected');
+          });
+          document.getElementById('dept-grid').classList.remove('error-border');
+        }
+        dropdown.classList.add('hidden');
+      }
+    }
+  });
+}
+setupPersonAutocomplete();
+
+// === 담당자 관리 모달 ===
+const personModal = document.getElementById('person-modal');
+function renderPersonList() {
+  const tbody = document.getElementById('person-list-body');
+  if (personsData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#a0aec0;padding:20px;font-size:12px">등록된 담당자가 없습니다</td></tr>';
+    return;
+  }
+  // 이름순 정렬
+  const sorted = [...personsData].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  tbody.innerHTML = sorted.map(p => {
+    const realIdx = personsData.findIndex(x => x.name === p.name);
+    return `<tr class="person-row" data-idx="${realIdx}" data-name="${p.name}" data-dept="${p.dept || ''}" style="cursor:pointer">
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#2b6cb0;font-weight:600">${p.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:${p.dept ? '#2d3748' : '#a0aec0'}">${p.dept || '(미지정)'}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;text-align:right">
+        <button class="del-person-btn" data-idx="${realIdx}" style="background:#fed7d7;color:#c53030;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+  // 행 클릭 → 위 입력란에 자동 채움
+  tbody.querySelectorAll('.person-row').forEach(row => {
+    row.onclick = (e) => {
+      // 삭제 버튼 클릭이면 무시 (별도 핸들러)
+      if (e.target.classList.contains('del-person-btn')) return;
+      document.getElementById('new-person-name').value = row.dataset.name;
+      document.getElementById('new-person-dept').value = row.dataset.dept;
+      // 강조 효과
+      tbody.querySelectorAll('.person-row').forEach(r => r.style.background = '');
+      row.style.background = '#ebf8ff';
+      // 입력란 포커스
+      document.getElementById('new-person-name').focus();
+    };
+    row.onmouseenter = () => { if (row.style.background !== 'rgb(235, 248, 255)') row.style.background = '#f7fafc'; };
+    row.onmouseleave = () => { if (row.style.background === 'rgb(247, 250, 252)') row.style.background = ''; };
+  });
+  tbody.querySelectorAll('.del-person-btn').forEach(b => {
+    b.onclick = (e) => {
+      e.stopPropagation(); // 행 클릭 방지
+      const idx = Number(b.dataset.idx);
+      if (!confirm(`'${personsData[idx].name}' 담당자를 삭제하시겠습니까?`)) return;
+      personsData.splice(idx, 1);
+      savePersons(personsData);
+      renderPersonList();
+    };
+  });
+}
+
+// 담당자 설정 진입 버튼은 관리자 페이지로 이동됨 — 폼에는 버튼이 없으므로 가드
+const _personSettingsBtn = document.getElementById('person-settings-btn');
+if (_personSettingsBtn) _personSettingsBtn.onclick = () => {
+  renderPersonList();
+  personModal.classList.remove('hidden');
+};
+document.getElementById('close-person-modal').onclick = () => personModal.classList.add('hidden');
+personModal.onclick = (e) => { if (e.target.id === 'person-modal') personModal.classList.add('hidden'); };
+
+// === 저장 로그 모달 ===
+const logModal = document.getElementById('log-modal');
+function renderSaveLog() {
+  const list = loadSaveLog();
+  const wrap = document.getElementById('log-list-wrap');
+  if (list.length === 0) {
+    wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">아직 저장 기록이 없습니다</div>';
+    return;
+  }
+  wrap.innerHTML = list.map((e, idx) => {
+    const dt = new Date(e.time);
+    const timeStr = dt.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const status = e.ok
+      ? '<span style="background:#c6f6d5;color:#22543d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ 완료</span>'
+      : '<span style="background:#fed7d7;color:#742a2a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✗ 오류</span>';
+    let detail = '';
+    if (e.ok) {
+      detail = '메인 행 ' + (e.row || '?');
+    } else {
+      if (e.networkError) detail = '네트워크: ' + e.networkError;
+      else if (e.mainError) detail = '메인: ' + e.mainError;
+      else if (e.stockError) detail = '입고: ' + e.stockError;
+      else detail = '알 수 없는 오류';
+    }
+    const editable = e.ok && e.row && e.formData;
+    const editHint = editable
+      ? '<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px">✏️ 클릭하여 수정</span>'
+      : (e.ok && e.row ? '<span style="color:#a0aec0;font-size:10px;margin-left:6px">(이전 저장 — 수정 불가)</span>' : '');
+    return `<div class="log-entry" data-idx="${idx}" data-editable="${editable ? '1' : '0'}" style="padding:12px 16px;border-bottom:1px solid #edf2f7;${editable ? 'cursor:pointer' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:13px;color:#2d3748">
+          <b>${e.person || '(이름없음)'}</b>
+          <span style="color:#718096;margin-left:6px">${e.date || ''}</span>
+          ${e.model ? '<span style="color:#a0aec0;margin-left:6px;font-size:11px">' + e.model + '</span>' : ''}
+        </div>
+        ${status}
+      </div>
+      <div style="font-size:11px;color:#718096">${timeStr} · ${detail}${editHint}</div>
+    </div>`;
+  }).join('');
+  // 수정 가능한 항목 클릭 → 폼 채우기
+  wrap.querySelectorAll('.log-entry').forEach(el => {
+    if (el.dataset.editable !== '1') return;
+    el.onmouseenter = () => el.style.background = '#f7fafc';
+    el.onmouseleave = () => el.style.background = '';
+    el.onclick = () => {
+      const idx = Number(el.dataset.idx);
+      const entry = list[idx];
+      if (!entry || !entry.formData || !entry.row) return;
+      if (editingRow && !confirm('현재 수정 중인 내용이 있습니다. 새 항목으로 바꾸시겠습니까?')) return;
+      enterEditMode(entry.row, entry.formData);
+      logModal.classList.add('hidden');
+      showToast('✏️ 수정 모드로 진입했습니다 (행 ' + entry.row + ')', 'success');
+    };
+  });
+}
+document.getElementById('log-btn').onclick = () => {
+  renderSaveLog();
+  logModal.classList.remove('hidden');
+};
+document.getElementById('close-log').onclick = () => logModal.classList.add('hidden');
+logModal.onclick = (e) => { if (e.target.id === 'log-modal') logModal.classList.add('hidden'); };
+document.getElementById('clear-log-btn').onclick = () => {
+  if (!confirm('저장 로그 전체를 삭제하시겠습니까? (시트의 데이터는 그대로 유지됩니다)')) return;
+  clearAllSaveLog();
+  renderSaveLog();
+};
+
+// === 저장 경로 설정 모달 ===
+const saveConfigModal = document.getElementById('save-config-modal');
+function fillSaveConfigInputs() {
+  document.getElementById('cfg-script-url').value = saveConfig.scriptUrl;
+  document.getElementById('cfg-main-sheet').value = saveConfig.mainSheet;
+  document.getElementById('cfg-main-tab').value = saveConfig.mainTab;
+  document.getElementById('cfg-stock-sheet').value = saveConfig.stockSheet;
+  document.getElementById('cfg-stock-tab').value = saveConfig.stockTab;
+}
+// 저장 경로 설정 버튼은 관리자 페이지로 이동됨 — 폼에는 버튼이 없으므로 가드
+const _saveConfigBtn = document.getElementById('save-config-btn');
+if (_saveConfigBtn) _saveConfigBtn.onclick = () => {
+  fillSaveConfigInputs();
+  saveConfigModal.classList.remove('hidden');
+};
+document.getElementById('close-save-config').onclick = () => saveConfigModal.classList.add('hidden');
+saveConfigModal.onclick = (e) => { if (e.target.id === 'save-config-modal') saveConfigModal.classList.add('hidden'); };
+document.getElementById('save-save-config').onclick = () => {
+  const mainResult = extractSheetId(document.getElementById('cfg-main-sheet').value.trim());
+  const stockResult = extractSheetId(document.getElementById('cfg-stock-sheet').value.trim());
+
+  if (mainResult && typeof mainResult === 'object' && mainResult.error) {
+    alert('[메인 시트] ' + mainResult.error);
+    return;
+  }
+  if (stockResult && typeof stockResult === 'object' && stockResult.error) {
+    alert('[입고 시트] ' + stockResult.error);
+    return;
+  }
+
+  const newCfg = {
+    scriptUrl: document.getElementById('cfg-script-url').value.trim(),
+    mainSheet: mainResult || '',
+    mainTab: document.getElementById('cfg-main-tab').value.trim(),
+    stockSheet: stockResult || '',
+    stockTab: document.getElementById('cfg-stock-tab').value.trim()
+  };
+  if (!newCfg.scriptUrl) { alert('Apps Script URL은 필수입니다'); return; }
+  if (!newCfg.mainSheet || !newCfg.mainTab) { alert('메인 시트 ID와 탭 이름은 필수입니다'); return; }
+  saveConfig = newCfg;
+  saveSaveConfig(saveConfig);
+  saveConfigModal.classList.add('hidden');
+  showToast('✅ 저장 경로 설정 저장됨. 다음 저장부터 적용됩니다.', 'success');
+};
+document.getElementById('reset-config-default').onclick = () => {
+  if (!confirm('기본값으로 되돌리시겠습니까?')) return;
+  saveConfig = { ...DEFAULT_SAVE_CONFIG };
+  saveSaveConfig(saveConfig);
+  fillSaveConfigInputs();
+  showToast('기본값으로 복원되었습니다', 'success');
+};
+
+document.getElementById('reset-persons-btn').onclick = () => {
+  if (!confirm('담당자 명단을 기본 24명(부서 포함)으로 되돌리시겠습니까?\n\n현재 추가/수정한 내용이 모두 사라집니다.')) return;
+  personsData = JSON.parse(JSON.stringify(DEFAULT_PERSONS));
+  savePersons(personsData);
+  renderPersonList();
+  showToast('✓ 기본 명단으로 초기화됨', 'success');
+};
+
+document.getElementById('add-person-btn').onclick = () => {
+  const name = document.getElementById('new-person-name').value.trim();
+  const dept = document.getElementById('new-person-dept').value;
+  if (!name) { alert('이름을 입력하세요'); return; }
+  if (personsData.some(p => p.name === name)) {
+    if (!confirm(`'${name}' 이미 등록되어 있습니다. 부서를 '${dept || '(미지정)'}'로 업데이트하시겠습니까?`)) return;
+    personsData = personsData.map(p => p.name === name ? { name, dept } : p);
+  } else {
+    personsData.push({ name, dept });
+  }
+  savePersons(personsData);
+  document.getElementById('new-person-name').value = '';
+  document.getElementById('new-person-dept').value = '';
+  renderPersonList();
+};
+
+// 오늘 날짜 기본값
+document.getElementById('f-date').valueAsDate = new Date();
+document.getElementById('today-info').textContent = new Date().toLocaleDateString('ko-KR', { weekday: 'long', month: 'long', day: 'numeric' });
+
+// 부서 칩 (단일 선택)
+document.querySelectorAll('.dept-grid .chip').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('.dept-grid .chip').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    document.getElementById('dept-grid').classList.remove('error-border');
+  };
+});
+
+// 오버홀/수리 칩
+function setupChips(selector) {
+  document.querySelectorAll(selector).forEach(c => {
+    c.onclick = () => {
+      const wasSelected = c.classList.contains('selected');
+      document.querySelectorAll(selector).forEach(x => x.classList.remove('selected'));
+      if (!wasSelected) c.classList.add('selected');
+      document.getElementById('overhaul-chips').classList.remove('error-border');
+      document.getElementById('repair-chips').classList.remove('error-border');
+    };
+  });
+}
+setupChips('.chip[data-overhaul]');
+setupChips('.chip[data-repair]');
+
+// === 시간 누적 ===
+const timeInput = document.getElementById('f-time');
+const timeDisplay = document.getElementById('time-display');
+function updateTimeDisplay() {
+  const m = Number(timeInput.value) || 0;
+  if (m === 0) timeDisplay.textContent = '0분';
+  else if (m < 60) timeDisplay.textContent = m + '분';
+  else if (m % 60 === 0) timeDisplay.textContent = (m / 60) + '시간';
+  else timeDisplay.textContent = Math.floor(m / 60) + '시간 ' + (m % 60) + '분';
+}
+document.querySelectorAll('.quick-time button').forEach(b => {
+  b.onclick = () => {
+    const add = Number(b.dataset.add);
+    const current = Number(timeInput.value) || 0;
+    timeInput.value = current + add;
+    updateTimeDisplay();
+    timeInput.classList.remove('error');
+  };
+});
+timeInput.addEventListener('input', updateTimeDisplay);
+updateTimeDisplay();
+
+// === 사진 처리 ===
+const photoData = { 'overhaul-list': null, 'color-chart': null };
+
+// 이미지 압축: 긴 변 1280px 이내, JPEG 85% 품질. 실패 시 원본 그대로.
+function compressImageDataUrl(dataUrl, maxDim, quality) {
+  maxDim = maxDim || 1280;
+  quality = quality || 0.85;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > h && w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else if (h >= w && h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (e) { resolve(dataUrl); }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+function dataUrlByteSize(dataUrl) {
+  const b64 = (dataUrl.split(',')[1] || '');
+  return Math.round(b64.length * 3 / 4);
+}
+
+document.querySelectorAll('.photo-slot input[type="file"]').forEach(input => {
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const slot = input.dataset.slot;
+    const slotEl = input.closest('.photo-slot');
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const compressed = await compressImageDataUrl(evt.target.result, 1280, 0.85);
+      const size = dataUrlByteSize(compressed);
+      photoData[slot] = { file, dataUrl: compressed, size: size, name: file.name };
+      const sizeKB = (size / 1024).toFixed(0);
+      slotEl.innerHTML = `
+        <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+        <img src="${compressed}" alt="${slot}">
+        <button class="remove-photo" data-remove="${slot}">×</button>
+        <div class="file-info">${sizeKB}KB</div>
+      `;
+      slotEl.classList.add('has-photo');
+      // 새 input에 핸들러 다시 연결 (handlePhotoChange는 아래에 정의됨)
+      slotEl.querySelector('input[type="file"]').addEventListener('change', handlePhotoChange);
+      // 삭제 버튼
+      slotEl.querySelector('.remove-photo').onclick = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        photoData[slot] = null;
+        resetPhotoSlot(slot);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+function resetPhotoSlot(slot) {
+  const slotEl = document.getElementById('slot-' + slot);
+  const labelText = slot === 'overhaul-list' ? '오버홀 리스트를 찍어주세요' : '4색 색상표를 찍어주세요';
+  const icon = slot === 'overhaul-list' ? '📋' : '🎨';
+  slotEl.innerHTML = `
+    <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+    <div class="placeholder-icon">${icon}</div>
+    <div class="placeholder-text">탭하여 사진 촬영/선택</div>
+    <div class="placeholder-sub">${labelText}</div>
+  `;
+  slotEl.classList.remove('has-photo');
+  // input 핸들러 재연결 - 페이지 reload되니 큰 문제 없음
+  slotEl.querySelector('input[type="file"]').addEventListener('change', handlePhotoChange);
+}
+
+function handlePhotoChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const input = e.target;
+  const slot = input.dataset.slot;
+  const slotEl = input.closest('.photo-slot');
+  slotEl.classList.remove('error'); // 에러 표시 즉시 해제
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    const compressed = await compressImageDataUrl(evt.target.result, 1280, 0.85);
+    const size = dataUrlByteSize(compressed);
+    photoData[slot] = { file, dataUrl: compressed, size: size, name: file.name };
+    const sizeKB = (size / 1024).toFixed(0);
+    slotEl.innerHTML = `
+      <input type="file" accept="image/*" capture="environment" data-slot="${slot}">
+      <img src="${compressed}" alt="${slot}">
+      <button class="remove-photo" data-remove="${slot}">×</button>
+      <div class="file-info">${sizeKB}KB</div>
+    `;
+    slotEl.classList.add('has-photo');
+    slotEl.querySelector('input[type="file"]').addEventListener('change', handlePhotoChange);
+    slotEl.querySelector('.remove-photo').onclick = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      photoData[slot] = null;
+      resetPhotoSlot(slot);
+    };
+  };
+  reader.readAsDataURL(file);
+}
+// 초기 핸들러 (덮어쓰기)
+document.querySelectorAll('.photo-slot input[type="file"]').forEach(input => {
+  input.removeEventListener('change', handlePhotoChange);
+  input.addEventListener('change', handlePhotoChange);
+});
+
+// === 입력값 수집 + 자동 계산 ===
+function collectInputs() {
+  const date = document.getElementById('f-date').value;
+  const person = document.getElementById('f-person').value.trim();
+  const dept = document.querySelector('.dept-grid .chip.selected')?.dataset.dept || '';
+  const incoming = document.getElementById('f-incoming').value.trim();
+  const model = document.getElementById('f-model').value.trim();
+  const serial = document.getElementById('f-serial').value.trim();
+  const part = document.getElementById('f-part').value.trim();
+  const overhaul = document.querySelector('.chip[data-overhaul].selected')?.dataset.overhaul || '';
+  const repair = document.querySelector('.chip[data-repair].selected')?.dataset.repair || '';
+  const time = Number(document.getElementById('f-time').value) || 0;
+  return { date, person, dept, incoming, model, serial, part, overhaul, repair, time };
+}
+
+function computeAutoFields(d) {
+  if (!d.date) return null;
+  const dt = new Date(d.date);
+  const year = dt.getFullYear() + '년';
+  const month = (dt.getMonth() + 1) + '월';
+  const firstDay = new Date(dt.getFullYear(), dt.getMonth(), 1);
+  const dayOfMonth = dt.getDate();
+  const weekOfMonth = Math.ceil((dayOfMonth + firstDay.getDay()) / 7);
+  const weekStr = (dt.getMonth() + 1) + '월' + weekOfMonth + '주차';
+  const overhaulPt = d.overhaul ? (parseInt(d.overhaul.match(/\d+/)?.[0]) || 1) : 0;
+  const repairPt = d.repair ? (parseInt(d.repair.match(/\d+/)?.[0]) || 1) : 0;
+  return { year, month, weekStr, overhaulPt, repairPt };
+}
+
+function validate(d) {
+  const errors = [];
+  if (!d.date) errors.push({ field: 'f-date', msg: '날짜를 선택하세요' });
+  if (!d.person) errors.push({ field: 'f-person', msg: '담당자를 입력하세요' });
+  if (!d.dept) errors.push({ field: 'dept-grid', msg: '부서를 선택하세요' });
+  if (!d.model) errors.push({ field: 'f-model', msg: '모델명을 입력하세요' });
+  if (!d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요' });
+  if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
+  if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
+  // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
+  if (!editingRow) {
+    if (!photoData['overhaul-list']) errors.push({ field: 'slot-overhaul-list', msg: '오버홀 리스트 사진을 첨부하세요' });
+    if (!photoData['color-chart']) errors.push({ field: 'slot-color-chart', msg: '4색 색상표 사진을 첨부하세요' });
+  }
+  return errors;
+}
+
+function showToast(msg, type = 'error') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function showPreview() {
+  const d = collectInputs();
+  const errors = validate(d);
+
+  document.querySelectorAll('.error, .error-border').forEach(el => {
+    el.classList.remove('error', 'error-border');
+  });
+
+  if (errors.length > 0) {
+    errors.forEach(e => {
+      const el = document.getElementById(e.field);
+      if (el) {
+        if (el.classList.contains('chips') || el.classList.contains('dept-grid')) el.classList.add('error-border');
+        else if (el.classList.contains('photo-slot')) el.classList.add('error');
+        else el.classList.add('error');
+      }
+    });
+    // 첫 에러로 스크롤 이동 (사용자가 어디가 잘못됐는지 바로 보이게)
+    const firstEl = document.getElementById(errors[0].field);
+    if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast(errors[0].msg, 'error');
+    return;
+  }
+
+  const auto = computeAutoFields(d);
+  const body = document.getElementById('preview-body');
+  const photoHtml = (slot, label) => {
+    const p = photoData[slot];
+    return p ? `<div class="preview-row"><span class="key">${label}</span><span class="val">${(p.size/1024).toFixed(0)}KB</span></div><img class="preview-photo" src="${p.dataUrl}">` : `<div class="preview-row"><span class="key">${label}</span><span class="val empty">(없음)</span></div>`;
+  };
+
+  body.innerHTML = `
+    <div class="modal-section-title">기본 정보</div>
+    <div class="preview-row"><span class="key">날짜</span><span class="val">${d.date}<br><span style="font-size:11px;color:#718096">${auto.year} ${auto.month} · ${auto.weekStr}</span></span></div>
+    <div class="preview-row"><span class="key">담당자</span><span class="val">${d.person}</span></div>
+    <div class="preview-row"><span class="key">부서</span><span class="val">${d.dept}</span></div>
+
+    <div class="modal-section-title">작업 대상</div>
+    <div class="preview-row"><span class="key">입고처</span>${d.incoming ? '<span class="val">' + d.incoming + '</span>' : '<span class="val empty">(미입력)</span>'}</div>
+    <div class="preview-row"><span class="key">모델명</span>${d.model ? '<span class="val">' + d.model + '</span>' : '<span class="val empty">(미입력)</span>'}</div>
+    <div class="preview-row"><span class="key">시리얼</span>${d.serial ? '<span class="val">' + d.serial + '</span>' : '<span class="val empty">(미입력)</span>'}</div>
+    <div class="preview-row"><span class="key">부품명</span>${d.part ? '<span class="val">' + d.part + '</span>' : '<span class="val empty">(미입력)</span>'}</div>
+
+    <div class="modal-section-title">작업 항목</div>
+    <div class="preview-row"><span class="key">오버홀</span>${d.overhaul ? '<span class="val">' + d.overhaul + '<span class="pt" style="background:#38a169">+' + auto.overhaulPt + 'pt</span></span>' : '<span class="val empty">없음</span>'}</div>
+    <div class="preview-row"><span class="key">수리</span>${d.repair ? '<span class="val">' + d.repair + '<span class="pt" style="background:' + (d.repair === '부품제조' ? '#3182ce' : '#d69e2e') + '">+' + auto.repairPt + 'pt</span></span>' : '<span class="val empty">없음</span>'}</div>
+
+    <div class="modal-section-title">소요 시간</div>
+    <div class="preview-row"><span class="key">시간</span><span class="val">${d.time}분 (${(d.time/60).toFixed(1)}시간)</span></div>
+
+    <div class="modal-section-title">증빙 사진</div>
+    ${photoHtml('overhaul-list', '오버홀 리스트')}
+    ${photoHtml('color-chart', '4색 색상표')}
+  `;
+
+  document.getElementById('preview-modal').classList.remove('hidden');
+}
+
+document.getElementById('btn-submit').onclick = showPreview;
+document.getElementById('btn-cancel-preview').onclick = () => document.getElementById('preview-modal').classList.add('hidden');
+document.getElementById('preview-modal').onclick = (e) => { if (e.target.id === 'preview-modal') document.getElementById('preview-modal').classList.add('hidden'); };
+document.getElementById('btn-confirm-preview').onclick = async () => {
+  const confirmBtn = document.getElementById('btn-confirm-preview');
+  const cancelBtn = document.getElementById('btn-cancel-preview');
+  const original = confirmBtn.textContent;
+  confirmBtn.textContent = '저장 중...';
+  confirmBtn.disabled = true;
+  cancelBtn.disabled = true;
+  try {
+    const d = collectInputs();
+    const payload = {
+      date: d.date,
+      person: d.person,
+      dept: d.dept,
+      incoming: d.incoming,
+      model: d.model,
+      serial: d.serial,
+      part: d.part,
+      overhaul: d.overhaul,
+      repair: d.repair,
+      time: d.time,
+      photos: photoData
+    };
+    // 수정 모드: action=updateWork + row + 옛 시리얼 포함 (입고 시트 매칭용)
+    if (editingRow) {
+      payload.action = 'updateWork';
+      payload.row = editingRow;
+      payload.oldSerial = (editingOriginal && editingOriginal.serial) || '';
+      payload.photosPartial = true;
+    }
+    // payload에 저장 경로 설정도 함께 포함 (Apps Script가 동적으로 사용 가능)
+    payload._config = {
+      mainSheet: saveConfig.mainSheet,
+      mainTab: saveConfig.mainTab,
+      stockSheet: saveConfig.stockSheet,
+      stockTab: saveConfig.stockTab
+    };
+    const resp = await fetch(saveConfig.scriptUrl, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      redirect: 'follow'
+      // Content-Type을 명시하지 않음 — 기본 text/plain으로 CORS preflight 회피
+    });
+    const result = await resp.json();
+    if (result.ok) {
+      // 로그 기록 (수정이면 기존 로그 항목 갱신, 새 저장이면 추가)
+      const d2 = collectInputs();
+      const wasEditing = !!editingRow;
+      const targetRow = result.row || editingRow;
+      const newEntry = {
+        time: new Date().toISOString(),
+        date: d2.date,
+        person: d2.person,
+        model: d2.model,
+        ok: !result.mainError && result.stockSaved !== false,
+        row: targetRow,
+        mainError: result.mainError,
+        stockError: result.stockError,
+        formData: { date: d2.date, person: d2.person, dept: d2.dept, incoming: d2.incoming, model: d2.model, serial: d2.serial, part: d2.part, overhaul: d2.overhaul, repair: d2.repair, time: d2.time }
+      };
+      if (wasEditing) {
+        // 같은 row 번호의 기존 로그를 교체
+        const arr = loadSaveLog();
+        const idx = arr.findIndex(x => x.row === targetRow);
+        if (idx >= 0) arr.splice(idx, 1);
+        arr.unshift(newEntry);
+        while (arr.length > 50) arr.pop();
+        localStorage.setItem(SAVE_LOG_KEY, JSON.stringify(arr));
+      } else {
+        addSaveLog(newEntry);
+      }
+      document.getElementById('preview-modal').classList.add('hidden');
+      // 수정 모드 종료 + 시리얼 캐시 무효화
+      if (wasEditing) { exitEditMode(); }
+      serialCacheClear();
+      let msg = '';
+      // 메인 시트 상태
+      if (result.mainError) {
+        msg += '메인 ✗: ' + result.mainError;
+      } else {
+        msg += (wasEditing ? '메인 행 ' + targetRow + ' 수정 ✓' : '메인 행 ' + result.row + ' ✓');
+      }
+      // 입고 시트 상태
+      if (result.stockSaved === true) msg += ' | 입고 ✓';
+      else if (result.stockError) msg += ' | 입고 ✗: ' + result.stockError;
+      else msg += ' | 입고 -';
+      // 사용된 설정 + 디버그 정보 표시
+      if (result.usedConfig) {
+        const sid = result.usedConfig.mainSheetId || '';
+        msg += ' [ID=' + sid.substring(0, 12) + '..., 탭="' + result.usedConfig.mainTabName + '"]';
+      }
+      if (result.debug) {
+        const d = result.debug;
+        msg += ' [DEBUG: lastRow=' + d.lastRow + ', maxNum=' + d.maxNum + ', firstEmpty=' + d.firstEmptyRow + ', hasDate=' + d.hasDateCount + ', gid=' + d.sheetGid + ']';
+      }
+      const allOk = !result.mainError && result.stockSaved === true;
+      showToast((allOk ? '✅ ' : '⚠️ ') + msg, allOk ? 'success' : 'error');
+      console.log('Save response:', result);
+      // 폼 초기화
+      document.getElementById('f-date').valueAsDate = new Date();
+      ['f-person', 'f-incoming', 'f-model', 'f-serial', 'f-part', 'f-time'].forEach(id => document.getElementById(id).value = '');
+      updateTimeDisplay();
+      document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
+      photoData['overhaul-list'] = null;
+      photoData['color-chart'] = null;
+      resetPhotoSlot('overhaul-list');
+      resetPhotoSlot('color-chart');
+    } else {
+      showToast('❌ 저장 실패: ' + result.error, 'error');
+    }
+  } catch (e) {
+    // 네트워크 에러도 로그 기록
+    try {
+      const d = collectInputs();
+      addSaveLog({
+        time: new Date().toISOString(), date: d.date, person: d.person, model: d.model,
+        ok: false, networkError: e.message
+      });
+    } catch (_) {}
+    showToast('❌ 네트워크 오류: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    confirmBtn.textContent = original;
+    confirmBtn.disabled = false;
+    cancelBtn.disabled = false;
+  }
+};
+
+document.getElementById('btn-reset').onclick = () => {
+  if (!confirm('입력한 내용을 모두 지우시겠습니까?')) return;
+  document.getElementById('f-date').valueAsDate = new Date();
+  ['f-person', 'f-incoming', 'f-model', 'f-serial', 'f-part', 'f-time'].forEach(id => document.getElementById(id).value = '');
+  updateTimeDisplay();
+  document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.error, .error-border').forEach(el => el.classList.remove('error', 'error-border'));
+  photoData['overhaul-list'] = null;
+  photoData['color-chart'] = null;
+  resetPhotoSlot('overhaul-list');
+  resetPhotoSlot('color-chart');
+};
+</script>
+</body>
+</html>
