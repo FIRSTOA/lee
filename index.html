@@ -866,7 +866,7 @@ function render() {
     const q = quotaOf(p);
     const cells = quotaWeeks.map(w => {
       const v = personWeekCount[p][w] || 0;
-      const cls = v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"');
+      const cls = v === 0 ? 'style="color:#a0aec0"' : (v >= q && q > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (q === 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="background:#fed7d7;color:#742a2a"'));
       return '<td class="num" ' + cls + '>' + v + '</td>';
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
@@ -878,7 +878,8 @@ function render() {
       const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
       pctCell = '<td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
     } else if (total > 0) {
-      pctCell = '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 상태에서 ' + total + '건 작업">달성+</td>';
+      const overPct = 100 + total;
+      pctCell = '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 — 100% + 실적 ' + total + '건">' + overPct + '%</td>';
     } else {
       pctCell = '<td class="num" style="color:#a0aec0">—</td>';
     }
