@@ -1090,52 +1090,52 @@ personModal.onclick = (e) => { if (e.target.id === 'person-modal') personModal.c
 
 // === 저장 로그 모달 ===
 const logModal = document.getElementById('log-modal');
-async function renderSaveLog() {
+function renderSaveLog() {
+  const list = loadSaveLog();
   const wrap = document.getElementById('log-list-wrap');
-  wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">불러오는 중...</div>';
-  let items = [];
-  try {
-    const resp = await fetch(saveConfig.scriptUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'listRecentSaves',
-        limit: 50,
-        _config: { mainSheet: saveConfig.mainSheet, mainTab: saveConfig.mainTab, stockSheet: saveConfig.stockSheet, stockTab: saveConfig.stockTab }
-      }),
-      redirect: 'follow'
-    });
-    const r = await resp.json();
-    if (!r.ok) { wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">불러오기 실패: ' + (r.error || '') + '</div>'; return; }
-    items = Array.isArray(r.items) ? r.items : [];
-  } catch (e) {
-    wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">네트워크 오류: ' + e.message + '</div>';
+  if (list.length === 0) {
+    wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">아직 저장 기록이 없습니다</div>';
     return;
   }
-  if (items.length === 0) {
-    wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">저장 기록이 없습니다</div>';
-    return;
-  }
-  wrap.innerHTML = items.map((e, idx) => {
-    const fd = e.formData || {};
-    const editHint = '<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px">✏️ 클릭하여 수정</span>';
-    return `<div class="log-entry" data-idx="${idx}" style="padding:12px 16px;border-bottom:1px solid #edf2f7;cursor:pointer">
+  wrap.innerHTML = list.map((e, idx) => {
+    const dt = new Date(e.time);
+    const timeStr = dt.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const status = e.ok
+      ? '<span style="background:#c6f6d5;color:#22543d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ 완료</span>'
+      : '<span style="background:#fed7d7;color:#742a2a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✗ 오류</span>';
+    let detail = '';
+    if (e.ok) {
+      detail = '메인 행 ' + (e.row || '?');
+    } else {
+      if (e.networkError) detail = '네트워크: ' + e.networkError;
+      else if (e.mainError) detail = '메인: ' + e.mainError;
+      else if (e.stockError) detail = '입고: ' + e.stockError;
+      else detail = '알 수 없는 오류';
+    }
+    const editable = e.ok && e.row && e.formData;
+    const editHint = editable
+      ? '<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px">✏️ 클릭하여 수정</span>'
+      : (e.ok && e.row ? '<span style="color:#a0aec0;font-size:10px;margin-left:6px">(이전 저장 — 수정 불가)</span>' : '');
+    return `<div class="log-entry" data-idx="${idx}" data-editable="${editable ? '1' : '0'}" style="padding:12px 16px;border-bottom:1px solid #edf2f7;${editable ? 'cursor:pointer' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <div style="font-size:13px;color:#2d3748">
-          <b>${fd.person || '(이름없음)'}</b>
-          <span style="color:#718096;margin-left:6px">${fd.date || ''}</span>
-          ${fd.model ? '<span style="color:#a0aec0;margin-left:6px;font-size:11px">' + fd.model + '</span>' : ''}
+          <b>${e.person || '(이름없음)'}</b>
+          <span style="color:#718096;margin-left:6px">${e.date || ''}</span>
+          ${e.model ? '<span style="color:#a0aec0;margin-left:6px;font-size:11px">' + e.model + '</span>' : ''}
         </div>
-        <span style="background:#c6f6d5;color:#22543d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">✓ 완료</span>
+        ${status}
       </div>
-      <div style="font-size:11px;color:#718096">번호 ${e.number || '?'} · 메인 행 ${e.row}${editHint}</div>
+      <div style="font-size:11px;color:#718096">${timeStr} · ${detail}${editHint}</div>
     </div>`;
   }).join('');
+  // 수정 가능한 항목 클릭 → 폼 채우기
   wrap.querySelectorAll('.log-entry').forEach(el => {
+    if (el.dataset.editable !== '1') return;
     el.onmouseenter = () => el.style.background = '#f7fafc';
     el.onmouseleave = () => el.style.background = '';
     el.onclick = () => {
       const idx = Number(el.dataset.idx);
-      const entry = items[idx];
+      const entry = list[idx];
       if (!entry || !entry.formData || !entry.row) return;
       if (editingRow && !confirm('현재 수정 중인 내용이 있습니다. 새 항목으로 바꾸시겠습니까?')) return;
       enterEditMode(entry.row, entry.formData);
@@ -1150,9 +1150,11 @@ document.getElementById('log-btn').onclick = () => {
 };
 document.getElementById('close-log').onclick = () => logModal.classList.add('hidden');
 logModal.onclick = (e) => { if (e.target.id === 'log-modal') logModal.classList.add('hidden'); };
-// '전체 삭제' 버튼은 서버 공유 로그에선 의미 없어 새로고침 역할로 변경
-document.getElementById('clear-log-btn').textContent = '↻ 새로고침';
-document.getElementById('clear-log-btn').onclick = () => { renderSaveLog(); };
+document.getElementById('clear-log-btn').onclick = () => {
+  if (!confirm('저장 로그 전체를 삭제하시겠습니까? (시트의 데이터는 그대로 유지됩니다)')) return;
+  clearAllSaveLog();
+  renderSaveLog();
+};
 
 // === 저장 경로 설정 모달 ===
 const saveConfigModal = document.getElementById('save-config-modal');
