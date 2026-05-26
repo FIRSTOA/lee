@@ -847,7 +847,7 @@ function render() {
   const qTbl = document.getElementById('quotaTable');
   const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
   const qHdr = document.createElement('tr');
-  qHdr.innerHTML = '<th>담당자</th><th>주간 목표</th>' + quotaWeeks.map(w => '<th>' + w + '</th>').join('') + '<th>총 실적</th><th>총 목표</th><th>달성률</th>';
+  qHdr.innerHTML = '<th>담당자</th><th>주간 목표</th>' + quotaWeeks.map(w => '<th>' + w + '</th>').join('') + '<th>총 목표</th><th>총 실적</th><th>달성률</th>';
   qThead.appendChild(qHdr);
   const qBody = qTbl.querySelector('tbody'); qBody.innerHTML = '';
   const qColspan = 5 + quotaWeeks.length;
@@ -866,7 +866,7 @@ function render() {
     const q = quotaOf(p);
     const cells = quotaWeeks.map(w => {
       const v = personWeekCount[p][w] || 0;
-      const cls = q === 0 ? 'style="color:#a0aec0"' : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
+      const cls = q === 0 ? (v > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="color:#a0aec0"') : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
       return '<td class="num" ' + cls + '>' + v + '</td>';
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
@@ -883,7 +883,7 @@ function render() {
     } else {
       pctCell = '<td class="num" style="color:#a0aec0">—</td>';
     }
-    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num"><b>' + total + '</b></td><td class="num">' + target + '</td>' + pctCell;
+    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCell;
     qBody.appendChild(tr);
   });
 
