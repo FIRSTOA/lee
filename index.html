@@ -866,7 +866,7 @@ function render() {
     const q = quotaOf(p);
     const cells = quotaWeeks.map(w => {
       const v = personWeekCount[p][w] || 0;
-      const cls = v === 0 ? 'style="color:#a0aec0"' : (v >= q && q > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (q === 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="background:#fed7d7;color:#742a2a"'));
+      const cls = q === 0 ? 'style="color:#a0aec0"' : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
       return '<td class="num" ' + cls + '>' + v + '</td>';
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
