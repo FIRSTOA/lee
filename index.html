@@ -357,6 +357,7 @@
 
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQU9um9z8bbHSMpIs1B-kP6FZ1sSCR1HoUIaN7IG8zGaQMGaAAVWa-SjXZaiKiSPxStK0KR_hitGKRA/pub?output=csv&gid=0&single=true';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
 const HEADER_ROW_MARKERS = ['번호', '1열', '0'];
 
 const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '#3182ce', '기기폐기': '#e53e3e', '부품정리': '#805ad5', '기타': '#a0aec0' };
@@ -590,16 +591,20 @@ async function loadData() {
   status.innerHTML = '<span class="spinner"></span>Google 시트에서 최신 데이터를 가져오는 중...';
   if (btn) btn.disabled = true;
   try {
-    const url = CSV_URL + '&_=' + Date.now();
-    const resp = await fetch(url, { cache: 'no-store' });
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'dashboardData' }),
+      redirect: 'follow'
+    });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const text = await resp.text();
-    RAW_DATA = processRows(parseCSV(text));
+    const r = await resp.json();
+    if (!r.ok) throw new Error(r.error || '데이터 로드 실패');
+    RAW_DATA = processRows(r.rows);
     if (RAW_DATA.length === 0) throw new Error('파싱된 데이터가 0건입니다');
     document.getElementById('mainContent').classList.remove('hidden');
     document.getElementById('updatedAt').textContent = '업데이트: ' + new Date().toLocaleString('ko-KR', { hour12: false });
     status.className = 'status';
-    status.textContent = '✓ ' + RAW_DATA.length.toLocaleString() + '건 로드 (시트 캐시 TTL ~5분)';
+    status.textContent = '✓ ' + RAW_DATA.length.toLocaleString() + '건 로드 (Apps Script 직접 읽기)';
     populateFilters();
     render();
   } catch (e) {
