@@ -340,12 +340,17 @@
       <span style="font-size:12px;color:#718096">건/주</span>
     </div>
     <table class="qtable">
-      <thead><tr><th>담당자</th><th style="text-align:right">주간 목표</th><th></th></tr></thead>
+      <thead><tr><th>담당자</th><th style="text-align:right">주간 목표</th><th>부서</th><th></th></tr></thead>
       <tbody id="quotaConfigBody"></tbody>
     </table>
     <div class="add-row">
       <input type="text" id="newPersonName" placeholder="담당자 이름">
       <input type="number" id="newPersonQuota" placeholder="목표" min="0">
+      <select id="newPersonDept" style="padding:6px 8px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;background:#fff">
+        <option value="">부서 선택</option>
+        <option>CSS</option><option>강북A</option><option>강서B</option>
+        <option>강남C</option><option>경기D</option><option>외부인력</option>
+      </select>
       <button class="btn-add" id="addPersonBtn">+ 추가</button>
     </div>
     <div class="actions">
@@ -369,13 +374,22 @@ const QUOTA_STORAGE_KEY = 'overhaul_quota_v1';
 function loadQuotaConfig() {
   try {
     const s = localStorage.getItem(QUOTA_STORAGE_KEY);
-    if (s) { const c = JSON.parse(s); if (typeof c.default === 'number' && c.persons) return c; }
+    if (s) {
+      const c = JSON.parse(s);
+      if (typeof c.default === 'number' && c.persons) {
+        // 마이그레이션: 숫자 형식을 {dept, target} 객체로
+        Object.keys(c.persons).forEach(k => {
+          if (typeof c.persons[k] === 'number') c.persons[k] = { dept: '', target: c.persons[k] };
+        });
+        return c;
+      }
+    }
   } catch (e) {}
   return { default: 3, persons: {} };
 }
 function saveQuotaConfig(c) { localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(c)); }
 let quotaConfig = loadQuotaConfig();
-function quotaOf(person) { return quotaConfig.persons[person] ?? quotaConfig.default; }
+function quotaOf(person) { const p = quotaConfig.persons[person]; if (p == null) return quotaConfig.default; if (typeof p === 'number') return p; return p.target ?? quotaConfig.default; }
 
 // 정량 목표 카드 로컬 필터 상태
 const QUOTA_FILTER_FIELDS = ['년','월','주차별','부서명'];
@@ -832,6 +846,8 @@ function render() {
   // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
   const personToDept = {};
   overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
+  // quota config의 명시 부서 우선 적용
+  Object.keys(quotaConfig.persons).forEach(nm => { const cfg = quotaConfig.persons[nm]; if (cfg && typeof cfg === 'object' && cfg.dept) personToDept[nm] = cfg.dept; });
   const deptSelected = quotaFilterState['부서명'] && quotaFilterState['부서명'].size > 0;
   const quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
     if (deptSelected) {
@@ -972,23 +988,56 @@ function closeQuotaModal() { quotaModal.classList.add('hidden'); }
 
 function renderQuotaConfigTable(tmp) {
   quotaConfigBody.innerHTML = '';
-  const names = Object.keys(tmp.persons).sort();
+  const names = Object.keys(tmp.persons);
   if (names.length === 0) {
-    quotaConfigBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#a0aec0;padding:20px">등록된 담당자가 없습니다. 아래에서 추가하세요.</td></tr>';
+    quotaConfigBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#a0aec0;padding:20px">등록된 담당자가 없습니다. 아래에서 추가하세요.</td></tr>';
     return;
   }
+  // 부서별 그룹화
+  const groups = {};
   names.forEach(name => {
-    const tr = document.createElement('tr');
-    const tdName = document.createElement('td'); tdName.textContent = name; tr.appendChild(tdName);
-    const tdQuota = document.createElement('td'); tdQuota.style.textAlign = 'right';
-    const inp = document.createElement('input'); inp.type = 'number'; inp.min = '0'; inp.value = tmp.persons[name];
-    inp.onchange = () => { tmp.persons[name] = Number(inp.value) || 0; };
-    tdQuota.appendChild(inp); tr.appendChild(tdQuota);
-    const tdAct = document.createElement('td'); tdAct.className = 'actions';
-    const del = document.createElement('button'); del.className = 'del-btn'; del.textContent = '삭제';
-    del.onclick = () => { delete tmp.persons[name]; renderQuotaConfigTable(tmp); };
-    tdAct.appendChild(del); tr.appendChild(tdAct);
-    quotaConfigBody.appendChild(tr);
+    const p = tmp.persons[name];
+    const dept = (p && typeof p === 'object' && p.dept) ? p.dept : '미지정';
+    if (!groups[dept]) groups[dept] = [];
+    groups[dept].push(name);
+  });
+  const orderedDepts = [...DEPT_ORDER, '미지정'].filter(d => groups[d]);
+  const otherDepts = Object.keys(groups).filter(d => !orderedDepts.includes(d));
+  const allDepts = [...orderedDepts, ...otherDepts];
+  allDepts.forEach(dept => {
+    const hdr = document.createElement('tr');
+    hdr.innerHTML = '<td colspan="4" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px">▸ ' + dept + ' (' + groups[dept].length + '명)</td>';
+    quotaConfigBody.appendChild(hdr);
+    groups[dept].sort((a, b) => a.localeCompare(b, 'ko')).forEach(name => {
+      const p = tmp.persons[name];
+      const target = (typeof p === 'object') ? p.target : p;
+      const currentDept = (typeof p === 'object' && p.dept) ? p.dept : '';
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td'); tdName.textContent = name; tr.appendChild(tdName);
+      const tdQuota = document.createElement('td'); tdQuota.style.textAlign = 'right';
+      const inp = document.createElement('input'); inp.type = 'number'; inp.min = '0'; inp.value = target;
+      inp.onchange = () => {
+        const t = Number(inp.value) || 0;
+        const ex = tmp.persons[name];
+        tmp.persons[name] = (typeof ex === 'object') ? { dept: ex.dept || '', target: t } : { dept: '', target: t };
+      };
+      tdQuota.appendChild(inp); tr.appendChild(tdQuota);
+      const tdDept = document.createElement('td');
+      const sel = document.createElement('select');
+      sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:#fff';
+      sel.innerHTML = '<option value="">미지정</option>' + DEPT_ORDER.map(d => '<option value="' + d + '"' + (d === currentDept ? ' selected' : '') + '>' + d + '</option>').join('');
+      sel.onchange = () => {
+        const t = (typeof tmp.persons[name] === 'object') ? tmp.persons[name].target : tmp.persons[name];
+        tmp.persons[name] = { dept: sel.value, target: t };
+        renderQuotaConfigTable(tmp);
+      };
+      tdDept.appendChild(sel); tr.appendChild(tdDept);
+      const tdAct = document.createElement('td'); tdAct.className = 'actions';
+      const del = document.createElement('button'); del.className = 'del-btn'; del.textContent = '삭제';
+      del.onclick = () => { delete tmp.persons[name]; renderQuotaConfigTable(tmp); };
+      tdAct.appendChild(del); tr.appendChild(tdAct);
+      quotaConfigBody.appendChild(tr);
+    });
   });
 }
 
@@ -1017,11 +1066,13 @@ quotaModal.onclick = (e) => { if (e.target === quotaModal) closeQuotaModal(); };
 document.getElementById('addPersonBtn').onclick = () => {
   const name = document.getElementById('newPersonName').value.trim();
   const quota = Number(document.getElementById('newPersonQuota').value);
+  const dept = document.getElementById('newPersonDept').value;
   if (!name) { alert('이름을 입력하세요'); return; }
   if (isNaN(quota) || quota < 0) { alert('목표 값을 입력하세요'); return; }
-  quotaModal._tmp.persons[name] = quota;
+  quotaModal._tmp.persons[name] = { dept: dept, target: quota };
   document.getElementById('newPersonName').value = '';
   document.getElementById('newPersonQuota').value = '';
+  document.getElementById('newPersonDept').value = '';
   renderQuotaConfigTable(quotaModal._tmp);
 };
 document.getElementById('saveQuotaBtn').onclick = () => {
