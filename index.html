@@ -332,7 +332,7 @@
 <!-- 정량 목표 설정 모달 -->
 <div id="quotaModal" class="modal-overlay hidden">
   <div class="modal">
-    <h2>정량 목표 설정</h2>
+    <h2>정량 목표 설정 (<span id="quotaTotalCount">0</span>명)</h2>
     <div class="sub">담당자별 주간 오버홀 목표를 설정합니다. 변경 후 저장하면 정량 목표 달성 현황표에 즉시 반영됩니다. 브라우저에 자동 저장되며 다음에 접속 시 그대로 유지됩니다.</div>
     <div class="field-row">
       <label>기본 주간 목표 (등록 안 된 사람):</label>
@@ -835,7 +835,10 @@ function render() {
   const quotaBase = applyQuotaFilters(RAW_DATA);
   const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
-  const quotaPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))];
+  // 데이터에 있는 담당자 + 설정에 등록된 담당자 모두 포함 (작업 0건이어도 표시)
+  const dataPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))];
+  const configPersons = Object.keys(quotaConfig.persons);
+  const quotaPersons = [...new Set([...dataPersons, ...configPersons])];
   const personWeekCount = {};
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
   overhaulOnly.forEach(r => {
@@ -989,6 +992,7 @@ function closeQuotaModal() { quotaModal.classList.add('hidden'); }
 function renderQuotaConfigTable(tmp) {
   quotaConfigBody.innerHTML = '';
   const names = Object.keys(tmp.persons);
+  const totalEl = document.getElementById('quotaTotalCount'); if (totalEl) totalEl.textContent = names.length;
   if (names.length === 0) {
     quotaConfigBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#a0aec0;padding:20px">등록된 담당자가 없습니다. 아래에서 추가하세요.</td></tr>';
     return;
