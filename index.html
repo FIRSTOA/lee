@@ -566,6 +566,9 @@ function processRows(allRows) {
     for (let j = 0; j < headers.length && j < cols.length; j++) r[headers[j]] = (cols[j] || '').trim();
     r.오버홀품목 = (r.오버홀품목 || '').replace(/\s+/g, '');
     r.수리품목 = (r.수리품목 || '').replace(/\s+/g, '');
+    // 년/월/주차 정규화 — 숫자만 있으면 단위 추가 (혼합 형식 통일)
+    if (r.년 && /^\d+$/.test(r.년)) r.년 = r.년 + '년';
+    if (r.월 && /^\d+$/.test(r.월)) r.월 = r.월 + '월';
     // 숫자 파싱 — "70분" 같은 단위 포함도 처리, 콤마(천단위) 제거
     r.소요시간 = parseFloat(String(r.소요시간).replace(/,/g, '')) || 0;
     r.오버홀포인트 = parseFloat(String(r.오버홀포인트).replace(/,/g, '')) || 0;
