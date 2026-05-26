@@ -870,13 +870,19 @@ function render() {
   qThead.appendChild(qHdr);
   const qBody = qTbl.querySelector('tbody'); qBody.innerHTML = '';
   const qColspan = 5 + quotaWeeks.length;
+  // 부서별 인원수 미리 계산
+  const qDeptCount = {};
+  quotaPersonsSorted.forEach(p => {
+    const d = personToDept[p] || '(미지정)';
+    qDeptCount[d] = (qDeptCount[d] || 0) + 1;
+  });
   let qLastDept = null;
   quotaPersonsSorted.forEach(p => {
     if (deptSelected) {
       const curDept = personToDept[p] || '(미지정)';
       if (curDept !== qLastDept) {
         const headerTr = document.createElement('tr');
-        headerTr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + curDept + '</td>';
+        headerTr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + curDept + ' (' + qDeptCount[curDept] + '명)</td>';
         qBody.appendChild(headerTr);
         qLastDept = curDept;
       }
