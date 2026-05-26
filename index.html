@@ -871,9 +871,18 @@ function render() {
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
     const target = q * quotaWeeks.length;
-    const pct = target > 0 ? Math.round(total / target * 100) : 0;
-    const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
-    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num"><b>' + total + '</b></td><td class="num">' + target + '</td><td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
+    // 목표 0인 경우: 작업했으면 '달성+' 녹색, 아니면 '-' 회색
+    let pctCell;
+    if (target > 0) {
+      const pct = Math.round(total / target * 100);
+      const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
+      pctCell = '<td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
+    } else if (total > 0) {
+      pctCell = '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 상태에서 ' + total + '건 작업">달성+</td>';
+    } else {
+      pctCell = '<td class="num" style="color:#a0aec0">—</td>';
+    }
+    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num"><b>' + total + '</b></td><td class="num">' + target + '</td>' + pctCell;
     qBody.appendChild(tr);
   });
 
