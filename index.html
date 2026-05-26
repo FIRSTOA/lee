@@ -899,7 +899,9 @@ function render() {
   });
 
   const rawTb = document.querySelector('#rawTable tbody'); rawTb.innerHTML = '';
-  data.forEach(r => {
+  // 번호 내림차순 (최신 먼저)
+  const sortedData = [...data].sort((a, b) => (Number(b.번호) || 0) - (Number(a.번호) || 0));
+  sortedData.forEach(r => {
     const tr = document.createElement('tr');
     const cats = r.카테고리목록.map(badge).join(' ');
     tr.innerHTML = '<td>'+r.번호+'</td><td>'+r.날짜+'</td><td>'+r.년+'</td><td>'+r.월+'</td><td>'+r.주차별+'</td><td>'+r.담당자+'</td><td>'+r.부서명+'</td><td>'+(r.오버홀품목||'')+'</td><td>'+(r.수리품목||'')+'</td><td>'+cats+'</td><td class="num">'+r.소요시간+'</td>';
