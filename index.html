@@ -829,12 +829,21 @@ function render() {
       personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + 1;
     }
   });
-  const quotaPersonsSorted = [...quotaPersons].sort((a,b) => {
-    const ta = quotaWeeks.reduce((s,w) => s + (personWeekCount[a][w] || 0), 0);
-    const tb = quotaWeeks.reduce((s,w) => s + (personWeekCount[b][w] || 0), 0);
-    return tb - ta;
+  // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
+  const personToDept = {};
+  overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
+  const deptSelected = quotaFilterState['부서명'] && quotaFilterState['부서명'].size > 0;
+  const quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
+    if (deptSelected) {
+      const ia = DEPT_ORDER.indexOf(personToDept[a] || '');
+      const ib = DEPT_ORDER.indexOf(personToDept[b] || '');
+      const ai = ia === -1 ? 999 : ia;
+      const bi = ib === -1 ? 999 : ib;
+      if (ai !== bi) return ai - bi;
+    }
+    return a.localeCompare(b, 'ko');
   });
-  document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황 (오버홀 · ' + quotaWeeks.length + '개 주차 · 기본 주간목표 ' + quotaConfig.default + '건)';
+  document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황';
   const qTbl = document.getElementById('quotaTable');
   const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
   const qHdr = document.createElement('tr');
