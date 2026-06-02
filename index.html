@@ -121,7 +121,8 @@
   .qp-card { flex: 1 1 150px; min-width: 140px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 13px; background: #f8fafc; }
   .qp-card .qp-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; color: #2b6cb0; }
   .qp-card .qp-top small { color: #a0aec0; font-weight: 500; font-size: 11px; }
-  .qp-card .qp-big { font-size: 22px; font-weight: 800; margin: 5px 0 1px; color: #2d3748; }
+  .qp-card .qp-cap { font-size: 11px; color: #a0aec0; margin-top: 7px; }
+  .qp-card .qp-big { font-size: 22px; font-weight: 800; margin: 1px 0 1px; color: #2d3748; }
   .qp-card .qp-big small { font-size: 13px; color: #a0aec0; font-weight: 600; }
   .qp-card .qp-bar { height: 9px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-top: 8px; }
   .qp-card .qp-bar > i { display: block; height: 100%; }
@@ -1015,7 +1016,8 @@ function render() {
         }
         return '<div class="qp-card">'
           + '<div class="qp-top">' + d + ' <small>' + qDeptCount[d] + '명</small></div>'
-          + '<div class="qp-big">' + t.total + '<small> / ' + t.target + '</small></div>'
+          + '<div class="qp-cap">실적 / 목표 (건)</div>'
+          + '<div class="qp-big"><b>' + t.total + '</b><small> / ' + t.target + '</small></div>'
           + '<div class="qp-bar"><i style="width:' + Math.min(100, pct) + '%;background:' + barColor + '"></i></div>'
           + '<div class="qp-pct" style="color:' + pctColor + '">달성률 ' + pctText + '</div>'
           + '</div>';
