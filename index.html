@@ -806,8 +806,15 @@ function sortByWeek(a, b) {
 }
 
 function countByCategory(rows) {
+  // 작업유형 필터가 켜져 있으면 '선택한 유형'만 집계 (복합 행에서 미선택 유형이 새어나오지 않게)
+  const sel = filterState.카테고리;
+  const active = sel && sel.size > 0;
   const c = {}; ALL_CATS.forEach(cat => c[cat] = 0);
-  rows.forEach(r => r.카테고리목록.forEach(cat => { if (c[cat] !== undefined) c[cat]++; }));
+  rows.forEach(r => r.카테고리목록.forEach(cat => {
+    if (c[cat] === undefined) return;
+    if (active && !sel.has(cat)) return; // 선택 안 한 작업유형은 세지 않음
+    c[cat]++;
+  }));
   return c;
 }
 
