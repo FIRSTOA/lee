@@ -112,6 +112,19 @@
   .quota-filters .ms-field { font-size: 11px; }
   .quota-filters .ms-trigger { min-width: 110px; height: 30px; font-size: 12px; }
   .quota-filters .clear-btn { background: #e2e8f0; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; height: 30px; }
+  /* 파트 요약 카드 */
+  .quota-part-summary { margin-bottom: 14px; }
+  .quota-part-summary:empty { display: none; }
+  .qp-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+  .qp-card { flex: 1 1 150px; min-width: 140px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 13px; background: #f8fafc; }
+  .qp-card .qp-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; color: #2b6cb0; }
+  .qp-card .qp-top small { color: #a0aec0; font-weight: 500; font-size: 11px; }
+  .qp-card .qp-big { font-size: 22px; font-weight: 800; margin: 5px 0 1px; color: #2d3748; }
+  .qp-card .qp-big small { font-size: 13px; color: #a0aec0; font-weight: 600; }
+  .qp-card .qp-bar { height: 9px; background: #e2e8f0; border-radius: 5px; overflow: hidden; margin-top: 8px; }
+  .qp-card .qp-bar > i { display: block; height: 100%; }
+  .qp-card .qp-pct { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .qp-title { font-size: 12px; font-weight: 700; color: #4a5568; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 2px 0 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* === 태블릿 (≤900px) === */
@@ -283,6 +296,7 @@
           <div class="ms-field">부서<div class="ms" data-qfield="부서명"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
           <button class="clear-btn" id="quotaClearBtn">필터 초기화</button>
         </div>
+        <div id="quotaPartSummary" class="quota-part-summary"></div>
         <div class="scroll">
           <table id="quotaTable">
             <thead></thead>
@@ -975,26 +989,40 @@ function render() {
     qDeptTotals[d].target += quotaOf(p) * quotaWeeks.length;
     qDeptTotals[d].total += quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
   });
-  // 부서 헤더 행 — 부서명·인원수 + 그 부서의 총 목표·총 실적·달성률을 헤더 줄에 함께 표시
-  const labelColspan = 2 + quotaWeeks.length;
-  const deptHeaderRow = (dept) => {
-    const t = qDeptTotals[dept] || { target: 0, total: 0 };
-    const headBg = 'background:#2b6cb0;color:#fff;font-weight:700';
-    let rateCell;
-    if (t.target > 0) {
-      const pct = Math.round(t.total / t.target * 100);
-      const rc = pct >= 100 ? '#2f855a' : pct >= 70 ? '#b7791f' : '#c53030';
-      rateCell = '<td class="num" style="background:' + rc + ';color:#fff;font-weight:700">' + pct + '%</td>';
-    } else if (t.total > 0) {
-      rateCell = '<td class="num" style="background:#2f855a;color:#fff;font-weight:700">' + (100 + t.total) + '%</td>';
+  // 파트 요약 카드 — 파트 전체 수치(목표·실적·달성률)를 표 위에 분리해 표시
+  const partSummary = document.getElementById('quotaPartSummary');
+  if (partSummary) {
+    if (deptSelected) {
+      const orderedDepts = [];
+      quotaPersonsSorted.forEach(p => { const d = personToDept[p] || '(미지정)'; if (!orderedDepts.includes(d)) orderedDepts.push(d); });
+      const cardsHtml = orderedDepts.map(d => {
+        const t = qDeptTotals[d] || { target: 0, total: 0 };
+        let pct, barColor, pctColor, pctText;
+        if (t.target > 0) {
+          pct = Math.round(t.total / t.target * 100);
+          barColor = pct >= 100 ? '#38a169' : pct >= 70 ? '#d69e2e' : '#e53e3e';
+          pctColor = barColor; pctText = pct + '%';
+        } else if (t.total > 0) {
+          pct = 100; barColor = '#38a169'; pctColor = '#38a169'; pctText = (100 + t.total) + '%';
+        } else {
+          pct = 0; barColor = '#cbd5e0'; pctColor = '#a0aec0'; pctText = '—';
+        }
+        return '<div class="qp-card">'
+          + '<div class="qp-top">' + d + ' <small>' + qDeptCount[d] + '명</small></div>'
+          + '<div class="qp-big">' + t.total + '<small> / ' + t.target + '</small></div>'
+          + '<div class="qp-bar"><i style="width:' + Math.min(100, pct) + '%;background:' + barColor + '"></i></div>'
+          + '<div class="qp-pct" style="color:' + pctColor + '">달성률 ' + pctText + '</div>'
+          + '</div>';
+      }).join('');
+      partSummary.innerHTML = '<div class="qp-title">파트 요약</div><div class="qp-cards">' + cardsHtml + '</div>';
     } else {
-      rateCell = '<td class="num" style="' + headBg + '">—</td>';
+      partSummary.innerHTML = '';
     }
+  }
+  // 부서 헤더 행 — 단순 라벨 (합계는 상단 '파트 요약' 카드로 분리)
+  const deptHeaderRow = (dept) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="' + labelColspan + '" style="' + headBg + ';padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + dept + ' (' + qDeptCount[dept] + '명)</td>'
-      + '<td class="num" style="' + headBg + '">' + t.target + '</td>'
-      + '<td class="num" style="' + headBg + '">' + t.total + '</td>'
-      + rateCell;
+    tr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + dept + ' (' + qDeptCount[dept] + '명)</td>';
     return tr;
   };
   let qLastDept = null;
