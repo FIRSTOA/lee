@@ -392,8 +392,8 @@ let quotaConfig = loadQuotaConfig();
 function quotaOf(person) { const p = quotaConfig.persons[person]; if (p == null) return quotaConfig.default; if (typeof p === 'number') return p; return p.target ?? quotaConfig.default; }
 
 // --- Supabase 공유 저장 (정량 목표를 모든 기기/사용자가 동일하게 보도록) ---
-const SUPA_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
-const SUPA_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
+const SUPA_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
+const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const SUPA_TABLE = 'app_config';
 const QUOTA_CONFIG_KEY = 'overhaul_quota';
 const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
