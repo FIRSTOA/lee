@@ -112,6 +112,7 @@
   .quota-filters .ms-field { font-size: 11px; }
   .quota-filters .ms-trigger { min-width: 110px; height: 30px; font-size: 12px; }
   .quota-filters .clear-btn { background: #e2e8f0; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; height: 30px; }
+  .quota-hint { font-size: 12px; color: #718096; background: #f7fafc; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; }
   /* 파트 요약 카드 */
   .quota-part-summary { margin-bottom: 14px; }
   .quota-part-summary:empty { display: none; }
@@ -289,13 +290,7 @@
       </div>
       <div class="card full-width" data-card-id="quotaTable" data-card-name="정량 목표 달성 현황">
         <h3><span class="title-text" id="quotaTitle">정량 목표 달성 현황 (오버홀 기준)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
-        <div class="quota-filters">
-          <div class="ms-field">년도<div class="ms" data-qfield="년"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
-          <div class="ms-field">월<div class="ms" data-qfield="월"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
-          <div class="ms-field">주차<div class="ms" data-qfield="주차별"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
-          <div class="ms-field">부서<div class="ms" data-qfield="부서명"><button type="button" class="ms-trigger">전체</button><div class="ms-menu hidden"></div></div></div>
-          <button class="clear-btn" id="quotaClearBtn">필터 초기화</button>
-        </div>
+        <div class="quota-hint">※ 상단의 <b>년도 · 월 · 주차 · 부서</b> 필터가 이 표에도 그대로 적용됩니다. (부서를 선택하면 파트별 요약 카드가 표시됩니다)</div>
         <div id="quotaPartSummary" class="quota-part-summary"></div>
         <div class="scroll">
           <table id="quotaTable">
@@ -791,7 +786,7 @@ function populateFilters() {
     render();
   };
   document.getElementById('refreshBtn').onclick = loadData;
-  if (typeof populateQuotaFilters === 'function') populateQuotaFilters();
+  // 정량목표 카드는 상단 메인 필터를 그대로 사용 — 자체 필터 UI 제거됨
 }
 
 function applyFilters(data) {
@@ -943,7 +938,7 @@ function render() {
   Object.keys(quotaConfig.persons).forEach(nm => { const cfg = quotaConfig.persons[nm]; if (cfg && typeof cfg === 'object' && cfg.dept) personToDept[nm] = cfg.dept; });
   // 조직도(인사DB) 부서를 최우선 적용 — 조직도 수정 시 그룹/부서가 자동 반영됨
   hrRoster.forEach(p => { if (p.dept) personToDept[p.name] = p.dept; });
-  const deptSel = quotaFilterState['부서명'];
+  const deptSel = filterState['부서명']; // 상단 메인 필터의 부서 선택을 따름
   const deptSelected = deptSel && deptSel.size > 0;
   let quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
     if (deptSelected) {
@@ -1328,10 +1323,11 @@ function populateQuotaFilters() {
   };
 }
 
+// 정량목표 표는 상단 메인 필터의 년/월/주차/부서만 따른다 (담당자·작업유형은 표 특성상 미적용)
 function applyQuotaFilters(rows) {
   return rows.filter(r => {
     for (const f of QUOTA_FILTER_FIELDS) {
-      if (quotaFilterState[f].size > 0 && !quotaFilterState[f].has(r[f])) return false;
+      if (filterState[f] && filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
     return true;
   });
