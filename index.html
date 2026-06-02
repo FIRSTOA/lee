@@ -851,8 +851,9 @@ function render() {
   overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
   // quota config의 명시 부서 우선 적용
   Object.keys(quotaConfig.persons).forEach(nm => { const cfg = quotaConfig.persons[nm]; if (cfg && typeof cfg === 'object' && cfg.dept) personToDept[nm] = cfg.dept; });
-  const deptSelected = quotaFilterState['부서명'] && quotaFilterState['부서명'].size > 0;
-  const quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
+  const deptSel = quotaFilterState['부서명'];
+  const deptSelected = deptSel && deptSel.size > 0;
+  let quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
     if (deptSelected) {
       const ia = DEPT_ORDER.indexOf(personToDept[a] || '');
       const ib = DEPT_ORDER.indexOf(personToDept[b] || '');
@@ -862,6 +863,11 @@ function render() {
     }
     return a.localeCompare(b, 'ko');
   });
+  // 부서 필터 선택 시: 선택한 부서 소속 담당자만 표시
+  // (설정에만 등록된 타 부서 인원이 섞여 나오던 버그 수정)
+  if (deptSelected) {
+    quotaPersonsSorted = quotaPersonsSorted.filter(p => deptSel.has(personToDept[p] || '(미지정)'));
+  }
   document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황';
   const qTbl = document.getElementById('quotaTable');
   const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
@@ -870,17 +876,46 @@ function render() {
   qThead.appendChild(qHdr);
   const qBody = qTbl.querySelector('tbody'); qBody.innerHTML = '';
   const qColspan = 5 + quotaWeeks.length;
-  // 부서별 인원수 미리 계산
+  // 달성률 셀 HTML 생성 (담당자 행 / 부서 합계 행 공통)
+  // target>0: 실적/목표 %, 목표 미설정인데 실적 있으면 100+실적%, 둘 다 0이면 '—'
+  const pctCellHtml = (target, total) => {
+    if (target > 0) {
+      const pct = Math.round(total / target * 100);
+      const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
+      return '<td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
+    } else if (total > 0) {
+      return '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 — 100% + 실적 ' + total + '건">' + (100 + total) + '%</td>';
+    }
+    return '<td class="num" style="color:#a0aec0">—</td>';
+  };
+  // 부서별 인원수 / 합계(총 목표·총 실적) 미리 계산
   const qDeptCount = {};
+  const qDeptTotals = {};
   quotaPersonsSorted.forEach(p => {
     const d = personToDept[p] || '(미지정)';
     qDeptCount[d] = (qDeptCount[d] || 0) + 1;
+    if (!qDeptTotals[d]) qDeptTotals[d] = { target: 0, total: 0 };
+    qDeptTotals[d].target += quotaOf(p) * quotaWeeks.length;
+    qDeptTotals[d].total += quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
   });
+  // 부서 그룹 합계 행 (부서 선택 시에만, 각 그룹 끝에 삽입)
+  const appendDeptSubtotal = (dept) => {
+    if (!deptSelected || !dept) return;
+    const t = qDeptTotals[dept] || { target: 0, total: 0 };
+    const labelColspan = 2 + quotaWeeks.length;
+    const subTr = document.createElement('tr');
+    subTr.innerHTML = '<td colspan="' + labelColspan + '" style="text-align:right;background:#ebf4ff;color:#2b6cb0;font-weight:700;padding:6px 12px">' + dept + ' 합계 (' + qDeptCount[dept] + '명)</td>'
+      + '<td class="num" style="background:#ebf4ff;color:#2b6cb0;font-weight:700">' + t.target + '</td>'
+      + '<td class="num" style="background:#ebf4ff;color:#2b6cb0;font-weight:700"><b>' + t.total + '</b></td>'
+      + pctCellHtml(t.target, t.total);
+    qBody.appendChild(subTr);
+  };
   let qLastDept = null;
   quotaPersonsSorted.forEach(p => {
     if (deptSelected) {
       const curDept = personToDept[p] || '(미지정)';
       if (curDept !== qLastDept) {
+        appendDeptSubtotal(qLastDept);   // 직전 부서 그룹 합계 마감
         const headerTr = document.createElement('tr');
         headerTr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + curDept + ' (' + qDeptCount[curDept] + '명)</td>';
         qBody.appendChild(headerTr);
@@ -896,21 +931,10 @@ function render() {
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
     const target = q * quotaWeeks.length;
-    // 목표 0인 경우: 작업했으면 '달성+' 녹색, 아니면 '-' 회색
-    let pctCell;
-    if (target > 0) {
-      const pct = Math.round(total / target * 100);
-      const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
-      pctCell = '<td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
-    } else if (total > 0) {
-      const overPct = 100 + total;
-      pctCell = '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 — 100% + 실적 ' + total + '건">' + overPct + '%</td>';
-    } else {
-      pctCell = '<td class="num" style="color:#a0aec0">—</td>';
-    }
-    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCell;
+    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCellHtml(target, total);
     qBody.appendChild(tr);
   });
+  appendDeptSubtotal(qLastDept);   // 마지막 부서 그룹 합계 마감
 
   const weekGroup = groupByCategory(data, '주차별', sortByWeek);
   makeChart('weekChart', { type: 'bar',
