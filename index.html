@@ -750,6 +750,9 @@ function stackedDatasets(keys, map, cats) {
 }
 
 function render() {
+  // 재렌더(필터 변경 등) 시 현재 스크롤 위치 기억 — 표 행수가 줄어 문서가 짧아질 때
+  // 브라우저가 스크롤을 위로 당겨 "화면이 위로 튀는" 모바일 문제 방지
+  const _prevScrollY = window.scrollY;
   const data = applyFilters(RAW_DATA);
   const mobile = isMobile();
 
@@ -996,6 +999,11 @@ function render() {
   });
 
   document.getElementById('subtitle').textContent = '총 ' + RAW_DATA.length.toLocaleString() + '건 중 ' + data.length.toLocaleString() + '건';
+
+  // 레이아웃 reflow 후 스크롤 위치 복원 (필터 선택 시 화면이 위로 튀지 않게)
+  const restoreScroll = () => { if (Math.abs(window.scrollY - _prevScrollY) > 1) window.scrollTo(0, _prevScrollY); };
+  requestAnimationFrame(restoreScroll);
+  setTimeout(restoreScroll, 60);
 }
 
 // Re-render on viewport change (mobile <-> desktop switch)
