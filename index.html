@@ -369,7 +369,7 @@ const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '
 const ALL_CATS = ['오버홀','수리','리페어','기기폐기','부품정리','기타'];
 const DEPT_ORDER = ['CSS', '강북A', '강서B', '강남C', '경기D', '외부인력'];
 
-// === 정량 목표 (주간 오버홀 건수 기준) — 브라우저 localStorage에 저장 ===
+// === 정량 목표 (주간 오버홀 건수 기준) — Supabase 공유 저장(전원 동일) + localStorage 캐시/폴백 ===
 const QUOTA_STORAGE_KEY = 'overhaul_quota_v1';
 function loadQuotaConfig() {
   try {
@@ -390,6 +390,44 @@ function loadQuotaConfig() {
 function saveQuotaConfig(c) { localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(c)); }
 let quotaConfig = loadQuotaConfig();
 function quotaOf(person) { const p = quotaConfig.persons[person]; if (p == null) return quotaConfig.default; if (typeof p === 'number') return p; return p.target ?? quotaConfig.default; }
+
+// --- Supabase 공유 저장 (정량 목표를 모든 기기/사용자가 동일하게 보도록) ---
+const SUPA_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
+const SUPA_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
+const SUPA_TABLE = 'app_config';
+const QUOTA_CONFIG_KEY = 'overhaul_quota';
+const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+function normalizeQuotaConfig(c) {
+  if (!c || typeof c.default !== 'number' || !c.persons) return null;
+  Object.keys(c.persons).forEach(k => { if (typeof c.persons[k] === 'number') c.persons[k] = { dept: '', target: c.persons[k] }; });
+  return c;
+}
+async function fetchQuotaConfigFromServer() {
+  try {
+    const resp = await fetch(SUPA_URL + '/rest/v1/' + SUPA_TABLE + '?key=eq.' + QUOTA_CONFIG_KEY + '&select=value', { headers: SUPA_HEADERS });
+    if (!resp.ok) return null;
+    const rows = await resp.json();
+    if (Array.isArray(rows) && rows.length && rows[0].value) return normalizeQuotaConfig(rows[0].value);
+  } catch (e) { console.warn('정량목표 서버 로드 실패 — 로컬 캐시 사용', e); }
+  return null;
+}
+async function saveQuotaConfigToServer(c) {
+  const resp = await fetch(SUPA_URL + '/rest/v1/' + SUPA_TABLE + '?on_conflict=key', {
+    method: 'POST',
+    headers: { ...SUPA_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ key: QUOTA_CONFIG_KEY, value: c }])
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text().catch(() => '')));
+}
+// 시작 시 서버값으로 동기화 (서버에 값이 있으면 그걸로 통일)
+async function syncQuotaConfigFromServer() {
+  const server = await fetchQuotaConfigFromServer();
+  if (server) {
+    quotaConfig = server;
+    saveQuotaConfig(quotaConfig); // 로컬 캐시 갱신
+    if (RAW_DATA.length) render();
+  }
+}
 
 // 정량 목표 카드 로컬 필터 상태
 const QUOTA_FILTER_FIELDS = ['년','월','주차별','부서명'];
@@ -1117,12 +1155,21 @@ document.getElementById('addPersonBtn').onclick = () => {
   document.getElementById('newPersonDept').value = '';
   renderQuotaConfigTable(quotaModal._tmp);
 };
-document.getElementById('saveQuotaBtn').onclick = () => {
+document.getElementById('saveQuotaBtn').onclick = async () => {
+  const btn = document.getElementById('saveQuotaBtn');
   const tmp = quotaModal._tmp;
   tmp.default = Number(quotaDefaultInput.value) || 0;
   quotaConfig = tmp;
-  saveQuotaConfig(quotaConfig);
-  closeQuotaModal();
+  saveQuotaConfig(quotaConfig); // 로컬 캐시 (즉시)
+  const orig = btn.textContent; btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    await saveQuotaConfigToServer(quotaConfig); // 서버 공유 저장 (전원 반영)
+    closeQuotaModal();
+  } catch (e) {
+    alert('서버(Supabase) 저장 실패: ' + e.message + '\n\n로컬에는 저장됐지만 다른 기기와는 공유되지 않습니다.\napp_config 테이블이 생성됐는지 확인해 주세요.');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
   if (RAW_DATA.length) render();
 };
 
@@ -1206,6 +1253,7 @@ applyLayout();
 initCardControls();
 
 loadData();
+syncQuotaConfigFromServer(); // 정량 목표를 서버(Supabase) 공유값으로 동기화
 </script>
 </body>
 </html>
