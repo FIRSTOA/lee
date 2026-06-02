@@ -50,6 +50,7 @@
   .kpi.repair { border-left-color: #d69e2e; }
   .kpi.refurbish { border-left-color: #3182ce; }
   .kpi.time { border-left-color: #805ad5; }
+  .kpi.discard { border-left-color: #e53e3e; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .grid.full { grid-template-columns: 1fr; }
   .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -258,6 +259,7 @@
       <div class="kpi overhaul"><div class="label">오버홀</div><div class="value"><span id="kpiOverhaul">0</span><span class="unit">건</span></div></div>
       <div class="kpi repair"><div class="label">수리</div><div class="value"><span id="kpiRepair">0</span><span class="unit">건</span></div></div>
       <div class="kpi refurbish"><div class="label">리페어</div><div class="value"><span id="kpiRefurbish">0</span><span class="unit">건</span></div></div>
+      <div class="kpi discard"><div class="label">기기폐기</div><div class="value"><span id="kpiDiscard">0</span><span class="unit">건</span></div></div>
     </div>
 
     <div class="dashboard-grid" id="dashboardGrid">
@@ -849,6 +851,7 @@ function render() {
   document.getElementById('kpiOverhaul').textContent = cc.오버홀.toLocaleString();
   document.getElementById('kpiRepair').textContent = cc.수리.toLocaleString();
   document.getElementById('kpiRefurbish').textContent = cc.리페어.toLocaleString();
+  document.getElementById('kpiDiscard').textContent = cc.기기폐기.toLocaleString();
 
   const legendOpt = { display: true, position: mobile ? 'bottom' : 'top', labels: { boxWidth: 10, padding: mobile ? 6 : 10, font: { size: mobile ? 10 : 12 } } };
 
