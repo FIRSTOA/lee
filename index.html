@@ -432,11 +432,11 @@ async function syncQuotaConfigFromServer() {
 // --- 퍼스트전산 공유 인사DB(조직도, 읽기전용) — CS 전체 + CSS(CS_S) 인원을 실시간 반영 ---
 const HR_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
 const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
-const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', 'CS': '' };
+const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', '운영지원': 'CSS', 'CS': '' };
 let hrRoster = []; // [{name, dept(매핑됨)}]
 async function loadHrRoster() {
   try {
-    const url = HR_URL + '/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S)';
+    const url = HR_URL + '/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)';
     const resp = await fetch(url, { headers: { apikey: HR_KEY, Authorization: 'Bearer ' + HR_KEY } });
     if (!resp.ok) return;
     const rows = await resp.json();
