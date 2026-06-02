@@ -480,6 +480,23 @@ function applyLayout() {
   });
 }
 
+// 1회 마이그레이션: 정량 목표 달성 현황 카드를 '작업유형별 비중'(category) 바로 위로 이동.
+// 저장된 순서/숨김은 유지하고, 이후엔 드래그로 자유롭게 재배치 가능.
+function migrateQuotaCardTop() {
+  if (layoutConfig.movedQuotaTop) return;
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+  let order = (layoutConfig.order && layoutConfig.order.length)
+    ? [...layoutConfig.order]
+    : Array.from(grid.querySelectorAll(':scope > .card')).map(c => c.dataset.cardId);
+  order = order.filter(id => id !== 'quotaTable');
+  const ci = order.indexOf('category');
+  if (ci >= 0) order.splice(ci, 0, 'quotaTable'); else order.unshift('quotaTable');
+  layoutConfig.order = order;
+  layoutConfig.movedQuotaTop = true;
+  saveLayout(layoutConfig);
+}
+
 function initCardControls() {
   const grid = document.getElementById('dashboardGrid');
   if (!grid) return;
@@ -958,27 +975,34 @@ function render() {
     qDeptTotals[d].target += quotaOf(p) * quotaWeeks.length;
     qDeptTotals[d].total += quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
   });
-  // 부서 그룹 합계 행 (부서 선택 시에만, 각 그룹 끝에 삽입)
-  const appendDeptSubtotal = (dept) => {
-    if (!deptSelected || !dept) return;
+  // 부서 헤더 행 — 부서명·인원수 + 그 부서의 총 목표·총 실적·달성률을 헤더 줄에 함께 표시
+  const labelColspan = 2 + quotaWeeks.length;
+  const deptHeaderRow = (dept) => {
     const t = qDeptTotals[dept] || { target: 0, total: 0 };
-    const labelColspan = 2 + quotaWeeks.length;
-    const subTr = document.createElement('tr');
-    subTr.innerHTML = '<td colspan="' + labelColspan + '" style="text-align:right;background:#ebf4ff;color:#2b6cb0;font-weight:700;padding:6px 12px">' + dept + ' 합계 (' + qDeptCount[dept] + '명)</td>'
-      + '<td class="num" style="background:#ebf4ff;color:#2b6cb0;font-weight:700">' + t.target + '</td>'
-      + '<td class="num" style="background:#ebf4ff;color:#2b6cb0;font-weight:700"><b>' + t.total + '</b></td>'
-      + pctCellHtml(t.target, t.total);
-    qBody.appendChild(subTr);
+    const headBg = 'background:#2b6cb0;color:#fff;font-weight:700';
+    let rateCell;
+    if (t.target > 0) {
+      const pct = Math.round(t.total / t.target * 100);
+      const rc = pct >= 100 ? '#2f855a' : pct >= 70 ? '#b7791f' : '#c53030';
+      rateCell = '<td class="num" style="background:' + rc + ';color:#fff;font-weight:700">' + pct + '%</td>';
+    } else if (t.total > 0) {
+      rateCell = '<td class="num" style="background:#2f855a;color:#fff;font-weight:700">' + (100 + t.total) + '%</td>';
+    } else {
+      rateCell = '<td class="num" style="' + headBg + '">—</td>';
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="' + labelColspan + '" style="' + headBg + ';padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + dept + ' (' + qDeptCount[dept] + '명)</td>'
+      + '<td class="num" style="' + headBg + '">' + t.target + '</td>'
+      + '<td class="num" style="' + headBg + '">' + t.total + '</td>'
+      + rateCell;
+    return tr;
   };
   let qLastDept = null;
   quotaPersonsSorted.forEach(p => {
     if (deptSelected) {
       const curDept = personToDept[p] || '(미지정)';
       if (curDept !== qLastDept) {
-        appendDeptSubtotal(qLastDept);   // 직전 부서 그룹 합계 마감
-        const headerTr = document.createElement('tr');
-        headerTr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + curDept + ' (' + qDeptCount[curDept] + '명)</td>';
-        qBody.appendChild(headerTr);
+        qBody.appendChild(deptHeaderRow(curDept));
         qLastDept = curDept;
       }
     }
@@ -994,7 +1018,6 @@ function render() {
     tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCellHtml(target, total);
     qBody.appendChild(tr);
   });
-  appendDeptSubtotal(qLastDept);   // 마지막 부서 그룹 합계 마감
 
   const weekGroup = groupByCategory(data, '주차별', sortByWeek);
   makeChart('weekChart', { type: 'bar',
@@ -1275,6 +1298,7 @@ function applyQuotaFilters(rows) {
 }
 
 // 카드 레이아웃 적용 (저장된 순서 + 숨김 상태)
+migrateQuotaCardTop();   // 정량목표 카드를 작업유형별 비중 위로 (1회)
 applyLayout();
 initCardControls();
 
