@@ -927,7 +927,8 @@ function render() {
   const dataPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))];
   const configPersons = Object.keys(quotaConfig.persons);
   const hrNames = hrRoster.map(p => p.name); // 조직도(인사DB) 현재 인원
-  const quotaPersons = [...new Set([...dataPersons, ...configPersons, ...hrNames])];
+  const quotaExcluded = new Set(quotaConfig.excluded || []); // 설정에서 삭제(제외)한 인원
+  const quotaPersons = [...new Set([...dataPersons, ...configPersons, ...hrNames])].filter(n => !quotaExcluded.has(n));
   const personWeekCount = {};
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
   overhaulOnly.forEach(r => {
@@ -1128,8 +1129,13 @@ const quotaDefaultInput = document.getElementById('quotaDefaultInput');
 
 function openQuotaModal() {
   const tmp = JSON.parse(JSON.stringify(quotaConfig));
-  // 조직도(인사DB) 인원 자동 포함 — 기존 목표는 유지, 부서는 조직도 기준으로 갱신
+  if (!Array.isArray(tmp.excluded)) tmp.excluded = [];
+  const exSet = new Set(tmp.excluded);
+  // 제외된 인원은 설정 목록에서도 빼서 표시
+  Object.keys(tmp.persons).forEach(nm => { if (exSet.has(nm)) delete tmp.persons[nm]; });
+  // 조직도(인사DB) 인원 자동 포함 (제외 인원 제외) — 기존 목표는 유지, 부서는 조직도 기준 갱신
   hrRoster.forEach(p => {
+    if (exSet.has(p.name)) return;
     const ex = tmp.persons[p.name];
     if (ex && typeof ex === 'object') { if (p.dept) ex.dept = p.dept; }
     else if (typeof ex === 'number') { tmp.persons[p.name] = { dept: p.dept || '', target: ex }; }
@@ -1191,7 +1197,12 @@ function renderQuotaConfigTable(tmp) {
       tdDept.appendChild(sel); tr.appendChild(tdDept);
       const tdAct = document.createElement('td'); tdAct.className = 'actions';
       const del = document.createElement('button'); del.className = 'del-btn'; del.textContent = '삭제';
-      del.onclick = () => { delete tmp.persons[name]; renderQuotaConfigTable(tmp); };
+      del.onclick = () => {
+        delete tmp.persons[name];
+        if (!Array.isArray(tmp.excluded)) tmp.excluded = [];
+        if (!tmp.excluded.includes(name)) tmp.excluded.push(name); // 조직도/작업기록에 있어도 다시 안 뜨게 제외
+        renderQuotaConfigTable(tmp);
+      };
       tdAct.appendChild(del); tr.appendChild(tdAct);
       quotaConfigBody.appendChild(tr);
     });
@@ -1227,6 +1238,7 @@ document.getElementById('addPersonBtn').onclick = () => {
   if (!name) { alert('이름을 입력하세요'); return; }
   if (isNaN(quota) || quota < 0) { alert('목표 값을 입력하세요'); return; }
   quotaModal._tmp.persons[name] = { dept: dept, target: quota };
+  if (Array.isArray(quotaModal._tmp.excluded)) quotaModal._tmp.excluded = quotaModal._tmp.excluded.filter(n => n !== name); // 재추가 시 제외 해제
   document.getElementById('newPersonName').value = '';
   document.getElementById('newPersonQuota').value = '';
   document.getElementById('newPersonDept').value = '';
