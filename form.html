@@ -734,24 +734,44 @@ const MODELS = [
 // === 부품명 자동완성 목록 ===
 const PARTS = ['정착기','드럼','현상기','급지부','공청기','문서세단기','전사벨트'];
 
-// === 담당자 명단 (localStorage 저장, 추가/삭제 가능) ===
-const PERSONS_STORAGE_KEY = 'overhaul_persons_v1';
-const DEFAULT_PERSONS = [
-  { name: '박옥주', dept: 'CSS' },{ name: '김정민', dept: 'CSS' },{ name: '심태현', dept: '강북A' },
-  { name: '정웅', dept: '강북A' },{ name: '권태혁', dept: '강서B' },{ name: '윤기준', dept: '강북A' },
-  { name: '조윤', dept: 'CSS' },{ name: '김대우', dept: '경기D' },{ name: '이홍진', dept: '강북A' },
-  { name: '이민구', dept: '강남C' },{ name: '한왕주', dept: '강남C' },{ name: '양승원', dept: '강북A' },
-  { name: '김종희', dept: '경기D' },{ name: '이호준', dept: '경기D' },{ name: '이의수', dept: 'CSS' },
-  { name: '안수복', dept: 'CSS' },{ name: '박영현', dept: 'CSS' },{ name: '정지훈', dept: 'CSS' },
-  { name: '김현군', dept: 'CSS' },{ name: '이혁주', dept: 'CSS' },{ name: '고태훈', dept: '강서B' },
-  { name: '허영재', dept: '강남C' },{ name: '엄재현', dept: '외부인력' },{ name: '유성용', dept: '강북A' }
-];
-function loadPersons() {
-  try { const s = localStorage.getItem(PERSONS_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) return a; } } catch (e) {}
-  return [...DEFAULT_PERSONS];
+// === 담당자 명단 ===
+// 원천: 퍼스트전산 공유 인사DB(조직도, 읽기전용) — CS 전체 + CSS(CS_S). 조직도가 바뀌면 자동 반영.
+// 외부인력은 인사DB에 없으므로 수동 명단으로 유지하여 합쳐서 표시.
+const HR_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
+const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
+// 인사DB 부서코드 → 오버홀 대시보드 부서명 매핑 (CS 상위부서는 세부팀 없음 → 수동 선택)
+const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', 'CS': '' };
+
+const EXTERNAL_STORAGE_KEY = 'overhaul_external_v1';
+const DEFAULT_EXTERNAL = [{ name: '엄재현', dept: '외부인력' }];
+function loadExternal() {
+  try { const s = localStorage.getItem(EXTERNAL_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) return a; } } catch (e) {}
+  // 구버전 명단(overhaul_persons_v1)에서 외부인력만 승계
+  try { const old = JSON.parse(localStorage.getItem('overhaul_persons_v1') || '[]'); const ext = old.filter(p => p && p.dept === '외부인력'); if (ext.length) return ext; } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_EXTERNAL));
 }
-function savePersons(arr) { localStorage.setItem(PERSONS_STORAGE_KEY, JSON.stringify(arr)); }
-let personsData = loadPersons();
+function saveExternal(arr) { localStorage.setItem(EXTERNAL_STORAGE_KEY, JSON.stringify(arr)); }
+
+let hrRoster = [];                       // 인사DB CS/CSS 인원 (실시간)
+let externalPersons = loadExternal();    // 외부인력 등 수동 명단
+let personsData = [...externalPersons];  // HR 로드 전 임시(폴백)
+function rebuildPersonsData() {
+  const map = new Map();
+  hrRoster.forEach(p => map.set(p.name, { name: p.name, dept: p.dept }));
+  externalPersons.forEach(p => { if (!map.has(p.name)) map.set(p.name, { name: p.name, dept: p.dept || '외부인력' }); });
+  personsData = [...map.values()];
+}
+async function fetchHrRoster() {
+  try {
+    const url = HR_URL + '/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S)';
+    const resp = await fetch(url, { headers: { apikey: HR_KEY, Authorization: 'Bearer ' + HR_KEY } });
+    if (!resp.ok) return [];
+    const rows = await resp.json();
+    return rows.map(r => ({ name: r.name, dept: HR_DEPT_TO_PART[r.department] ?? '' }));
+  } catch (e) { console.warn('인사DB(조직도) 조회 실패 — 외부인력 명단만 사용', e); return []; }
+}
+async function loadHrRoster() { hrRoster = await fetchHrRoster(); rebuildPersonsData(); }
+loadHrRoster();
 
 // === 자동완성 셋업 ===
 function setupAutocomplete(inputId, dropdownId, dataList) {
@@ -1043,11 +1063,18 @@ function renderPersonList() {
   const sorted = [...personsData].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   tbody.innerHTML = sorted.map(p => {
     const realIdx = personsData.findIndex(x => x.name === p.name);
+    const isHr = hrRoster.some(h => h.name === p.name);
+    const srcBadge = isHr
+      ? '<span style="background:#ebf8ff;color:#2b6cb0;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:6px">조직도</span>'
+      : '<span style="background:#fefcbf;color:#975a16;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:6px">외부(수동)</span>';
+    const delCell = isHr
+      ? '<span style="color:#cbd5e0;font-size:11px">조직도 관리</span>'
+      : `<button class="del-person-btn" data-idx="${realIdx}" style="background:#fed7d7;color:#c53030;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">삭제</button>`;
     return `<tr class="person-row" data-idx="${realIdx}" data-name="${p.name}" data-dept="${p.dept || ''}" style="cursor:pointer">
-      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#2b6cb0;font-weight:600">${p.name}</td>
+      <td style="padding:8px;border-bottom:1px solid #edf2f7;color:#2b6cb0;font-weight:600">${p.name}${srcBadge}</td>
       <td style="padding:8px;border-bottom:1px solid #edf2f7;color:${p.dept ? '#2d3748' : '#a0aec0'}">${p.dept || '(미지정)'}</td>
       <td style="padding:8px;border-bottom:1px solid #edf2f7;text-align:right">
-        <button class="del-person-btn" data-idx="${realIdx}" style="background:#fed7d7;color:#c53030;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">삭제</button>
+        ${delCell}
       </td>
     </tr>`;
   }).join('');
@@ -1071,9 +1098,13 @@ function renderPersonList() {
     b.onclick = (e) => {
       e.stopPropagation(); // 행 클릭 방지
       const idx = Number(b.dataset.idx);
-      if (!confirm(`'${personsData[idx].name}' 담당자를 삭제하시겠습니까?`)) return;
-      personsData.splice(idx, 1);
-      savePersons(personsData);
+      const person = personsData[idx];
+      if (!person) return;
+      if (hrRoster.some(p => p.name === person.name)) { alert(`'${person.name}' 님은 인사DB(조직도) 인원이라 여기서 삭제할 수 없습니다. 조직도(firstoa-hr)에서 변경하세요.`); return; }
+      if (!confirm(`'${person.name}' 외부인력을 삭제하시겠습니까?`)) return;
+      externalPersons = externalPersons.filter(p => p.name !== person.name);
+      saveExternal(externalPersons);
+      rebuildPersonsData();
       renderPersonList();
     };
   });
@@ -1207,24 +1238,27 @@ document.getElementById('reset-config-default').onclick = () => {
 };
 
 document.getElementById('reset-persons-btn').onclick = () => {
-  if (!confirm('담당자 명단을 기본 24명(부서 포함)으로 되돌리시겠습니까?\n\n현재 추가/수정한 내용이 모두 사라집니다.')) return;
-  personsData = JSON.parse(JSON.stringify(DEFAULT_PERSONS));
-  savePersons(personsData);
+  if (!confirm('외부인력 수동 명단을 기본값(엄재현)으로 되돌리시겠습니까?\n\nCS/CSS 인원은 인사DB(조직도)에서 자동으로 가져오므로 영향받지 않습니다.')) return;
+  externalPersons = JSON.parse(JSON.stringify(DEFAULT_EXTERNAL));
+  saveExternal(externalPersons);
+  rebuildPersonsData();
   renderPersonList();
-  showToast('✓ 기본 명단으로 초기화됨', 'success');
+  showToast('✓ 외부인력 명단 초기화됨', 'success');
 };
 
 document.getElementById('add-person-btn').onclick = () => {
   const name = document.getElementById('new-person-name').value.trim();
   const dept = document.getElementById('new-person-dept').value;
   if (!name) { alert('이름을 입력하세요'); return; }
-  if (personsData.some(p => p.name === name)) {
+  if (hrRoster.some(p => p.name === name)) { alert(`'${name}' 님은 인사DB(조직도)에 이미 있어 자동 반영됩니다. 수동 추가가 필요 없습니다.`); return; }
+  if (externalPersons.some(p => p.name === name)) {
     if (!confirm(`'${name}' 이미 등록되어 있습니다. 부서를 '${dept || '(미지정)'}'로 업데이트하시겠습니까?`)) return;
-    personsData = personsData.map(p => p.name === name ? { name, dept } : p);
+    externalPersons = externalPersons.map(p => p.name === name ? { name, dept } : p);
   } else {
-    personsData.push({ name, dept });
+    externalPersons.push({ name, dept });
   }
-  savePersons(personsData);
+  saveExternal(externalPersons);
+  rebuildPersonsData();
   document.getElementById('new-person-name').value = '';
   document.getElementById('new-person-dept').value = '';
   renderPersonList();
