@@ -797,21 +797,33 @@ function buildMenu(field, values) {
   menu.innerHTML = '';
   const actions = document.createElement('div'); actions.className = 'ms-actions';
   const allBtn = document.createElement('button'); allBtn.type = 'button'; allBtn.textContent = '전체선택';
-  allBtn.onclick = (e) => { e.stopPropagation(); filterState[field] = new Set(values); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateTrigger(field); render(); };
+  allBtn.onclick = (e) => { e.stopPropagation(); filterState[field] = new Set(values); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateTrigger(field); if (field === '년' || field === '월') rebuildWeekMenu(); render(); };
   const noneBtn = document.createElement('button'); noneBtn.type = 'button'; noneBtn.textContent = '전체해제';
-  noneBtn.onclick = (e) => { e.stopPropagation(); filterState[field].clear(); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateTrigger(field); render(); };
+  noneBtn.onclick = (e) => { e.stopPropagation(); filterState[field].clear(); menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateTrigger(field); if (field === '년' || field === '월') rebuildWeekMenu(); render(); };
   actions.appendChild(allBtn); actions.appendChild(noneBtn);
   menu.appendChild(actions);
   values.forEach(v => {
     const lbl = document.createElement('label');
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = v; cb.checked = filterState[field].has(v);
     cb.onclick = (e) => e.stopPropagation();
-    cb.onchange = () => { if (cb.checked) filterState[field].add(v); else filterState[field].delete(v); updateTrigger(field); render(); };
+    cb.onchange = () => { if (cb.checked) filterState[field].add(v); else filterState[field].delete(v); updateTrigger(field); if (field === '년' || field === '월') rebuildWeekMenu(); render(); };
     lbl.appendChild(cb);
     lbl.appendChild(document.createTextNode(' ' + v));
     lbl.onclick = (e) => { if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); e.stopPropagation(); } };
     menu.appendChild(lbl);
   });
+}
+
+// 주차 옵션을 현재 선택된 년/월에 맞게 다시 구성 (예: 5월 선택 시 5월 주차만 표시)
+function rebuildWeekMenu() {
+  let rows = RAW_DATA;
+  if (filterState['년'].size) rows = rows.filter(r => filterState['년'].has(r.년));
+  if (filterState['월'].size) rows = rows.filter(r => filterState['월'].has(r.월));
+  const weeks = [...new Set(rows.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
+  // 더 이상 유효하지 않은 주차 선택은 해제
+  [...filterState['주차별']].forEach(w => { if (!weeks.includes(w)) filterState['주차별'].delete(w); });
+  buildMenu('주차별', weeks);
+  updateTrigger('주차별');
 }
 
 function populateFilters() {
@@ -827,6 +839,7 @@ function populateFilters() {
     buildMenu(field, vals);
     updateTrigger(field);
   }
+  rebuildWeekMenu(); // 현재 선택된 년/월에 맞춰 주차 옵션 제한
   document.querySelectorAll('.ms-trigger').forEach(t => {
     t.onclick = (e) => {
       e.stopPropagation();
@@ -847,6 +860,7 @@ function populateFilters() {
       ms.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
       updateTrigger(f);
     });
+    rebuildWeekMenu(); // 주차 옵션도 전체로 복원
     render();
   };
   document.getElementById('refreshBtn').onclick = loadData;
