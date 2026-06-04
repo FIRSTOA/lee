@@ -1004,7 +1004,9 @@ function render() {
       const w = overhaulWeight(r);
       personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + w;
       const key = r.담당자 + '' + r.주차별;
-      (quotaDetail[key] = quotaDetail[key] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
+      const dk = r.담당자, wk = r.주차별;
+      (quotaDetail[dk] = quotaDetail[dk] || {});
+      (quotaDetail[dk][wk] = quotaDetail[dk][wk] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
     }
   });
   // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
@@ -1408,7 +1410,7 @@ function closeQuotaDetail() { quotaDetailModal.classList.add('hidden'); }
 document.getElementById('qd-close').onclick = closeQuotaDetail;
 quotaDetailModal.onclick = (e) => { if (e.target === quotaDetailModal) closeQuotaDetail(); };
 function openQuotaDetail(person, week) {
-  const recs = quotaDetail[person + week] || [];
+  const recs = (quotaDetail[person] && quotaDetail[person][week]) || [];
   const total = recs.reduce((s, r) => s + (r.weight || 0), 0);
   document.getElementById('qd-title').textContent = person + ' — ' + week + ' 상세';
   document.getElementById('qd-sub').textContent = '환산 실적 합계 ' + total + ' · 작업 ' + recs.length + '건';
