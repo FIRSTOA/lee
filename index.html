@@ -1254,7 +1254,8 @@ function renderQuotaConfigTable(tmp) {
   const groups = {};
   names.forEach(name => {
     const p = tmp.persons[name];
-    const dept = (p && typeof p === 'object' && p.dept) ? p.dept : '미지정';
+    const hrInfo = hrRoster.find(h => h.name === name); // 조직도 인원은 조직도 부서로 그룹
+    const dept = hrInfo ? (hrInfo.dept || '미지정') : ((p && typeof p === 'object' && p.dept) ? p.dept : '미지정');
     if (!groups[dept]) groups[dept] = [];
     groups[dept].push(name);
   });
@@ -1280,15 +1281,23 @@ function renderQuotaConfigTable(tmp) {
       };
       tdQuota.appendChild(inp); tr.appendChild(tdQuota);
       const tdDept = document.createElement('td');
-      const sel = document.createElement('select');
-      sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:#fff';
-      sel.innerHTML = '<option value="">미지정</option>' + DEPT_ORDER.map(d => '<option value="' + d + '"' + (d === currentDept ? ' selected' : '') + '>' + d + '</option>').join('');
-      sel.onchange = () => {
-        const t = (typeof tmp.persons[name] === 'object') ? tmp.persons[name].target : tmp.persons[name];
-        tmp.persons[name] = { dept: sel.value, target: t };
-        renderQuotaConfigTable(tmp);
-      };
-      tdDept.appendChild(sel); tr.appendChild(tdDept);
+      const hrInfo = hrRoster.find(h => h.name === name);
+      if (hrInfo) {
+        // 조직도(인사DB) 인원: 부서는 조직도 값 우선 → 읽기전용으로 표시 (수정은 조직도에서)
+        tdDept.innerHTML = '<span style="color:#2d3748">' + (hrInfo.dept || '(미지정)') + '</span> <span style="background:#ebf8ff;color:#2b6cb0;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">조직도</span>';
+      } else {
+        // 비조직도(외부인력 등): 부서 직접 지정 가능
+        const sel = document.createElement('select');
+        sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:#fff';
+        sel.innerHTML = '<option value="">미지정</option>' + DEPT_ORDER.map(d => '<option value="' + d + '"' + (d === currentDept ? ' selected' : '') + '>' + d + '</option>').join('');
+        sel.onchange = () => {
+          const t = (typeof tmp.persons[name] === 'object') ? tmp.persons[name].target : tmp.persons[name];
+          tmp.persons[name] = { dept: sel.value, target: t };
+          renderQuotaConfigTable(tmp);
+        };
+        tdDept.appendChild(sel);
+      }
+      tr.appendChild(tdDept);
       const tdAct = document.createElement('td'); tdAct.className = 'actions';
       const del = document.createElement('button'); del.className = 'del-btn'; del.textContent = '삭제';
       del.onclick = () => {
@@ -1452,10 +1461,12 @@ document.getElementById('quotaTable').addEventListener('click', (e) => {
   openQuotaDetail(decodeURIComponent(td.dataset.person), decodeURIComponent(td.dataset.week));
 });
 
-// 정량목표 표는 상단 메인 필터의 년/월/주차/부서만 따른다 (담당자·작업유형은 표 특성상 미적용)
+// 정량목표 표는 상단 메인 필터의 년/월/주차만 행에 적용한다.
+// 부서는 '행의 부서명'이 아니라 '사람의 조직도 부서'(personToDept) 기준으로 거른다.
+// (담당자가 작업 기록의 부서명을 다르게 입력해도, 그 사람 조직도 부서로 집계되도록)
 function applyQuotaFilters(rows) {
   return rows.filter(r => {
-    for (const f of QUOTA_FILTER_FIELDS) {
+    for (const f of ['년','월','주차별']) {
       if (filterState[f] && filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
     return true;
