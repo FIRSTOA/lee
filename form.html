@@ -1121,28 +1121,10 @@ personModal.onclick = (e) => { if (e.target.id === 'person-modal') personModal.c
 
 // === 저장 로그 모달 ===
 const logModal = document.getElementById('log-modal');
-async function renderSaveLog() {
+const LOG_CACHE_KEY = 'overhaul_savelog_cache_v1';
+function renderLogItems(items) {
   const wrap = document.getElementById('log-list-wrap');
-  wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">불러오는 중...</div>';
-  let items = [];
-  try {
-    const resp = await fetch(saveConfig.scriptUrl, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'listRecentSaves',
-        limit: 50,
-        _config: { mainSheet: saveConfig.mainSheet, mainTab: saveConfig.mainTab, stockSheet: saveConfig.stockSheet, stockTab: saveConfig.stockTab }
-      }),
-      redirect: 'follow'
-    });
-    const r = await resp.json();
-    if (!r.ok) { wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">불러오기 실패: ' + (r.error || '') + '</div>'; return; }
-    items = Array.isArray(r.items) ? r.items : [];
-  } catch (e) {
-    wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">네트워크 오류: ' + e.message + '</div>';
-    return;
-  }
-  if (items.length === 0) {
+  if (!items || items.length === 0) {
     wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">저장 기록이 없습니다</div>';
     return;
   }
@@ -1174,6 +1156,35 @@ async function renderSaveLog() {
       showToast('✏️ 수정 모드로 진입했습니다 (행 ' + entry.row + ')', 'success');
     };
   });
+}
+async function renderSaveLog() {
+  const wrap = document.getElementById('log-list-wrap');
+  // 1) 캐시 즉시 표시 (체감 속도 향상) — 이후 백그라운드로 최신 갱신
+  let shown = false;
+  try {
+    const cached = localStorage.getItem(LOG_CACHE_KEY);
+    if (cached) { const arr = JSON.parse(cached); if (Array.isArray(arr) && arr.length) { renderLogItems(arr); shown = true; } }
+  } catch (e) { /* 캐시 손상 무시 */ }
+  if (!shown) wrap.innerHTML = '<div style="text-align:center;color:#a0aec0;padding:40px;font-size:13px">불러오는 중...</div>';
+  // 2) 서버 최신 조회
+  try {
+    const resp = await fetch(saveConfig.scriptUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'listRecentSaves',
+        limit: 50,
+        _config: { mainSheet: saveConfig.mainSheet, mainTab: saveConfig.mainTab, stockSheet: saveConfig.stockSheet, stockTab: saveConfig.stockTab }
+      }),
+      redirect: 'follow'
+    });
+    const r = await resp.json();
+    if (!r.ok) { if (!shown) wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">불러오기 실패: ' + (r.error || '') + '</div>'; return; }
+    const items = Array.isArray(r.items) ? r.items : [];
+    try { localStorage.setItem(LOG_CACHE_KEY, JSON.stringify(items)); } catch (e) { /* 용량 초과 무시 */ }
+    renderLogItems(items);
+  } catch (e) {
+    if (!shown) wrap.innerHTML = '<div style="text-align:center;color:#c53030;padding:40px;font-size:13px">네트워크 오류: ' + e.message + '</div>';
+  }
 }
 document.getElementById('log-btn').onclick = () => {
   renderSaveLog();
