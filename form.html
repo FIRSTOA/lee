@@ -1459,9 +1459,8 @@ function computeAutoFields(d) {
   const dt = new Date(d.date);
   const year = dt.getFullYear() + '년';
   const month = (dt.getMonth() + 1) + '월';
-  const firstDay = new Date(dt.getFullYear(), dt.getMonth(), 1);
   const dayOfMonth = dt.getDate();
-  const weekOfMonth = Math.ceil((dayOfMonth + firstDay.getDay()) / 7);
+  const weekOfMonth = Math.ceil(dayOfMonth / 7); // 7일 단위: 1~7일=1주차, 8~14=2주차 …
   const weekStr = (dt.getMonth() + 1) + '월' + weekOfMonth + '주차';
   const overhaulPt = d.overhaul ? (parseInt(d.overhaul.match(/\d+/)?.[0]) || 1) : 0;
   const repairPt = d.repair ? (parseInt(d.repair.match(/\d+/)?.[0]) || 1) : 0;
