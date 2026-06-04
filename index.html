@@ -114,6 +114,11 @@
   .quota-filters .ms-trigger { min-width: 110px; height: 30px; font-size: 12px; }
   .quota-filters .clear-btn { background: #e2e8f0; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; height: 30px; }
   .quota-hint { font-size: 12px; color: #718096; background: #f7fafc; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; }
+  #quotaTable td.qcell { cursor: pointer; }
+  #quotaTable td.qcell:hover { outline: 2px solid #2b6cb0; outline-offset: -2px; }
+  #qd-sum .pill { background: #edf2f7; border-radius: 14px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: #2d3748; }
+  #qd-rows .grade { display: inline-block; background: #2b6cb0; color: #fff; border-radius: 5px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+  #qd-rows .total-row td { font-weight: 800; background: #f7fafc; }
   /* 파트 요약 카드 */
   .quota-part-summary { margin-bottom: 14px; }
   .quota-part-summary:empty { display: none; }
@@ -372,6 +377,24 @@
   </div>
 </div>
 
+<!-- 정량목표 주차 셀 상세(드릴다운) 모달 -->
+<div id="quotaDetailModal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:480px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <h2 id="qd-title" style="margin:0;font-size:16px">상세</h2>
+        <div class="sub" id="qd-sub" style="margin-top:3px"></div>
+      </div>
+      <button id="qd-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:#a0aec0;line-height:1">×</button>
+    </div>
+    <div id="qd-sum" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0"></div>
+    <table class="qtable">
+      <thead><tr><th style="text-align:left">날짜</th><th style="text-align:left">오버홀 등급</th><th style="text-align:left">수리</th><th style="text-align:right">환산</th></tr></thead>
+      <tbody id="qd-rows"></tbody>
+    </table>
+  </div>
+</div>
+
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQU9um9z8bbHSMpIs1B-kP6FZ1sSCR1HoUIaN7IG8zGaQMGaAAVWa-SjXZaiKiSPxStK0KR_hitGKRA/pub?output=csv&gid=0&single=true';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
@@ -612,6 +635,7 @@ const palette = ['#3182ce','#38a169','#d69e2e','#805ad5','#dd6b20','#e53e3e','#3
 
 let RAW_DATA = [];
 const charts = {};
+let quotaDetail = {}; // 정량목표 셀 클릭 상세: key = 담당자+주차별 → [{날짜, 오버홀품목, 수리품목, weight}]
 const FILTER_FIELDS = ['년','월','주차별','부서명','담당자','카테고리'];
 const filterState = {};
 FILTER_FIELDS.forEach(f => filterState[f] = new Set());
@@ -974,9 +998,13 @@ function render() {
   const quotaPersons = [...new Set([...dataPersons, ...configPersons, ...hrNames])].filter(n => !quotaExcluded.has(n));
   const personWeekCount = {};
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
+  quotaDetail = {}; // 셀 클릭 상세용: key = 담당자주차 → [{날짜, 오버홀품목, 수리품목, weight}]
   overhaulOnly.forEach(r => {
     if (r.담당자 && r.주차별 && personWeekCount[r.담당자]) {
-      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + overhaulWeight(r);
+      const w = overhaulWeight(r);
+      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + w;
+      const key = r.담당자 + '' + r.주차별;
+      (quotaDetail[key] = quotaDetail[key] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
     }
   });
   // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
@@ -1084,7 +1112,9 @@ function render() {
     const cells = quotaWeeks.map(w => {
       const v = personWeekCount[p][w] || 0;
       const cls = q === 0 ? (v > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="color:#a0aec0"') : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
-      return '<td class="num" ' + cls + '>' + v + '</td>';
+      // 작업 있는 셀은 클릭 시 상세(날짜·등급) 표시
+      const clickable = v > 0 ? ' qcell" data-person="' + encodeURIComponent(p) + '" data-week="' + encodeURIComponent(w) + '" title="클릭하면 상세 내역' : '';
+      return '<td class="num' + clickable + '" ' + cls + '>' + v + '</td>';
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
     const target = q * quotaWeeks.length;
@@ -1371,6 +1401,36 @@ function populateQuotaFilters() {
     render();
   };
 }
+
+// === 정량목표 주차 셀 클릭 → 상세(날짜·오버홀 등급·환산) ===
+const quotaDetailModal = document.getElementById('quotaDetailModal');
+function closeQuotaDetail() { quotaDetailModal.classList.add('hidden'); }
+document.getElementById('qd-close').onclick = closeQuotaDetail;
+quotaDetailModal.onclick = (e) => { if (e.target === quotaDetailModal) closeQuotaDetail(); };
+function openQuotaDetail(person, week) {
+  const recs = quotaDetail[person + week] || [];
+  const total = recs.reduce((s, r) => s + (r.weight || 0), 0);
+  document.getElementById('qd-title').textContent = person + ' — ' + week + ' 상세';
+  document.getElementById('qd-sub').textContent = '환산 실적 합계 ' + total + ' · 작업 ' + recs.length + '건';
+  const byGrade = {};
+  recs.forEach(r => { const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || ''); const g = m ? m[1] : '기타'; byGrade[g] = (byGrade[g] || 0) + 1; });
+  document.getElementById('qd-sum').innerHTML = Object.keys(byGrade).sort().map(g => {
+    const wt = OVERHAUL_WEIGHT[g] || 0;
+    return '<span class="pill">오버홀' + g + ' ' + byGrade[g] + '건' + (wt ? ' = ' + (byGrade[g] * wt) : '') + '</span>';
+  }).join('') || '<span class="pill">내역 없음</span>';
+  const sorted = [...recs].sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
+  document.getElementById('qd-rows').innerHTML = sorted.map(r => {
+    const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || '');
+    const gradeHtml = m ? '<span class="grade">오버홀' + m[1] + '</span>' : (r.오버홀품목 || '-');
+    return '<tr><td style="text-align:left">' + (r.날짜 || '') + '</td><td style="text-align:left">' + gradeHtml + '</td><td style="text-align:left">' + (r.수리품목 || '') + '</td><td class="num">' + (r.weight || 0) + '</td></tr>';
+  }).join('') + '<tr class="total-row"><td colspan="3" style="text-align:left">합계</td><td class="num">' + total + '</td></tr>';
+  quotaDetailModal.classList.remove('hidden');
+}
+document.getElementById('quotaTable').addEventListener('click', (e) => {
+  const td = e.target.closest('td.qcell');
+  if (!td) return;
+  openQuotaDetail(decodeURIComponent(td.dataset.person), decodeURIComponent(td.dataset.week));
+});
 
 // 정량목표 표는 상단 메인 필터의 년/월/주차/부서만 따른다 (담당자·작업유형은 표 특성상 미적용)
 function applyQuotaFilters(rows) {
