@@ -293,7 +293,7 @@
       </div>
       <div class="card full-width" data-card-id="quotaTable" data-card-name="정량 목표 달성 현황">
         <h3><span class="title-text" id="quotaTitle">정량 목표 달성 현황 (오버홀 기준)</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
-        <div class="quota-hint">※ 상단의 <b>년도 · 월 · 주차 · 부서</b> 필터가 이 표에도 그대로 적용됩니다. (부서를 선택하면 파트별 요약 카드가 표시됩니다)</div>
+        <div class="quota-hint">※ 상단의 <b>년도 · 월 · 주차 · 부서</b> 필터가 이 표에도 그대로 적용됩니다. (부서를 선택하면 파트별 요약 카드가 표시됩니다)<br>※ 실적은 <b>등급 환산</b>으로 집계됩니다: <b>오버홀1=5 · 오버홀2=4 · 오버홀3=3 · 오버홀4=2 · 오버홀5=1</b> (목표는 건수 기준)</div>
         <div id="quotaPartSummary" class="quota-part-summary"></div>
         <div class="scroll">
           <table id="quotaTable">
@@ -402,6 +402,12 @@ function loadQuotaConfig() {
 function saveQuotaConfig(c) { localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(c)); }
 let quotaConfig = loadQuotaConfig();
 function quotaOf(person) { const p = quotaConfig.persons[person]; if (p == null) return quotaConfig.default; if (typeof p === 'number') return p; return p.target ?? quotaConfig.default; }
+// 오버홀 실적 환산 가중치 — 등급 역가중: 오버홀1=5, 2=4, 3=3, 4=2, 5=1 (그 외 오버홀C 등은 0)
+const OVERHAUL_WEIGHT = { '1': 5, '2': 4, '3': 3, '4': 2, '5': 1 };
+function overhaulWeight(r) {
+  const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || '');
+  return m ? OVERHAUL_WEIGHT[m[1]] : 0;
+}
 
 // --- Supabase 공유 저장 (정량 목표를 모든 기기/사용자가 동일하게 보도록) ---
 const SUPA_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
@@ -970,7 +976,7 @@ function render() {
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
   overhaulOnly.forEach(r => {
     if (r.담당자 && r.주차별 && personWeekCount[r.담당자]) {
-      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + 1;
+      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + overhaulWeight(r);
     }
   });
   // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
