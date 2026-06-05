@@ -1019,9 +1019,10 @@ function render() {
   const quotaBase = applyQuotaFilters(RAW_DATA);
   const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
-  // 기록 부서(작업 당시 부서) 기준 — 그 기간/부서에 오버홀 기록이 있는 사람만 표시
+  // 정량목표 설정(로스터) 기준 — 설정/조직도에 등록된 인원을 표시(작업 0건이어도)
   const quotaExcluded = new Set(quotaConfig.excluded || []); // 설정에서 삭제(제외)한 인원
-  const quotaPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))].filter(n => !quotaExcluded.has(n));
+  const rosterNames = [...new Set([...Object.keys(quotaConfig.persons), ...hrRoster.map(p => p.name)])];
+  const quotaPersons = rosterNames.filter(n => !quotaExcluded.has(n) && !hrResigned.has(n));
   const personWeekCount = {};
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
   quotaDetail = {}; // 셀 클릭 상세용: key = 담당자주차 → [{날짜, 오버홀품목, 수리품목, weight}]
@@ -1035,11 +1036,11 @@ function render() {
       (quotaDetail[dk][wk] = quotaDetail[dk][wk] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
     }
   });
-  // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
-  // 분류 기준: 각 작업 기록의 부서명(작업 당시 부서). 조직도/설정 부서로 덮어쓰지 않음
-  // → 부서 이동 시 과거 실적은 과거 부서, 현재 실적은 현재 부서로 자동 분리됨
+  // 부서(그룹) 결정: 설정에서 수동 지정한 부서 최우선 → 조직도(인사DB) → 기록 부서 순
   const personToDept = {};
   overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
+  hrRoster.forEach(p => { if (p.dept) personToDept[p.name] = p.dept; });
+  Object.keys(quotaConfig.persons).forEach(nm => { const c = quotaConfig.persons[nm]; if (c && typeof c === 'object' && c.dept) personToDept[nm] = c.dept; });
   const deptSel = filterState['부서명']; // 상단 메인 필터의 부서 선택을 따름
   const deptSelected = deptSel && deptSel.size > 0;
   let quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
@@ -1237,7 +1238,7 @@ function openQuotaModal() {
   hrRoster.forEach(p => {
     if (exSet.has(p.name)) return;
     const ex = tmp.persons[p.name];
-    if (ex && typeof ex === 'object') { if (p.dept) ex.dept = p.dept; }
+    if (ex && typeof ex === 'object') { if (p.dept && !ex.dept) ex.dept = p.dept; } // 수동 지정값 보존, 비어있을 때만 조직도로 채움
     else if (typeof ex === 'number') { tmp.persons[p.name] = { dept: p.dept || '', target: ex }; }
     else { tmp.persons[p.name] = { dept: p.dept || '', target: tmp.default }; }
   });
@@ -1258,10 +1259,10 @@ function renderQuotaConfigTable(tmp) {
   }
   // 부서별 그룹화
   const groups = {};
+  const hrDeptOf = (name) => { const h = hrRoster.find(x => x.name === name); return h ? h.dept : ''; };
+  const effDeptOf = (name) => { const p = tmp.persons[name]; const cd = (p && typeof p === 'object' && p.dept) ? p.dept : ''; return cd || hrDeptOf(name) || '미지정'; };
   names.forEach(name => {
-    const p = tmp.persons[name];
-    const hrInfo = hrRoster.find(h => h.name === name); // 조직도 인원은 조직도 부서로 그룹
-    const dept = hrInfo ? (hrInfo.dept || '미지정') : ((p && typeof p === 'object' && p.dept) ? p.dept : '미지정');
+    const dept = effDeptOf(name); // 설정(수동) 부서 우선 → 조직도
     if (!groups[dept]) groups[dept] = [];
     groups[dept].push(name);
   });
@@ -1275,7 +1276,7 @@ function renderQuotaConfigTable(tmp) {
     groups[dept].sort((a, b) => a.localeCompare(b, 'ko')).forEach(name => {
       const p = tmp.persons[name];
       const target = (typeof p === 'object') ? p.target : p;
-      const currentDept = (typeof p === 'object' && p.dept) ? p.dept : '';
+      const currentDept = effDeptOf(name) === '미지정' ? '' : effDeptOf(name); // 설정 부서 우선, 없으면 조직도
       const tr = document.createElement('tr');
       const tdName = document.createElement('td'); tdName.textContent = name; tr.appendChild(tdName);
       const tdQuota = document.createElement('td'); tdQuota.style.textAlign = 'right';
@@ -1287,22 +1288,16 @@ function renderQuotaConfigTable(tmp) {
       };
       tdQuota.appendChild(inp); tr.appendChild(tdQuota);
       const tdDept = document.createElement('td');
-      const hrInfo = hrRoster.find(h => h.name === name);
-      if (hrInfo) {
-        // 조직도(인사DB) 인원: 부서는 조직도 값 우선 → 읽기전용으로 표시 (수정은 조직도에서)
-        tdDept.innerHTML = '<span style="color:#2d3748">' + (hrInfo.dept || '(미지정)') + '</span> <span style="background:#ebf8ff;color:#2b6cb0;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">조직도</span>';
-      } else {
-        // 비조직도(외부인력 등): 부서 직접 지정 가능
-        const sel = document.createElement('select');
-        sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:#fff';
-        sel.innerHTML = '<option value="">미지정</option>' + DEPT_ORDER.map(d => '<option value="' + d + '"' + (d === currentDept ? ' selected' : '') + '>' + d + '</option>').join('');
-        sel.onchange = () => {
-          const t = (typeof tmp.persons[name] === 'object') ? tmp.persons[name].target : tmp.persons[name];
-          tmp.persons[name] = { dept: sel.value, target: t };
-          renderQuotaConfigTable(tmp);
-        };
-        tdDept.appendChild(sel);
-      }
+      // 부서 직접 지정(수동) — 전원 편집 가능. 비워두면 조직도 부서를 따름
+      const sel = document.createElement('select');
+      sel.style.cssText = 'padding:4px 6px;border:1px solid #cbd5e0;border-radius:4px;font-size:12px;background:#fff';
+      sel.innerHTML = '<option value="">미지정</option>' + DEPT_ORDER.map(d => '<option value="' + d + '"' + (d === currentDept ? ' selected' : '') + '>' + d + '</option>').join('');
+      sel.onchange = () => {
+        const t = (typeof tmp.persons[name] === 'object') ? tmp.persons[name].target : tmp.persons[name];
+        tmp.persons[name] = { dept: sel.value, target: t };
+        renderQuotaConfigTable(tmp);
+      };
+      tdDept.appendChild(sel);
       tr.appendChild(tdDept);
       const tdAct = document.createElement('td'); tdAct.className = 'actions';
       const del = document.createElement('button'); del.className = 'del-btn'; del.textContent = '삭제';
@@ -1472,7 +1467,7 @@ document.getElementById('quotaTable').addEventListener('click', (e) => {
 function applyQuotaFilters(rows) {
   return rows.filter(r => {
     if (hrResigned.has(r.담당자)) return false; // 인사DB 퇴사자 제외 (부서명 오타 무관)
-    for (const f of ['년','월','주차별','부서명']) {
+    for (const f of ['년','월','주차별']) { // 부서는 사람(설정 부서) 기준으로 거르므로 행에는 적용 안 함
       if (filterState[f] && filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
     return true;
