@@ -480,6 +480,7 @@ const HR_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
 const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
 const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', '운영지원': 'CSS', 'CS': '' };
 let hrRoster = []; // [{name, dept(매핑됨)}]
+let hrResigned = new Set(); // 인사DB 퇴사자 — 작업기록 부서명이 잘못 입력돼도 통계에서 제외
 async function loadHrRoster() {
   try {
     const url = HR_URL + '/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)';
@@ -487,6 +488,11 @@ async function loadHrRoster() {
     if (!resp.ok) return;
     const rows = await resp.json();
     hrRoster = rows.map(r => ({ name: r.name, dept: HR_DEPT_TO_PART[r.department] ?? '' }));
+    // 퇴사자 명단 조회 (부서명 오타로 다른 부서에 잡히는 것 방지)
+    try {
+      const rr = await fetch(HR_URL + '/rest/v1/employees?select=name&status=eq.퇴사', { headers: { apikey: HR_KEY, Authorization: 'Bearer ' + HR_KEY } });
+      if (rr.ok) hrResigned = new Set((await rr.json()).map(x => x.name));
+    } catch (e) {}
     if (RAW_DATA.length) render();
   } catch (e) { console.warn('인사DB(조직도) 조회 실패 — 인사 연동 없이 표시', e); }
 }
@@ -877,6 +883,7 @@ function populateFilters() {
 
 function applyFilters(data) {
   return data.filter(r => {
+    if (hrResigned.has(r.담당자)) return false; // 인사DB 퇴사자 제외 (부서명 오타 무관)
     for (const f of ['년','월','주차별','부서명','담당자']) {
       if (filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
@@ -1464,6 +1471,7 @@ document.getElementById('quotaTable').addEventListener('click', (e) => {
 // 부서도 기록의 부서명으로 거르므로, 작업 당시 부서로 집계된다 (부서 이동 이력 자동 반영).
 function applyQuotaFilters(rows) {
   return rows.filter(r => {
+    if (hrResigned.has(r.담당자)) return false; // 인사DB 퇴사자 제외 (부서명 오타 무관)
     for (const f of ['년','월','주차별','부서명']) {
       if (filterState[f] && filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
