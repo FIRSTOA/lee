@@ -1019,45 +1019,49 @@ function render() {
   const quotaBase = applyQuotaFilters(RAW_DATA);
   const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
-  // 정량목표 설정(로스터) 기준 — 설정/조직도에 등록된 인원을 표시(작업 0건이어도)
-  const quotaExcluded = new Set(quotaConfig.excluded || []); // 설정에서 삭제(제외)한 인원
-  const rosterNames = [...new Set([...Object.keys(quotaConfig.persons), ...hrRoster.map(p => p.name)])];
-  const quotaPersons = rosterNames.filter(n => !quotaExcluded.has(n) && !hrResigned.has(n));
-  const personWeekCount = {};
-  quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
-  quotaDetail = {}; // 셀 클릭 상세용: key = 담당자주차 → [{날짜, 오버홀품목, 수리품목, weight}]
-  overhaulOnly.forEach(r => {
-    if (r.담당자 && r.주차별 && personWeekCount[r.담당자]) {
-      const w = overhaulWeight(r);
-      personWeekCount[r.담당자][r.주차별] = (personWeekCount[r.담당자][r.주차별] || 0) + w;
-      const key = r.담당자 + '' + r.주차별;
-      const dk = r.담당자, wk = r.주차별;
-      (quotaDetail[dk] = quotaDetail[dk] || {});
-      (quotaDetail[dk][wk] = quotaDetail[dk][wk] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
-    }
-  });
-  // 부서(그룹) 결정: 설정에서 수동 지정한 부서 최우선 → 조직도(인사DB) → 기록 부서 순
-  const personToDept = {};
-  overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
-  hrRoster.forEach(p => { if (p.dept) personToDept[p.name] = p.dept; });
-  Object.keys(quotaConfig.persons).forEach(nm => { const c = quotaConfig.persons[nm]; if (c && typeof c === 'object' && c.dept) personToDept[nm] = c.dept; });
-  const deptSel = filterState['부서명']; // 상단 메인 필터의 부서 선택을 따름
+  const quotaExcluded = new Set(quotaConfig.excluded || []);
+  const deptSel = filterState['부서명'];
   const deptSelected = deptSel && deptSel.size > 0;
-  let quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
-    if (deptSelected) {
-      const ia = DEPT_ORDER.indexOf(personToDept[a] || '');
-      const ib = DEPT_ORDER.indexOf(personToDept[b] || '');
-      const ai = ia === -1 ? 999 : ia;
-      const bi = ib === -1 ? 999 : ib;
-      if (ai !== bi) return ai - bi;
-    }
-    return a.localeCompare(b, 'ko');
+  const UKEY = (person, dept) => person + '' + dept;
+
+  // 집계 단위 = (담당자 × 기록 부서). 각 작업을 '작업 당시 부서(기록 부서명)'로 집계
+  const units = {};
+  quotaDetail = {};
+  overhaulOnly.forEach(r => {
+    if (!r.담당자 || !r.주차별) return;
+    if (quotaExcluded.has(r.담당자)) return;
+    const dept = r.부서명 || '(미지정)';
+    if (deptSelected && !deptSel.has(dept)) return;
+    const k = UKEY(r.담당자, dept);
+    if (!units[k]) { units[k] = { person: r.담당자, dept: dept, weeks: {} }; quotaWeeks.forEach(w => units[k].weeks[w] = 0); }
+    const w = overhaulWeight(r);
+    units[k].weeks[r.주차별] = (units[k].weeks[r.주차별] || 0) + w;
+    (quotaDetail[k] = quotaDetail[k] || {});
+    (quotaDetail[k][r.주차별] = quotaDetail[k][r.주차별] || []).push({ 날짜: r.날짜, 오버홀품목: r.오버홀품목, 수리품목: r.수리품목, weight: w });
   });
-  // 부서 필터 선택 시: 선택한 부서 소속 담당자만 표시
-  // (설정에만 등록된 타 부서 인원이 섞여 나오던 버그 수정)
-  if (deptSelected) {
-    quotaPersonsSorted = quotaPersonsSorted.filter(p => deptSel.has(personToDept[p] || '(미지정)'));
-  }
+
+  // 0건 인원: 기록 없는 설정/조직도 로스터 인원을 현재(설정) 부서에 0행으로 추가
+  const settingsDept = {};
+  hrRoster.forEach(p => { if (p.dept) settingsDept[p.name] = p.dept; });
+  Object.keys(quotaConfig.persons).forEach(nm => { const c = quotaConfig.persons[nm]; if (c && typeof c === 'object' && c.dept) settingsDept[nm] = c.dept; });
+  const personHasRecord = new Set(Object.values(units).map(u => u.person));
+  const rosterNames = [...new Set([...Object.keys(quotaConfig.persons), ...hrRoster.map(p => p.name)])];
+  rosterNames.forEach(nm => {
+    if (quotaExcluded.has(nm) || hrResigned.has(nm) || personHasRecord.has(nm)) return;
+    const dept = settingsDept[nm] || '(미지정)';
+    if (deptSelected && !deptSel.has(dept)) return;
+    const k = UKEY(nm, dept);
+    if (!units[k]) { units[k] = { person: nm, dept: dept, weeks: {} }; quotaWeeks.forEach(w => units[k].weeks[w] = 0); }
+  });
+
+  const unitList = Object.values(units).sort((a, b) => {
+    const ia = DEPT_ORDER.indexOf(a.dept), ib = DEPT_ORDER.indexOf(b.dept);
+    const ai = ia === -1 ? 999 : ia, bi = ib === -1 ? 999 : ib;
+    if (ai !== bi) return ai - bi;
+    if (a.dept !== b.dept) return a.dept.localeCompare(b.dept, 'ko');
+    return a.person.localeCompare(b.person, 'ko');
+  });
+
   document.getElementById('quotaTitle').textContent = '정량 목표 달성 현황';
   const qTbl = document.getElementById('quotaTable');
   const qThead = qTbl.querySelector('thead'); qThead.innerHTML = '';
@@ -1066,34 +1070,29 @@ function render() {
   qThead.appendChild(qHdr);
   const qBody = qTbl.querySelector('tbody'); qBody.innerHTML = '';
   const qColspan = 5 + quotaWeeks.length;
-  // 달성률 셀 HTML 생성 (담당자 행 / 부서 합계 행 공통)
-  // target>0: 실적/목표 %, 목표 미설정인데 실적 있으면 100+실적%, 둘 다 0이면 '—'
   const pctCellHtml = (target, total) => {
     if (target > 0) {
       const pct = Math.round(total / target * 100);
       const pctStyle = pct >= 100 ? 'background:#38a169;color:#fff' : pct >= 70 ? 'background:#d69e2e;color:#fff' : 'background:#e53e3e;color:#fff';
       return '<td class="num" style="' + pctStyle + ';font-weight:700">' + pct + '%</td>';
     } else if (total > 0) {
-      return '<td class="num" style="background:#38a169;color:#fff;font-weight:700" title="목표 미설정 — 100% + 실적 ' + total + '건">' + (100 + total) + '%</td>';
+      return '<td class="num" style="background:#38a169;color:#fff;font-weight:700">' + (100 + total) + '%</td>';
     }
     return '<td class="num" style="color:#a0aec0">—</td>';
   };
-  // 부서별 인원수 / 합계(총 목표·총 실적) 미리 계산
   const qDeptCount = {};
   const qDeptTotals = {};
-  quotaPersonsSorted.forEach(p => {
-    const d = personToDept[p] || '(미지정)';
-    qDeptCount[d] = (qDeptCount[d] || 0) + 1;
-    if (!qDeptTotals[d]) qDeptTotals[d] = { target: 0, total: 0 };
-    qDeptTotals[d].target += quotaOf(p) * quotaWeeks.length;
-    qDeptTotals[d].total += quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
+  unitList.forEach(u => {
+    qDeptCount[u.dept] = (qDeptCount[u.dept] || 0) + 1;
+    if (!qDeptTotals[u.dept]) qDeptTotals[u.dept] = { target: 0, total: 0 };
+    qDeptTotals[u.dept].target += quotaOf(u.person) * quotaWeeks.length;
+    qDeptTotals[u.dept].total += quotaWeeks.reduce((s,w) => s + (u.weeks[w] || 0), 0);
   });
-  // 파트 요약 카드 — 파트 전체 수치(목표·실적·달성률)를 표 위에 분리해 표시
   const partSummary = document.getElementById('quotaPartSummary');
   if (partSummary) {
     if (deptSelected) {
       const orderedDepts = [];
-      quotaPersonsSorted.forEach(p => { const d = personToDept[p] || '(미지정)'; if (!orderedDepts.includes(d)) orderedDepts.push(d); });
+      unitList.forEach(u => { if (!orderedDepts.includes(u.dept)) orderedDepts.push(u.dept); });
       const cardsHtml = orderedDepts.map(d => {
         const t = qDeptTotals[d] || { target: 0, total: 0 };
         let pct, barColor, pctColor, pctText;
@@ -1119,36 +1118,28 @@ function render() {
       partSummary.innerHTML = '';
     }
   }
-  // 부서 헤더 행 — 단순 라벨 (합계는 상단 '파트 요약' 카드로 분리)
   const deptHeaderRow = (dept) => {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td colspan="' + qColspan + '" style="background:#2b6cb0;color:#fff;font-weight:700;padding:8px 12px;font-size:13px;letter-spacing:0.5px">▸ ' + dept + ' (' + qDeptCount[dept] + '명)</td>';
     return tr;
   };
   let qLastDept = null;
-  quotaPersonsSorted.forEach(p => {
-    if (deptSelected) {
-      const curDept = personToDept[p] || '(미지정)';
-      if (curDept !== qLastDept) {
-        qBody.appendChild(deptHeaderRow(curDept));
-        qLastDept = curDept;
-      }
-    }
+  unitList.forEach(u => {
+    if (deptSelected && u.dept !== qLastDept) { qBody.appendChild(deptHeaderRow(u.dept)); qLastDept = u.dept; }
     const tr = document.createElement('tr');
-    const q = quotaOf(p);
+    const q = quotaOf(u.person);
+    const k = UKEY(u.person, u.dept);
     const cells = quotaWeeks.map(w => {
-      const v = personWeekCount[p][w] || 0;
+      const v = u.weeks[w] || 0;
       const cls = q === 0 ? (v > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="color:#a0aec0"') : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
-      // 작업 있는 셀은 클릭 시 상세(날짜·등급) 표시
-      const clickable = v > 0 ? ' qcell" data-person="' + encodeURIComponent(p) + '" data-week="' + encodeURIComponent(w) + '" title="클릭하면 상세 내역' : '';
+      const clickable = v > 0 ? ' qcell" data-key="' + encodeURIComponent(k) + '" data-person="' + encodeURIComponent(u.person) + '" data-dept="' + encodeURIComponent(u.dept) + '" data-week="' + encodeURIComponent(w) + '" title="클릭하면 상세 내역' : '';
       return '<td class="num' + clickable + '" ' + cls + '>' + v + '</td>';
     }).join('');
-    const total = quotaWeeks.reduce((s,w) => s + (personWeekCount[p][w] || 0), 0);
+    const total = quotaWeeks.reduce((s,w) => s + (u.weeks[w] || 0), 0);
     const target = q * quotaWeeks.length;
-    tr.innerHTML = '<td style="text-align:left">' + p + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCellHtml(target, total);
+    tr.innerHTML = '<td style="text-align:left">' + u.person + '</td><td class="num">' + q + '</td>' + cells + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCellHtml(target, total);
     qBody.appendChild(tr);
   });
-
   const weekGroup = groupByCategory(data, '주차별', sortByWeek);
   makeChart('weekChart', { type: 'bar',
     data: { labels: weekGroup.keys, datasets: stackedDatasets(weekGroup.keys, weekGroup.map, ALL_CATS) },
@@ -1437,10 +1428,10 @@ const quotaDetailModal = document.getElementById('quotaDetailModal');
 function closeQuotaDetail() { quotaDetailModal.classList.add('hidden'); }
 document.getElementById('qd-close').onclick = closeQuotaDetail;
 quotaDetailModal.onclick = (e) => { if (e.target === quotaDetailModal) closeQuotaDetail(); };
-function openQuotaDetail(person, week) {
-  const recs = (quotaDetail[person] && quotaDetail[person][week]) || [];
+function openQuotaDetail(key, person, dept, week) {
+  const recs = (quotaDetail[key] && quotaDetail[key][week]) || [];
   const total = recs.reduce((s, r) => s + (r.weight || 0), 0);
-  document.getElementById('qd-title').textContent = person + ' — ' + week + ' 상세';
+  document.getElementById('qd-title').textContent = person + (dept ? ' (' + dept + ')' : '') + ' — ' + week + ' 상세';
   document.getElementById('qd-sub').textContent = '환산 실적 합계 ' + total + ' · 작업 ' + recs.length + '건';
   const byGrade = {};
   recs.forEach(r => { const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || ''); const g = m ? m[1] : '기타'; byGrade[g] = (byGrade[g] || 0) + 1; });
@@ -1459,7 +1450,7 @@ function openQuotaDetail(person, week) {
 document.getElementById('quotaTable').addEventListener('click', (e) => {
   const td = e.target.closest('td.qcell');
   if (!td) return;
-  openQuotaDetail(decodeURIComponent(td.dataset.person), decodeURIComponent(td.dataset.week));
+  openQuotaDetail(decodeURIComponent(td.dataset.key || ''), decodeURIComponent(td.dataset.person || ''), decodeURIComponent(td.dataset.dept || ''), decodeURIComponent(td.dataset.week || ''));
 });
 
 // 정량목표 표는 상단 메인 필터(년/월/주차/부서)를 '기록(행)' 기준으로 적용한다.
