@@ -1012,12 +1012,9 @@ function render() {
   const quotaBase = applyQuotaFilters(RAW_DATA);
   const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
-  // 데이터에 있는 담당자 + 설정에 등록된 담당자 모두 포함 (작업 0건이어도 표시)
-  const dataPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))];
-  const configPersons = Object.keys(quotaConfig.persons);
-  const hrNames = hrRoster.map(p => p.name); // 조직도(인사DB) 현재 인원
+  // 기록 부서(작업 당시 부서) 기준 — 그 기간/부서에 오버홀 기록이 있는 사람만 표시
   const quotaExcluded = new Set(quotaConfig.excluded || []); // 설정에서 삭제(제외)한 인원
-  const quotaPersons = [...new Set([...dataPersons, ...configPersons, ...hrNames])].filter(n => !quotaExcluded.has(n));
+  const quotaPersons = [...new Set(overhaulOnly.map(r => r.담당자).filter(v => v))].filter(n => !quotaExcluded.has(n));
   const personWeekCount = {};
   quotaPersons.forEach(p => { personWeekCount[p] = {}; quotaWeeks.forEach(w => personWeekCount[p][w] = 0); });
   quotaDetail = {}; // 셀 클릭 상세용: key = 담당자주차 → [{날짜, 오버홀품목, 수리품목, weight}]
@@ -1032,12 +1029,10 @@ function render() {
     }
   });
   // 부서 미선택 → 이름순. 부서 선택 → 부서 순서(CSS→강북A→강서B→강남C→경기D→외부인력) + 이름순
+  // 분류 기준: 각 작업 기록의 부서명(작업 당시 부서). 조직도/설정 부서로 덮어쓰지 않음
+  // → 부서 이동 시 과거 실적은 과거 부서, 현재 실적은 현재 부서로 자동 분리됨
   const personToDept = {};
   overhaulOnly.forEach(r => { if (r.담당자 && r.부서명) personToDept[r.담당자] = r.부서명; });
-  // quota config의 명시 부서 적용
-  Object.keys(quotaConfig.persons).forEach(nm => { const cfg = quotaConfig.persons[nm]; if (cfg && typeof cfg === 'object' && cfg.dept) personToDept[nm] = cfg.dept; });
-  // 조직도(인사DB) 부서를 최우선 적용 — 조직도 수정 시 그룹/부서가 자동 반영됨
-  hrRoster.forEach(p => { if (p.dept) personToDept[p.name] = p.dept; });
   const deptSel = filterState['부서명']; // 상단 메인 필터의 부서 선택을 따름
   const deptSelected = deptSel && deptSel.size > 0;
   let quotaPersonsSorted = [...quotaPersons].sort((a, b) => {
@@ -1465,12 +1460,11 @@ document.getElementById('quotaTable').addEventListener('click', (e) => {
   openQuotaDetail(decodeURIComponent(td.dataset.person), decodeURIComponent(td.dataset.week));
 });
 
-// 정량목표 표는 상단 메인 필터의 년/월/주차만 행에 적용한다.
-// 부서는 '행의 부서명'이 아니라 '사람의 조직도 부서'(personToDept) 기준으로 거른다.
-// (담당자가 작업 기록의 부서명을 다르게 입력해도, 그 사람 조직도 부서로 집계되도록)
+// 정량목표 표는 상단 메인 필터(년/월/주차/부서)를 '기록(행)' 기준으로 적용한다.
+// 부서도 기록의 부서명으로 거르므로, 작업 당시 부서로 집계된다 (부서 이동 이력 자동 반영).
 function applyQuotaFilters(rows) {
   return rows.filter(r => {
-    for (const f of ['년','월','주차별']) {
+    for (const f of ['년','월','주차별','부서명']) {
       if (filterState[f] && filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
     }
     return true;
