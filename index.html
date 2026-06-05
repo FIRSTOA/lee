@@ -76,6 +76,7 @@
   table th { background: #f7fafc; font-weight: 600; color: #4a5568; position: sticky; top: 0; }
   table td.num { text-align: right; }
   .scroll { max-height: 380px; overflow: auto; }
+  .card[data-card-id="quotaTable"] .scroll { max-height: 70vh; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; }
   .badge-overhaul { background: #38a169; }
   .badge-repair { background: #d69e2e; }
@@ -369,8 +370,8 @@
       <input type="number" id="newPersonQuota" placeholder="목표" min="0">
       <select id="newPersonDept" style="padding:6px 8px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;background:#fff">
         <option value="">부서 선택</option>
-        <option>CSS</option><option>강북A</option><option>강서B</option>
-        <option>강남C</option><option>경기D</option><option>외부인력</option>
+        <option>강북A</option><option>강서B</option><option>강남C</option>
+        <option>경기D</option><option>CSS</option><option>외부인력</option>
       </select>
       <button class="btn-add" id="addPersonBtn">+ 추가</button>
     </div>
@@ -406,7 +407,7 @@ const HEADER_ROW_MARKERS = ['번호', '1열', '0'];
 
 const CAT_COLORS = { '오버홀': '#38a169', '수리': '#d69e2e', '리페어': '#3182ce', '기기폐기': '#e53e3e', '부품정리': '#805ad5', '기타': '#a0aec0' };
 const ALL_CATS = ['오버홀','수리','리페어','기기폐기','부품정리','기타'];
-const DEPT_ORDER = ['CSS', '강북A', '강서B', '강남C', '경기D', '외부인력'];
+const DEPT_ORDER = ['강북A', '강서B', '강남C', '경기D', 'CSS', '외부인력'];
 
 // === 정량 목표 (주간 오버홀 건수 기준) — Supabase 공유 저장(전원 동일) + localStorage 캐시/폴백 ===
 const QUOTA_STORAGE_KEY = 'overhaul_quota_v1';
