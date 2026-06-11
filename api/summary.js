@@ -22,7 +22,7 @@ function processRows(allRows){
     const dateCol=(cols[iDate]==null?'':String(cols[iDate])).trim();
     if(!/^\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(dateCol)) continue;
     const r={}; for(let j=0;j<headers.length;j++) r[headers[j]]=(cols[j]==null?'':String(cols[j])).trim();
-    if(r.부서명==='퇴사자') continue;
+    if(r.부서명==='퇴사자' || r.부서명==='교육생') continue;
     const dm=/^(\d{2,4})[\/\-](\d{1,2})[\/\-](\d{1,2})/.exec(dateCol);
     if(!dm) continue;
     let y=parseInt(dm[1]); if(y<100) y+=2000;
