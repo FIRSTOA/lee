@@ -98,7 +98,8 @@ function processRows(allRows){
 
 async function fetchAll(){
   const [dashResp, qcRows, hrRows, resignRows] = await Promise.all([
-    fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'dashboardData'}),redirect:'follow'}).then(r=>r.json()),
+    // 캐시 서버 함수 우선(빠름), 실패 시 Apps Script 직접
+    fetch('/api/data').then(r=>r.ok?r.json():Promise.reject()).catch(()=>fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'dashboardData'}),redirect:'follow'}).then(r=>r.json())),
     fetch(SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_quota&select=value',{headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}}).then(r=>r.ok?r.json():[]).catch(()=>[]),
     fetch(HR_URL+'/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)',{headers:{apikey:HR_KEY,Authorization:'Bearer '+HR_KEY}}).then(r=>r.ok?r.json():[]).catch(()=>[]),
     fetch(HR_URL+'/rest/v1/employees?select=name&status=eq.퇴사',{headers:{apikey:HR_KEY,Authorization:'Bearer '+HR_KEY}}).then(r=>r.ok?r.json():[]).catch(()=>[])
