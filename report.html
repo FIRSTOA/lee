@@ -225,6 +225,25 @@ function build(data){
   document.getElementById('report').innerHTML=h;
   document.title = (isQuarter?'분기보고 ':'주간보고 ')+periodSub;
   window._reportReady = true; // 메신저봇R 캡처 타이밍용
+
+  // ?img=1 : 보고를 PNG로 생성해 window.__REPORT_IMG(base64)에 담음 (메신저봇R이 읽어서 전송)
+  if (new URLSearchParams(location.search).get('img') === '1') {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    s.onload = function(){
+      html2canvas(document.getElementById('report'), { scale: 1.5, backgroundColor: '#ffffff', useCORS: true }).then(function(cv){
+        const url = cv.toDataURL('image/png');
+        window.__REPORT_IMG = url.split(',')[1]; // base64 (prefix 제외)
+        window.__REPORT_READY = true;
+        // 화면엔 생성된 이미지만 표시 (확인용)
+        document.body.style.background = '#fff';
+        document.body.innerHTML = '';
+        const img = new Image(); img.src = url; img.style.width = '100%'; img.style.display = 'block';
+        document.body.appendChild(img);
+      }).catch(function(e){ window.__REPORT_ERR = String(e); });
+    };
+    document.body.appendChild(s);
+  }
 }
 
 fetchAll().then(build).catch(e=>{ document.getElementById('report').innerHTML='<div class="loading" style="color:#c53030">보고 생성 실패: '+(e&&e.message||e)+'</div>'; console.error(e); });
