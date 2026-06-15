@@ -600,6 +600,22 @@ function migrateQuotaCardTop() {
   saveLayout(layoutConfig);
 }
 
+// 1회 마이그레이션: 재수리 통계 카드를 정량목표(quotaTable) 바로 아래로.
+function migrateRebuildAfterQuota() {
+  if (layoutConfig.movedRebuild) return;
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+  let order = (layoutConfig.order && layoutConfig.order.length)
+    ? [...layoutConfig.order]
+    : Array.from(grid.querySelectorAll(':scope > .card')).map(c => c.dataset.cardId);
+  order = order.filter(id => id !== 'rebuildStats');
+  const qi = order.indexOf('quotaTable');
+  if (qi >= 0) order.splice(qi + 1, 0, 'rebuildStats'); else order.push('rebuildStats');
+  layoutConfig.order = order;
+  layoutConfig.movedRebuild = true;
+  saveLayout(layoutConfig);
+}
+
 function initCardControls() {
   const grid = document.getElementById('dashboardGrid');
   if (!grid) return;
@@ -1584,6 +1600,7 @@ function applyQuotaFilters(rows) {
 
 // 카드 레이아웃 적용 (저장된 순서 + 숨김 상태)
 migrateQuotaCardTop();   // 정량목표 카드를 작업유형별 비중 위로 (1회)
+migrateRebuildAfterQuota(); // 재수리 통계 카드를 정량목표 바로 아래로 (1회)
 applyLayout();
 initCardControls();
 
