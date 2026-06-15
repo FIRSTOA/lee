@@ -25,6 +25,13 @@ function doneMsg(r){
     + '처리: ' + (r.workDone || '-') + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '') + '\n'
     + '📊 ' + DASH;
 }
+function cancelMsg(r){
+  return '🗑 [재수리 취소]\n'
+    + '모델: ' + (r.model || '-') + ' (' + dev(r) + ')\n'
+    + '취소자: ' + (r.canceledBy || r.requester || '-') + '\n'
+    + '원 요청일 ' + (r.reqDate || '-') + '\n'
+    + '📊 ' + DASH;
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,8 +43,9 @@ module.exports = async (req, res) => {
     const messages = [];
     let changed = false;
     list.forEach(rec => {
-      if (!rec.notified) { messages.push(reqMsg(rec)); rec.notified = true; changed = true; }
+      if (rec.status !== '취소' && !rec.notified) { messages.push(reqMsg(rec)); rec.notified = true; changed = true; }
       if (rec.status === '완료' && !rec.notifiedDone) { messages.push(doneMsg(rec)); rec.notifiedDone = true; changed = true; }
+      if (rec.status === '취소' && !rec.notifiedCancel) { messages.push(cancelMsg(rec)); rec.notifiedCancel = true; changed = true; }
     });
     if (changed) {
       await fetch(SUPA_URL + '/rest/v1/app_config?on_conflict=key', {
