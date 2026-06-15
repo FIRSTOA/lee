@@ -16,7 +16,8 @@ function reqMsg(r){
     + '증상: ' + (r.symptom || '-') + '\n'
     + '요청자: ' + (r.requester || '-') + ' → 담당: ' + (r.handler || '-') + '\n'
     + '보관: ' + (r.place || '-') + ' · 요청일: ' + (r.reqDate || '-')
-    + ((r.files && r.files.length) ? '\n📷 사진/영상:\n' + r.files.map(function(f){ return f.url; }).join('\n') : '');
+    + ((r.files && r.files.length) ? '\n📷 재수리 증상사진:\n' + r.files.map(function(f){ return f.url; }).join('\n') : '')
+    + ((r.origPhotos && r.origPhotos.length) ? '\n🛠 오버홀 당시 사진:\n' + r.origPhotos.join('\n') : '');
 }
 function doneMsg(r){
   return '✅ [재수리 완료]\n'
