@@ -438,6 +438,17 @@
           <input type="text" id="rbd-handler" placeholder="실제 수리한 사람 (기본=배정 담당, 다르면 변경)">
         </div>
         <div class="field">
+          <label>왜 재수리했나요? (재수리 사유)<span class="req">*</span></label>
+          <div class="rbchips" id="rbd-cause">
+            <div class="rbchip red" onclick="rbSingle(this)">오버홀 불량</div>
+            <div class="rbchip" onclick="rbSingle(this)">부품 고장·수명</div>
+            <div class="rbchip" onclick="rbSingle(this)">이동중 고장</div>
+            <div class="rbchip" onclick="rbSingle(this)">기타</div>
+          </div>
+          <div style="font-size:11.5px;color:#94a3b8;margin-top:6px">※ "오버홀 불량"만 처음 담당자 품질 책임으로 집계됩니다.</div>
+        </div>
+        <div class="field">
+          <label>처리 내용<span class="req">*</span></label>
           <textarea id="rbd-work" placeholder="예: 정착기 교체, 급지롤러 교체 후 정상 작동 확인"></textarea>
         </div>
         <div class="field">
@@ -2131,11 +2142,13 @@ function rbdPick(rec){
 async function rbDoneSubmit(){
   if(!RBD_CUR){ alert('처리할 재수리 요청을 선택하세요'); return; }
   const actual=document.getElementById('rbd-handler').value.trim();
+  const cause=rbSelOne('rbd-cause');
   const work=document.getElementById('rbd-work').value.trim();
   const replaced=document.getElementById('rbd-replaced').value.trim();
   const cdate=document.getElementById('rbd-date').value;
   const st=document.getElementById('rbd-status');
   if(!actual){ alert('실제 처리자를 입력하세요'); return; }
+  if(!cause){ alert('재수리 사유를 선택하세요'); return; }
   if(!work){ alert('처리 내용을 입력하세요'); return; }
   if(!cdate){ alert('완료일을 입력하세요'); return; }
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
@@ -2148,7 +2161,7 @@ async function rbDoneSubmit(){
     const idx=RB_LIST.findIndex(x=>x.id===RBD_CUR.id);
     if(idx<0) throw new Error('요청을 찾을 수 없음(이미 처리됨?)');
     RB_LIST[idx].status='완료'; RB_LIST[idx].completedDate=cdate; RB_LIST[idx].completedBy=actual;
-    RB_LIST[idx].workDone=work; RB_LIST[idx].replacedParts=replaced; RB_LIST[idx].completedFiles=urls; RB_LIST[idx].completedAt=new Date().toISOString();
+    RB_LIST[idx].cause=cause; RB_LIST[idx].workDone=work; RB_LIST[idx].replacedParts=replaced; RB_LIST[idx].completedFiles=urls; RB_LIST[idx].completedAt=new Date().toISOString();
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
     if(!up.ok) throw new Error('저장 실패('+up.status+')');
     st.innerHTML='<b style="color:#16a34a">✅ 재수리 완료 등록!</b>'; btn.textContent='완료!'; setTimeout(()=>location.reload(),1600);

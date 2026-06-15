@@ -157,6 +157,7 @@
   .rebuild-bars .b .tk { flex:1; background:#eef2f7; border-radius:6px; height:15px; overflow:hidden; }
   .rebuild-bars .b .fl { height:100%; border-radius:6px; background:linear-gradient(90deg,#dd6b20,#f6ad55); }
   .rebuild-bars .b .fl.bl { background:linear-gradient(90deg,#3182ce,#63b3ed); }
+  .rebuild-bars .b .fl.gr { background:linear-gradient(90deg,#16a34a,#4ade80); }
   .rebuild-bars .b .vv { width:30px; text-align:right; color:#718096; }
   #rebuildListTable tbody tr { cursor:pointer; }
   #rebuildListTable tbody tr:hover { background:#fff7ed; }
@@ -356,8 +357,10 @@
         <div id="rebuildSummary" class="rebuild-summary"></div>
         <div class="rebuild-2col">
           <div><div class="rebuild-subtitle">불량 부위별 분포</div><div id="rebuildParts" class="rebuild-bars"></div></div>
-          <div><div class="rebuild-subtitle">부서별 재수리 발생 <span style="font-weight:400;color:#a0aec0;font-size:10px">(원담당 부서)</span></div><div id="rebuildDepts" class="rebuild-bars"></div></div>
+          <div><div class="rebuild-subtitle">부서별 재수리 발생 <span style="font-weight:400;color:#a0aec0;font-size:10px">(오버홀 불량만·원담당 부서)</span></div><div id="rebuildDepts" class="rebuild-bars"></div></div>
         </div>
+        <div class="rebuild-subtitle">처리자별 재수리 처리 <span style="font-weight:400;color:#a0aec0;font-size:10px">(실제 수리한 사람·작업량)</span></div>
+        <div id="rebuildHandlers" class="rebuild-bars"></div>
         <div class="rebuild-subtitle">⚠️ 반복 재수리 기기 (2회 이상)</div>
         <div class="scroll" style="max-height:200px"><table id="rebuildRepeat"><thead><tr><th style="text-align:left">시리얼/자산</th><th style="text-align:left">모델</th><th>원담당</th><th>횟수</th><th>최근</th></tr></thead><tbody></tbody></table></div>
         <div class="rebuild-subtitle">재수리 요청 목록 <span id="rebuildListInfo" style="font-size:11px;color:#718096;font-weight:400"></span></div>
@@ -1626,10 +1629,10 @@ function rbInPeriod(rec){
   if (ms && ms.size>0 && ![...ms].some(v=>parseInt(v)===mo)) return false;
   return true;
 }
-function rbBars(obj, blue){
+function rbBars(obj, cls){
   const ent = Object.entries(obj).sort((a,b)=>b[1]-a[1]); if(!ent.length) return '<div style="color:#a0aec0;font-size:12px">데이터 없음</div>';
   const max = ent[0][1] || 1;
-  return ent.map(([k,v])=>'<div class="b"><span class="nm">'+rbEscH(k)+'</span><span class="tk"><span class="fl'+(blue?' bl':'')+'" style="width:'+Math.round(v/max*100)+'%"></span></span><span class="vv">'+v+'</span></div>').join('');
+  return ent.map(([k,v])=>'<div class="b"><span class="nm">'+rbEscH(k)+'</span><span class="tk"><span class="fl'+(cls?' '+cls:'')+'" style="width:'+Math.round(v/max*100)+'%"></span></span><span class="vv">'+v+'</span></div>').join('');
 }
 function renderRebuild(){
   const card = document.querySelector('[data-card-id="rebuildStats"]'); if(!card) return;
@@ -1641,10 +1644,15 @@ function renderRebuild(){
   document.getElementById('rebuildSummary').innerHTML = box('','전체',list.length,'')+box('req','요청',req,'요청')+box('done','완료',done,'완료')+box('urg','긴급(미완)',urg,'긴급');
   document.querySelectorAll('#rebuildSummary .rb-box').forEach(b=>b.onclick=()=>{ rbStatusFilter = (rbStatusFilter===b.dataset.f?'':b.dataset.f); renderRebuild(); });
   // 부위별 / 부서별
-  const pc={}, dc={};
-  list.forEach(x=>{ (x.parts||[]).forEach(p=>{ const k=String(p).split(':')[0].trim(); if(k) pc[k]=(pc[k]||0)+1; }); const d=x.origDept||'(미상)'; dc[d]=(dc[d]||0)+1; });
-  document.getElementById('rebuildParts').innerHTML = rbBars(pc,false);
-  document.getElementById('rebuildDepts').innerHTML = rbBars(dc,true);
+  const pc={}, dc={}, hc={};
+  list.forEach(x=>{
+    (x.parts||[]).forEach(p=>{ const k=String(p).split(':')[0].trim(); if(k) pc[k]=(pc[k]||0)+1; });
+    if(x.cause==='오버홀 불량'){ const d=x.origDept||'(미상)'; dc[d]=(dc[d]||0)+1; }
+    if(x.status==='완료'){ const h=x.completedBy||x.handler||'(미상)'; hc[h]=(hc[h]||0)+1; }
+  });
+  document.getElementById('rebuildParts').innerHTML = rbBars(pc,'');
+  document.getElementById('rebuildDepts').innerHTML = rbBars(dc,'bl');
+  document.getElementById('rebuildHandlers').innerHTML = rbBars(hc,'gr');
   // 반복 재수리 기기
   const dev={}; list.forEach(x=>{ const k=rbDevKey(x); if(!dev[k]) dev[k]={count:0,model:x.model||'',person:x.origPerson||'',last:''}; dev[k].count++; if((x.reqDate||'')>dev[k].last) dev[k].last=x.reqDate||''; });
   const rep = Object.entries(dev).filter(([k,v])=>v.count>=2).sort((a,b)=>b[1].count-a[1].count);
@@ -1671,6 +1679,21 @@ function openRebuildDetail(id){
     return '<a href="'+f.url+'" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#edf2f7;border-radius:8px;font-size:12px;margin:2px">'+(f.type==='video'?'🎬 동영상':'📎 파일')+' 열기</a>';
   }).join(' ') || '<span style="color:#a0aec0">첨부 없음</span>';
   const row=(k,v)=>'<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px"><b style="width:90px;color:#718096;flex-shrink:0">'+k+'</b><span>'+rbEscH(v||'-')+'</span></div>';
+  let doneHtml='';
+  if(x.status==='완료'){
+    const cf=(x.completedFiles||[]).map(f=>{
+      const fid=rbDriveId(f.url);
+      const cap=f.label?'<div style="font-size:10px;color:#6b7280;text-align:center;margin-top:2px">'+rbEscH(f.label)+'</div>':'';
+      if(f.type==='photo'&&fid) return '<div><a href="'+f.url+'" target="_blank" rel="noopener"><img src="https://drive.google.com/thumbnail?id='+fid+'&sz=w160" style="width:88px;height:70px;object-fit:cover;border-radius:7px;border:1px solid #e2e8f0"></a>'+cap+'</div>';
+      return '<div><a href="'+f.url+'" target="_blank" rel="noopener" style="display:inline-block;padding:8px 10px;background:#edf2f7;border-radius:7px;font-size:12px">'+(f.type==='video'?'🎬 동영상':'📎 파일')+'</a>'+cap+'</div>';
+    }).join(' ');
+    doneHtml='<div style="margin-top:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px">'
+      +'<div style="font-size:12px;font-weight:800;color:#16a34a;margin-bottom:6px">✅ 완료 정보</div>'
+      +row('실제 처리자', x.completedBy) + row('완료일', x.completedDate) + row('재수리 사유', x.cause) + row('교체 부품', x.replacedParts)
+      +'<div style="padding:6px 0;font-size:13px"><b style="color:#718096">처리 내용</b><div style="margin-top:3px;white-space:pre-wrap">'+rbEscH(x.workDone)+'</div></div>'
+      +(cf?'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:10px">'+cf+'</div>':'')
+      +'</div>';
+  }
   document.getElementById('rb-detail-body').innerHTML =
     row('요청일', x.reqDate) + row('상태', (x.status||'요청')) + row('긴급도', x.urgent) +
     row('자산번호', x.asset_no) + row('시리얼', x.serial) + row('모델', x.model) + row('업체', x.business) +
@@ -1678,7 +1701,8 @@ function openRebuildDetail(id){
     row('요청자', x.requester) + row('재수리 담당', x.handler) + row('보관 장소', x.place) +
     row('발견 시점', x.found) + row('불량 부위', (x.parts||[]).join(', ')) +
     '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px"><b style="color:#718096">증상</b><div style="margin-top:4px;white-space:pre-wrap">'+rbEscH(x.symptom)+'</div></div>' +
-    '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>';
+    '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>' +
+    doneHtml;
   document.getElementById('rb-detail-title').textContent = '재수리 상세 — ' + rbDevKey(x) + ' (' + (x.model||'') + ')';
   document.getElementById('rebuildDetailModal').classList.remove('hidden');
 }

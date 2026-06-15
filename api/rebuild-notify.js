@@ -23,6 +23,7 @@ function doneMsg(r){
     + '자산번호: ' + (r.asset_no || '-') + '\n'
     + '시리얼: ' + (r.serial || '-') + '\n'
     + '처리자: ' + (r.completedBy || r.handler || '-') + '\n'
+    + '사유: ' + (r.cause || '-') + '\n'
     + '완료일: ' + (r.completedDate || '-') + '\n'
     + '처리: ' + (r.workDone || '-')
     + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '');
