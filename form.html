@@ -421,13 +421,9 @@
 
     <div id="rb-mode-done" style="display:none">
       <div class="form-card">
-        <div class="section-title" style="color:#16a34a">✅ 재수리 완료 처리 — 요청을 불러와 완료 등록</div>
+        <div class="section-title" style="color:#16a34a">✅ 재수리 완료 처리</div>
         <div class="field">
-          <label>재수리 담당자 선택<span class="req">*</span></label>
-          <select id="rbd-person"><option value="">담당자 선택…</option></select>
-        </div>
-        <div id="rbd-listwrap" style="display:none">
-          <label>처리할 재수리 요청 — 선택하세요</label>
+          <label>처리할 재수리 요청 — 선택하세요<span class="req">*</span></label>
           <div class="rbreclist" id="rbd-list"></div>
         </div>
         <div class="rborig" id="rbd-info">
@@ -437,6 +433,10 @@
       </div>
       <div class="form-card" id="rbd-form" style="display:none">
         <div class="section-title">완료 내용</div>
+        <div class="field">
+          <label>실제 처리자 (수리한 사람)<span class="req">*</span></label>
+          <input type="text" id="rbd-handler" placeholder="실제 수리한 사람 (기본=배정 담당, 다르면 변경)">
+        </div>
         <div class="field">
           <textarea id="rbd-work" placeholder="예: 정착기 교체, 급지롤러 교체 후 정상 작동 확인"></textarea>
         </div>
@@ -2102,30 +2102,25 @@ function setRbSub(s){
 async function rbdInit(){
   document.getElementById('rbd-date').value=new Date().toISOString().slice(0,10);
   try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
-  const pending=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소');
-  const handlers=[...new Set(pending.map(x=>x.handler).filter(Boolean))].sort();
-  const sel=document.getElementById('rbd-person'); sel.innerHTML='<option value="">담당자 선택…</option>';
-  handlers.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
-  if(rbdReady) return; rbdReady=true;
-  sel.addEventListener('change',e=>{
-    const p=e.target.value,wrap=document.getElementById('rbd-listwrap'),box=document.getElementById('rbd-list');
-    document.getElementById('rbd-info').classList.remove('show'); document.getElementById('rbd-form').style.display='none'; RBD_CUR=null;
-    if(!p){ wrap.style.display='none'; return; }
-    const items=RB_LIST.filter(x=>x.handler===p && (x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
-    wrap.style.display='block';
-    if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; return; }
-    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
+  const box=document.getElementById('rbd-list');
+  document.getElementById('rbd-info').classList.remove('show'); document.getElementById('rbd-form').style.display='none'; RBD_CUR=null;
+  const items=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
+  if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; }
+  else {
+    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+' · 담당 '+rbEsc(x.handler||'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbdPick(items[+el.dataset.i]); });
-  });
+  }
+  if(rbdReady) return; rbdReady=true;
   document.querySelectorAll('#rbd-form .rbslot').forEach(slot=>{
-    const key=slot.dataset.slot, box=slot.querySelector('.rbslot-box');
+    const key=slot.dataset.slot, sbox=slot.querySelector('.rbslot-box');
     const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*,video/*'; inp.style.display='none'; slot.appendChild(inp);
-    box.onclick=(e)=>{ if(e.target.classList.contains('rmv')) return; inp.click(); };
-    inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; if(f.type.startsWith('video')&&f.size>42*1024*1024){ alert('동영상 40MB 초과'); inp.value=''; return; } RBD_SLOTS[key]=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); box.classList.add('has'); box.innerHTML=(isVid?'<video src="'+url+'" muted></video>':'<img src="'+url+'">')+'<div class="rmv">×</div>'; box.querySelector('.rmv').onclick=(ev)=>{ ev.stopPropagation(); RBD_SLOTS[key]=null; inp.value=''; box.classList.remove('has'); box.textContent='📷 첨부'; }; };
+    sbox.onclick=(e)=>{ if(e.target.classList.contains('rmv')) return; inp.click(); };
+    inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; if(f.type.startsWith('video')&&f.size>42*1024*1024){ alert('동영상 40MB 초과'); inp.value=''; return; } RBD_SLOTS[key]=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); sbox.classList.add('has'); sbox.innerHTML=(isVid?'<video src="'+url+'" muted></video>':'<img src="'+url+'">')+'<div class="rmv">×</div>'; sbox.querySelector('.rmv').onclick=(ev)=>{ ev.stopPropagation(); RBD_SLOTS[key]=null; inp.value=''; sbox.classList.remove('has'); sbox.textContent='📷 첨부'; }; };
   });
 }
 function rbdPick(rec){
   RBD_CUR=rec;
+  document.getElementById('rbd-handler').value=rec.handler||'';
   document.getElementById('rbd-info-body').innerHTML=
     '<b>'+rbEsc(rec.model||'')+'</b> · 시리얼 '+rbEsc(rec.serial||rec.asset_no||'-')+'<br>'
     +'요청일 '+rbEsc(rbShort(rec.reqDate))+' · 요청자 '+rbEsc(rec.requester||'')+' · 긴급도: '+rbEsc(rec.urgent||'')+'<br>'
@@ -2135,10 +2130,12 @@ function rbdPick(rec){
 }
 async function rbDoneSubmit(){
   if(!RBD_CUR){ alert('처리할 재수리 요청을 선택하세요'); return; }
+  const actual=document.getElementById('rbd-handler').value.trim();
   const work=document.getElementById('rbd-work').value.trim();
   const replaced=document.getElementById('rbd-replaced').value.trim();
   const cdate=document.getElementById('rbd-date').value;
   const st=document.getElementById('rbd-status');
+  if(!actual){ alert('실제 처리자를 입력하세요'); return; }
   if(!work){ alert('처리 내용을 입력하세요'); return; }
   if(!cdate){ alert('완료일을 입력하세요'); return; }
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
@@ -2150,7 +2147,7 @@ async function rbDoneSubmit(){
     try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
     const idx=RB_LIST.findIndex(x=>x.id===RBD_CUR.id);
     if(idx<0) throw new Error('요청을 찾을 수 없음(이미 처리됨?)');
-    RB_LIST[idx].status='완료'; RB_LIST[idx].completedDate=cdate; RB_LIST[idx].completedBy=RB_LIST[idx].handler;
+    RB_LIST[idx].status='완료'; RB_LIST[idx].completedDate=cdate; RB_LIST[idx].completedBy=actual;
     RB_LIST[idx].workDone=work; RB_LIST[idx].replacedParts=replaced; RB_LIST[idx].completedFiles=urls; RB_LIST[idx].completedAt=new Date().toISOString();
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
     if(!up.ok) throw new Error('저장 실패('+up.status+')');
