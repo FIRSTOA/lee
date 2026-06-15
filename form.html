@@ -239,6 +239,10 @@
     header h1 { font-size: 16px; margin-bottom: 0; }
     header p { display: none; }
   }
+  /* 실물 확인 필수 강조: 연한 빨강 */
+  .warn-field { background: #fff5f5 !important; border-color: #fc8181 !important; }
+  .warn-field:focus { border-color: #f56565 !important; box-shadow: 0 0 0 2px rgba(245,101,101,0.15) !important; }
+  .warn-note { font-size: 11.5px; color: #e06a6a; margin-top: 4px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -293,7 +297,8 @@
     <div class="section-title">작업 대상</div>
     <div class="field">
       <label>입고처</label>
-      <input type="text" id="f-incoming" placeholder="예: 강남 OO지점, 본사 등">
+      <input type="text" id="f-incoming" class="warn-field" placeholder="예: 강남 OO지점, 본사 등">
+      <div class="warn-note">⚠️ 자동입력될 수 있어요 — 실제 입고처 꼭 확인!!</div>
     </div>
     <div class="field">
       <label>모델명</label>
@@ -304,15 +309,17 @@
     </div>
     <div class="field">
       <label>자산번호</label>
-      <input type="text" id="f-asset" placeholder="자산번호 입력 → ERP 임대리스트에서 시리얼·모델 자동매칭" autocomplete="off">
+      <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 입력 → ERP 임대리스트에서 시리얼·모델 자동매칭" autocomplete="off">
+      <div class="warn-note">⚠️ 실물 자산번호 확인 필수!!</div>
       <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
     </div>
     <div class="field">
       <label>시리얼 번호</label>
       <div class="autocomplete-wrap">
-        <input type="text" id="f-serial" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
+        <input type="text" id="f-serial" class="warn-field" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
         <div id="serial-dropdown" class="autocomplete-dropdown hidden"></div>
       </div>
+      <div class="warn-note">⚠️ 실물 시리얼 번호 확인 필수!!</div>
     </div>
     <div class="field">
       <label>부품명</label>
@@ -966,13 +973,15 @@ function setupAssetLookup() {
   function esc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function show(j) {
     const a = j.asset || {}, c = j.client || {};
-    if (a.asset_no) assetEl.value = a.asset_no;
-    if (a.device_sn) serialEl.value = a.device_sn;
-    if (a.model) { const m = document.getElementById('f-model'); if (m) m.value = a.model; }
+    // ERP는 빈칸만 채움(실물 입력값이 우선) · ERP엔 절대 쓰지 않고 시트에만 저장됨
+    if (a.asset_no && !assetEl.value.trim()) assetEl.value = a.asset_no;
+    if (a.device_sn && !serialEl.value.trim()) serialEl.value = a.device_sn;
+    const m = document.getElementById('f-model'); if (m && a.model && !m.value.trim()) m.value = a.model;
     const inc = document.getElementById('f-incoming');
     if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
-    status.innerHTML = '✅ 자산 ' + esc(a.asset_no || '') + ' · ' + esc(c.business_name || '')
-      + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '');
+    status.innerHTML = '✅ ERP 임대리스트: 자산 ' + esc(a.asset_no || '') + ' · ' + esc(c.business_name || '')
+      + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '')
+      + ' &nbsp;<b style="color:#c53030">→ 실물과 대조 확인!</b>';
     status.style.color = '#2f855a';
   }
   async function lookup(param, val) {
