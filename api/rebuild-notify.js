@@ -51,6 +51,17 @@ function cancelMsg(r){
     + '취소자: ' + (r.canceledBy || r.requester || '-') + '\n'
     + '원 요청일: ' + (r.reqDate || '-');
 }
+function remindMsg(r, ds){
+  return '⏰ [재수리 미완료 ' + ds + '일째]\n'
+    + '모델: ' + (r.model || '-') + '\n'
+    + '시리얼: ' + (r.serial || '-') + '\n'
+    + '담당: ' + (r.handler || '-') + '\n'
+    + '요청자: ' + (r.requester || '-') + '\n'
+    + '요청일: ' + (r.reqDate || '-') + ' (요청 ' + ds + '일 경과)\n'
+    + '아직 완료 등록이 안 됐습니다. 처리 부탁드립니다.';
+}
+function kstToday(){ const k = new Date(Date.now() + 9*3600*1000); return k.getUTCFullYear() + '-' + String(k.getUTCMonth()+1).padStart(2,'0') + '-' + String(k.getUTCDate()).padStart(2,'0'); }
+function daysSinceKst(rd){ const m=/(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(rd||'')); if(!m) return -1; const k=new Date(Date.now()+9*3600*1000); const today=Date.UTC(k.getUTCFullYear(),k.getUTCMonth(),k.getUTCDate()); return Math.floor((today - Date.UTC(+m[1],+m[2]-1,+m[3]))/86400000); }
 
 function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=>d+=c); req.on('end',()=>resolve(d)); req.on('error',()=>resolve('')); }); }
 async function loadList(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
@@ -71,6 +82,7 @@ module.exports = async (req, res) => {
         if (a.type === 'req') { rec.notified = true; changed++; }
         else if (a.type === 'done') { rec.notifiedDone = true; changed++; }
         else if (a.type === 'cancel') { rec.notifiedCancel = true; changed++; }
+        else if (a.type === 'remind') { rec.lastReminded = kstToday(); changed++; }
       });
       if (changed) await saveList(list);
       res.status(200).json({ ok: true, acked: changed });
@@ -84,6 +96,16 @@ module.exports = async (req, res) => {
       if (rec.status === '완료' && !rec.notifiedDone) items.push({ id: rec.id, type: 'done', text: doneMsg(rec) });
       if (rec.status === '취소' && !rec.notifiedCancel) items.push({ id: rec.id, type: 'cancel', text: cancelMsg(rec) });
     });
+    // 미완료 독촉: 요청 2일 경과 + 매일 오전 10시 이후, 하루 1회
+    const kH = new Date(Date.now() + 9*3600*1000).getUTCHours();
+    if (kH >= 10) {
+      const tStr = kstToday();
+      list.forEach(rec => {
+        if (rec.status === '완료' || rec.status === '취소') return;
+        const ds = daysSinceKst(rec.reqDate);
+        if (ds >= 2 && rec.lastReminded !== tStr) items.push({ id: rec.id, type: 'remind', text: remindMsg(rec, ds) });
+      });
+    }
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.status(200).json({ ok: true, count: items.length, items });
   } catch (e) {
