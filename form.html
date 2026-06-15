@@ -248,6 +248,7 @@
   .rb-subbtn { flex:1; padding:9px; border:1px solid #cbd5e0; border-radius:8px; background:#fff; font-size:13px; font-weight:700; cursor:pointer; color:#64748b; }
   #rbsub-new.active { background:#fff7ed; color:#9a3412; border-color:#ff7a18; }
   #rbsub-done.active { background:#f0fdf4; color:#166534; border-color:#16a34a; }
+  #rbsub-cancel.active { background:#fef2f2; color:#c53030; border-color:#e53e3e; }
   /* 재수리 블록 (스코프: #mode-rebuild) */
   #mode-rebuild select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; background:#fff; }
   #mode-rebuild textarea, #mode-rebuild input[type=text], #mode-rebuild input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; }
@@ -318,7 +319,8 @@
   <div id="mode-rebuild" style="display:none">
     <div class="rb-subtoggle">
       <button type="button" id="rbsub-new" class="rb-subbtn active" onclick="setRbSub('new')">📝 재수리 요청</button>
-      <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">✅ 재수리 완료 처리</button>
+      <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">✅ 완료 처리</button>
+      <button type="button" id="rbsub-cancel" class="rb-subbtn" onclick="setRbSub('cancel')">🗑 취소</button>
     </div>
     <div id="rb-mode-new">
     <div class="form-card">
@@ -462,6 +464,25 @@
           <input type="date" id="rbd-date">
         </div>
         <div id="rbd-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div id="rb-mode-cancel" style="display:none">
+      <div class="form-card">
+        <div class="section-title" style="color:#c53030">🗑 재수리 취소 — 요청자 본인만 가능</div>
+        <div class="field">
+          <label>요청자 선택<span class="req">*</span></label>
+          <select id="rbc-person"><option value="">요청자 선택…</option></select>
+        </div>
+        <div id="rbc-listwrap" style="display:none">
+          <label>취소할 재수리 요청 (본인이 요청한 건만)</label>
+          <div class="rbreclist" id="rbc-list"></div>
+        </div>
+        <div class="rborig" id="rbc-info">
+          <div class="t">선택한 요청</div>
+          <div id="rbc-info-body" style="font-size:13px"></div>
+        </div>
+        <div id="rbc-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
       </div>
     </div>
   </div>
@@ -2005,7 +2026,7 @@ function rbBind(){
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hover');}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hover');}));
   drop.addEventListener('drop',e=>rbAddFiles(e.dataTransfer.files));
-  document.getElementById('btn-rb-submit').onclick=()=>{ (RB_SUB==='done'?rbDoneSubmit:rbSubmit)(); };
+  document.getElementById('btn-rb-submit').onclick=()=>{ (RB_SUB==='cancel'?rbCancelSubmit:(RB_SUB==='done'?rbDoneSubmit:rbSubmit))(); };
 }
 async function rbErp(param,val){ try{ const r=await fetch('/api/asset?'+param+'='+encodeURIComponent(val)); const j=await r.json(); return (r.ok&&!j.error)?j:null; }catch(e){ return null; } }
 function rbFillOrig(o){
@@ -2081,12 +2102,16 @@ function setRbSub(s){
   RB_SUB=s;
   document.getElementById('rb-mode-new').style.display = s==='new'?'block':'none';
   document.getElementById('rb-mode-done').style.display = s==='done'?'block':'none';
+  document.getElementById('rb-mode-cancel').style.display = s==='cancel'?'block':'none';
   document.getElementById('rbsub-new').classList.toggle('active', s==='new');
   document.getElementById('rbsub-done').classList.toggle('active', s==='done');
+  document.getElementById('rbsub-cancel').classList.toggle('active', s==='cancel');
   const btn=document.getElementById('btn-rb-submit');
-  btn.textContent = s==='done' ? '재수리 완료 등록' : '재수리 요청 등록 + 채팅방 알림';
-  btn.style.background = s==='done' ? '#16a34a' : '#ff7a18';
+  if(s==='cancel'){ btn.textContent='재수리 요청 취소'; btn.style.background='#e53e3e'; }
+  else if(s==='done'){ btn.textContent='재수리 완료 등록'; btn.style.background='#16a34a'; }
+  else { btn.textContent='재수리 요청 등록 + 채팅방 알림'; btn.style.background='#ff7a18'; }
   if(s==='done') rbdInit();
+  if(s==='cancel') rbcInit();
 }
 async function rbdInit(){
   document.getElementById('rbd-date').value=new Date().toISOString().slice(0,10);
@@ -2145,6 +2170,45 @@ async function rbDoneSubmit(){
     if(!up.ok) throw new Error('저장 실패('+up.status+')');
     st.innerHTML='<b style="color:#16a34a">✅ 재수리 완료 등록!</b>'; btn.textContent='완료!'; setTimeout(()=>location.reload(),1600);
   }catch(e){ st.innerHTML='<b style="color:#c53030">❌ '+rbEsc(String(e))+'</b>'; btn.disabled=false; btn.textContent='재수리 완료 등록'; }
+}
+
+// ----- 재수리 취소 (요청자 본인만) -----
+let RBC_CUR=null, rbcReady=false;
+async function rbcInit(){
+  try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
+  const pend=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소');
+  const reqs=[...new Set(pend.map(x=>x.requester).filter(Boolean))].sort();
+  const sel=document.getElementById('rbc-person'); sel.innerHTML='<option value="">요청자 선택…</option>';
+  reqs.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
+  if(rbcReady) return; rbcReady=true;
+  sel.addEventListener('change',e=>{
+    const p=e.target.value,wrap=document.getElementById('rbc-listwrap'),box=document.getElementById('rbc-list');
+    document.getElementById('rbc-info').classList.remove('show'); RBC_CUR=null;
+    if(!p){ wrap.style.display='none'; return; }
+    const items=RB_LIST.filter(x=>x.requester===p && (x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
+    wrap.style.display='block';
+    if(!items.length){ box.innerHTML='<div class="rbempty">취소할 요청이 없습니다</div>'; return; }
+    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.reqDate||'')+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
+    box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbcPick(items[+el.dataset.i]); });
+  });
+}
+function rbcPick(rec){
+  RBC_CUR=rec;
+  document.getElementById('rbc-info-body').innerHTML='<b>'+rbEsc(rec.model||'')+'</b> · '+rbEsc(rec.serial||rec.asset_no||'')+'<br>요청일 '+rbEsc(rec.reqDate||'')+' · 담당 '+rbEsc(rec.handler||'')+'<br>증상: '+rbEsc(rec.symptom||'');
+  document.getElementById('rbc-info').classList.add('show');
+}
+async function rbCancelSubmit(){
+  if(!RBC_CUR){ alert('취소할 요청을 선택하세요'); return; }
+  if(!confirm('이 재수리 요청을 취소할까요?')) return;
+  const st=document.getElementById('rbc-status'); const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='취소 중…';
+  try{
+    try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
+    const idx=RB_LIST.findIndex(x=>x.id===RBC_CUR.id); if(idx<0) throw new Error('요청을 찾을 수 없음');
+    RB_LIST[idx].status='취소'; RB_LIST[idx].notified=true; RB_LIST[idx].canceledBy=RBC_CUR.requester; RB_LIST[idx].canceledAt=new Date().toISOString();
+    const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
+    if(!up.ok) throw new Error('저장 실패('+up.status+')');
+    st.innerHTML='<b style="color:#16a34a">✅ 재수리 요청이 취소되었습니다</b>'; btn.textContent='완료!'; setTimeout(()=>location.reload(),1500);
+  }catch(e){ st.innerHTML='<b style="color:#c53030">❌ '+rbEsc(String(e))+'</b>'; btn.disabled=false; btn.textContent='재수리 요청 취소'; }
 }
 </script>
 </body>
