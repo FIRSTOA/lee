@@ -7,7 +7,19 @@ const DASH = 'https://lee-zeta-one.vercel.app/';
 
 function dev(r){ return r.serial || (r.asset_no ? '자산:' + r.asset_no : '(미상)'); }
 
-function reqMsg(r){
+function ymd(s){ const m=/(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/.exec(String(s||'')); if(!m) return ''; let y=+m[1]; if(y<100)y+=2000; return y+'-'+(+m[2])+'-'+(+m[3]); }
+function findOrigPhotos(rec, rows){
+  if(!rows || !rec.origPerson || !rec.model) return rec.origPhotos || [];
+  const oy=ymd(rec.origDate); const out=[];
+  for(let i=2;i<rows.length;i++){ const row=rows[i]; if(!row) continue;
+    if((row[4]||'')===rec.origPerson && (row[6]||'')===rec.model && (!oy || ymd(row[1])===oy)){
+      const u=String(row[16]||'').match(/https?:\/\/[^\s|]+/g); if(u) u.forEach(function(x){ if(out.indexOf(x)<0) out.push(x); });
+    }
+  }
+  return out.length ? out : (rec.origPhotos || []);
+}
+function reqMsg(r, origPhotos){
+  origPhotos = origPhotos || r.origPhotos || [];
   return '🔧 [재수리 요청]' + (r.urgent === '긴급' ? ' 🔴긴급' : '') + '\n'
     + '모델: ' + (r.model || '-') + '\n'
     + '자산번호: ' + (r.asset_no || '-') + '\n'
@@ -17,7 +29,7 @@ function reqMsg(r){
     + '요청자: ' + (r.requester || '-') + ' → 담당: ' + (r.handler || '-') + '\n'
     + '보관: ' + (r.place || '-') + ' · 요청일: ' + (r.reqDate || '-')
     + ((r.files && r.files.length) ? '\n📷 재수리 증상사진:\n' + r.files.map(function(f){ return f.url; }).join('\n') : '')
-    + ((r.origPhotos && r.origPhotos.length) ? '\n🛠 오버홀 당시 사진:\n' + r.origPhotos.join('\n') : '');
+    + ((origPhotos && origPhotos.length) ? '\n🛠 오버홀 당시 사진:\n' + origPhotos.join('\n') : '');
 }
 function doneMsg(r){
   return '✅ [재수리 완료]\n'
@@ -66,9 +78,12 @@ module.exports = async (req, res) => {
     }
     // GET: 미전송 알림 목록 반환 (여기서는 '보냄' 표시 안 함 — 봇이 보낸 뒤 ack해야 표시됨)
     const list = await loadList();
+    const needDash = list.some(r => r.status !== '취소' && !r.notified && r.origPerson && r.model);
+    let rows = null;
+    if (needDash) { try { const dr = await fetch('https://lee-zeta-one.vercel.app/api/data'); const dj = await dr.json(); rows = (dj && dj.rows) || null; } catch (e) {} }
     const items = [];
     list.forEach(rec => {
-      if (rec.status !== '취소' && !rec.notified) items.push({ id: rec.id, type: 'req', text: reqMsg(rec) });
+      if (rec.status !== '취소' && !rec.notified) items.push({ id: rec.id, type: 'req', text: reqMsg(rec, findOrigPhotos(rec, rows)) });
       if (rec.status === '완료' && !rec.notifiedDone) items.push({ id: rec.id, type: 'done', text: doneMsg(rec) });
       if (rec.status === '취소' && !rec.notifiedCancel) items.push({ id: rec.id, type: 'cancel', text: cancelMsg(rec) });
     });
