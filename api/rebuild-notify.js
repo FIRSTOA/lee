@@ -8,26 +8,32 @@ const DASH = 'https://lee-zeta-one.vercel.app/';
 function dev(r){ return r.serial || (r.asset_no ? '자산:' + r.asset_no : '(미상)'); }
 
 function reqMsg(r){
-  const parts = (r.parts || []).join(', ');
   return '🔧 [재수리 요청]' + (r.urgent === '긴급' ? ' 🔴긴급' : '') + '\n'
-    + '모델: ' + (r.model || '-') + ' (' + dev(r) + ')\n'
-    + (r.business ? '업체: ' + r.business + '\n' : '')
-    + '부위: ' + (parts || '-') + '\n'
+    + '모델: ' + (r.model || '-') + '\n'
+    + '자산번호: ' + (r.asset_no || '-') + '\n'
+    + '시리얼: ' + (r.serial || '-') + '\n'
+    + '부위: ' + ((r.parts || []).join(', ') || '-') + '\n'
     + '증상: ' + (r.symptom || '-') + '\n'
     + '요청자: ' + (r.requester || '-') + ' → 담당: ' + (r.handler || '-') + '\n'
-    + '보관: ' + (r.place || '-') + ' · 요청일 ' + (r.reqDate || '-');
+    + '보관: ' + (r.place || '-') + ' · 요청일: ' + (r.reqDate || '-');
 }
 function doneMsg(r){
   return '✅ [재수리 완료]\n'
-    + '모델: ' + (r.model || '-') + ' (' + dev(r) + ')\n'
-    + '담당: ' + (r.completedBy || r.handler || '-') + ' · 완료일 ' + (r.completedDate || '-') + '\n'
-    + '처리: ' + (r.workDone || '-') + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '');
+    + '모델: ' + (r.model || '-') + '\n'
+    + '자산번호: ' + (r.asset_no || '-') + '\n'
+    + '시리얼: ' + (r.serial || '-') + '\n'
+    + '처리자: ' + (r.completedBy || r.handler || '-') + '\n'
+    + '완료일: ' + (r.completedDate || '-') + '\n'
+    + '처리: ' + (r.workDone || '-')
+    + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '');
 }
 function cancelMsg(r){
   return '🗑 [재수리 취소]\n'
-    + '모델: ' + (r.model || '-') + ' (' + dev(r) + ')\n'
+    + '모델: ' + (r.model || '-') + '\n'
+    + '자산번호: ' + (r.asset_no || '-') + '\n'
+    + '시리얼: ' + (r.serial || '-') + '\n'
     + '취소자: ' + (r.canceledBy || r.requester || '-') + '\n'
-    + '원 요청일 ' + (r.reqDate || '-');
+    + '원 요청일: ' + (r.reqDate || '-');
 }
 
 module.exports = async (req, res) => {
