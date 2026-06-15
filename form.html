@@ -957,31 +957,39 @@ function setupSerialAutocomplete() {
 }
 setupSerialAutocomplete();
 
-// === 자산번호 → ERP(임대리스트 first_MPS) 자동매칭: 시리얼·모델·업체 자동완성 ===
+// === 자산번호 ↔ 시리얼 ERP(임대리스트 first_MPS) 양방향 자동매칭 ===
 function setupAssetLookup() {
-  const el = document.getElementById('f-asset');
-  if (!el) return;
+  const assetEl = document.getElementById('f-asset');
+  const serialEl = document.getElementById('f-serial');
   const status = document.getElementById('asset-status');
+  if (!assetEl || !serialEl || !status) return;
   function esc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  async function lookup() {
-    const code = el.value.trim();
-    if (!code) { status.textContent = ''; return; }
+  function show(j) {
+    const a = j.asset || {}, c = j.client || {};
+    if (a.asset_no) assetEl.value = a.asset_no;
+    if (a.device_sn) serialEl.value = a.device_sn;
+    if (a.model) { const m = document.getElementById('f-model'); if (m) m.value = a.model; }
+    const inc = document.getElementById('f-incoming');
+    if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
+    status.innerHTML = '✅ 자산 ' + esc(a.asset_no || '') + ' · ' + esc(c.business_name || '')
+      + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '');
+    status.style.color = '#2f855a';
+  }
+  async function lookup(param, val) {
+    val = (val || '').trim();
+    if (!val) return;
     status.textContent = '🔎 ERP 임대리스트 조회 중...'; status.style.color = '#718096';
     try {
-      const r = await fetch('/api/asset?asset_no=' + encodeURIComponent(code));
+      const r = await fetch('/api/asset?' + param + '=' + encodeURIComponent(val));
       const j = await r.json();
-      if (!r.ok || j.error) { status.textContent = '❌ ' + (j.error || '조회 실패 (자산번호 확인)'); status.style.color = '#c53030'; return; }
-      const a = j.asset || {}, c = j.client || {};
-      if (a.device_sn) document.getElementById('f-serial').value = a.device_sn;
-      if (a.model) document.getElementById('f-model').value = a.model;
-      const inc = document.getElementById('f-incoming');
-      if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
-      status.innerHTML = '✅ ' + esc(c.business_name || '') + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '');
-      status.style.color = '#2f855a';
+      if (!r.ok || j.error) { status.textContent = '❌ ' + (j.error || '조회 실패'); status.style.color = '#c53030'; return; }
+      show(j);
     } catch (e) { status.textContent = '❌ 네트워크 오류'; status.style.color = '#c53030'; }
   }
-  el.addEventListener('change', lookup);
-  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup(); } });
+  assetEl.addEventListener('change', () => lookup('asset_no', assetEl.value));
+  assetEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup('asset_no', assetEl.value); } });
+  // 시리얼만 입력해도 → 자산번호 자동 매칭 (자산번호가 비어 있을 때)
+  serialEl.addEventListener('change', () => { if (serialEl.value.trim() && !assetEl.value.trim()) lookup('serial', serialEl.value); });
 }
 setupAssetLookup();
 
