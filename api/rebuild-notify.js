@@ -15,7 +15,8 @@ function reqMsg(r){
     + '부위: ' + ((r.parts || []).join(', ') || '-') + '\n'
     + '증상: ' + (r.symptom || '-') + '\n'
     + '요청자: ' + (r.requester || '-') + ' → 담당: ' + (r.handler || '-') + '\n'
-    + '보관: ' + (r.place || '-') + ' · 요청일: ' + (r.reqDate || '-');
+    + '보관: ' + (r.place || '-') + ' · 요청일: ' + (r.reqDate || '-')
+    + ((r.files && r.files.length) ? '\n📷 첨부 ' + r.files.length + '장 (대시보드에서 확인)' : '');
 }
 function doneMsg(r){
   return '✅ [재수리 완료]\n'
@@ -26,7 +27,8 @@ function doneMsg(r){
     + '사유: ' + (r.cause || '-') + '\n'
     + '완료일: ' + (r.completedDate || '-') + '\n'
     + '처리: ' + (r.workDone || '-')
-    + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '');
+    + (r.replacedParts ? '\n교체부품: ' + r.replacedParts : '')
+    + ((r.completedFiles && r.completedFiles.length) ? '\n📷 완료사진 ' + r.completedFiles.length + '장 (대시보드에서 확인)' : '');
 }
 function cancelMsg(r){
   return '🗑 [재수리 취소]\n'
