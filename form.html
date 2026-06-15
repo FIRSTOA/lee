@@ -260,7 +260,8 @@
   #mode-rebuild .rbetc { display:none; margin-top:8px; width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; min-height:54px; }
   #mode-rebuild .rbetc.show { display:block; }
   #mode-rebuild .rbreclist { margin-top:8px; border:1px solid #e5e7eb; border-radius:10px; max-height:220px; overflow:auto; }
-  #mode-rebuild .rbit { padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; display:flex; justify-content:space-between; gap:8px; }
+  #mode-rebuild .rbit { padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 8px; }
+  #mode-rebuild .rbit .s { word-break:break-all; }
   #mode-rebuild .rbit:hover { background:#fff7ed; } #mode-rebuild .rbit:last-child { border-bottom:none; }
   #mode-rebuild .rbit .s { font-family:monospace; color:#2563eb; font-size:12px; }
   #mode-rebuild .rbempty { padding:14px; color:#9ca3af; font-size:13px; text-align:center; }
@@ -324,29 +325,21 @@
     </div>
     <div id="rb-mode-new">
     <div class="form-card">
-      <div class="section-title" style="color:#c05621">🔧 재수리 요청 — 원 오버홀 담당자가 다시 수리</div>
-      <div class="row-2">
-        <div class="field">
-          <label>작성자 (원 오버홀 담당자)<span class="req">*</span></label>
-          <select id="rb-person"><option value="">담당자 선택…</option></select>
-        </div>
-        <div class="field">
-          <label>또는 자산번호/시리얼 직접</label>
-          <div style="display:flex;gap:6px"><input type="text" id="rb-direct" placeholder="자산번호 또는 시리얼" style="flex:1"><button type="button" class="btn btn-primary" id="btn-rb-direct" style="white-space:nowrap">조회</button></div>
-        </div>
-      </div>
-      <div id="rb-reclist-wrap" style="display:none">
-        <label>이 담당자의 오버홀 작업 — 재수리할 기기를 고르세요</label>
-        <div class="rbreclist" id="rb-reclist"></div>
+      <div class="section-title" style="color:#c05621">🔧 재수리 요청</div>
+      <div class="field">
+        <label>자산번호 또는 시리얼 입력<span class="req">*</span></label>
+        <div style="display:flex;gap:6px"><input type="text" id="rb-direct" placeholder="자산번호 또는 시리얼 입력" style="flex:1"><button type="button" class="btn btn-primary" id="btn-rb-direct" style="white-space:nowrap">조회</button></div>
+        <p style="font-size:11.5px;color:#718096;margin-top:5px">입력 후 조회 → 기기 정보·원 담당자가 자동 표시됩니다</p>
       </div>
       <div class="rborig" id="rb-orig">
-        <div class="t">✅ 선택된 기기 (재수리 대상)</div>
+        <div class="t">✅ 조회된 기기 (재수리 대상)</div>
         <div class="rbgrid">
           <div class="rbkv"><b>모델</b><span id="rbo-model">-</span></div>
-          <div class="rbkv"><b>시리얼</b><span id="rbo-serial">-</span></div>
+          <div class="rbkv"><b>시리얼</b><span id="rbo-serial" style="word-break:break-all">-</span></div>
           <div class="rbkv"><b>자산번호</b><span id="rbo-asset">-</span></div>
           <div class="rbkv"><b>업체</b><span id="rbo-biz">-</span></div>
           <div class="rbkv"><b>원 작업일</b><span id="rbo-date">-</span></div>
+          <div class="rbkv"><b>원 담당자</b><span id="rbo-person">-</span></div>
           <div class="rbkv"><b>누적 재수리</b><span id="rbo-count">0회</span></div>
         </div>
       </div>
@@ -404,8 +397,8 @@
           <input type="text" id="rb-requester" placeholder="요청자 이름">
         </div>
         <div class="field">
-          <label>재수리 담당자 (원 오버홀 담당자)<span class="req">*</span></label>
-          <input type="text" id="rb-handler" placeholder="기본=원 담당자">
+          <label>재수리 담당 (오버홀 담당)<span class="req">*</span></label>
+          <input type="text" id="rb-handler" placeholder="조회 시 자동">
         </div>
       </div>
       <div class="field">
@@ -2005,22 +1998,14 @@ let RB_SERIALS=[],RB_LIST=[],RB_CUR={},RB_FILES=[],rbReady=false;
 async function rbInit(){
   if(rbReady) return; rbReady=true;
   document.getElementById('rb-reqdate').value=new Date().toISOString().slice(0,10);
-  try{ const r=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'listSerials'}),redirect:'follow'}); const j=await r.json(); RB_SERIALS=(j&&j.items)||[]; const persons=[...new Set(RB_SERIALS.map(x=>x.person).filter(Boolean))].sort(); const sel=document.getElementById('rb-person'); persons.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);}); }catch(e){}
+  try{ const r=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'listSerials'}),redirect:'follow'}); const j=await r.json(); RB_SERIALS=(j&&j.items)||[]; }catch(e){}
   try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){ RB_LIST=[]; }
   rbBind();
 }
+function rbShort(d){ const m=/^\d{2}(\d{2})-(\d{1,2})-(\d{1,2})/.exec(String(d||'')); return m?(m[1]+'-'+m[2]+'-'+m[3]):(d||''); }
 function rbBind(){
-  document.getElementById('rb-person').addEventListener('change',e=>{
-    const p=e.target.value,wrap=document.getElementById('rb-reclist-wrap'),box=document.getElementById('rb-reclist');
-    if(!p){ wrap.style.display='none'; return; }
-    document.getElementById('rb-handler').value=p;
-    const list=RB_SERIALS.filter(x=>x.person===p).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    wrap.style.display='block';
-    if(!list.length){ box.innerHTML='<div class="rbempty">시리얼 기록이 없습니다 — 우측에서 직접 조회</div>'; return; }
-    box.innerHTML=list.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.date||'')+' · '+rbEsc(x.model||'(모델?)')+'</span><span class="s">'+rbEsc(x.serial||'')+'</span></div>').join('');
-    box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbPick(list[+el.dataset.i]); });
-  });
   document.getElementById('btn-rb-direct').onclick=rbDirect;
+  document.getElementById('rb-direct').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); rbDirect(); } });
   const drop=document.getElementById('rb-drop'),fi=document.getElementById('rb-file');
   drop.onclick=()=>fi.click(); fi.onchange=e=>rbAddFiles(e.target.files);
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hover');}));
@@ -2030,28 +2015,29 @@ function rbBind(){
 }
 async function rbErp(param,val){ try{ const r=await fetch('/api/asset?'+param+'='+encodeURIComponent(val)); const j=await r.json(); return (r.ok&&!j.error)?j:null; }catch(e){ return null; } }
 function rbFillOrig(o){
-  RB_CUR={model:o.model||'',serial:o.serial||'',asset_no:(o.asset_no!==undefined?o.asset_no:RB_CUR.asset_no)||'',business:(o.business!==undefined?o.business:RB_CUR.business)||'',origDate:o.date||'',origDept:o.dept||'',origPerson:document.getElementById('rb-person').value||''};
+  RB_CUR={model:o.model||'',serial:o.serial||'',asset_no:o.asset_no||'',business:o.business||'',origDate:o.date||'',origDept:o.dept||'',origPerson:o.person||''};
   document.getElementById('rbo-model').textContent=o.model||'-';
   document.getElementById('rbo-serial').textContent=o.serial||'-';
-  document.getElementById('rbo-date').textContent=o.date||'-';
-  if(o.asset_no!==undefined) document.getElementById('rbo-asset').textContent=o.asset_no||'-';
-  if(o.business!==undefined) document.getElementById('rbo-biz').textContent=o.business||'-';
+  document.getElementById('rbo-date').textContent=rbShort(o.date)||'-';
+  document.getElementById('rbo-asset').textContent=o.asset_no||'-';
+  document.getElementById('rbo-biz').textContent=o.business||'-';
+  document.getElementById('rbo-person').textContent=o.person||'-';
+  if(o.person){ document.getElementById('rb-handler').value=o.person; }
   const cnt=RB_LIST.filter(x=>x.serial&&x.serial===o.serial).length;
   document.getElementById('rbo-count').innerHTML=cnt>0?'<span class="rbbadge">'+cnt+'회</span> (이번이 '+(cnt+1)+'번째)':'0회 (첫 재수리)';
   document.getElementById('rb-orig').classList.add('show');
 }
-async function rbPick(rec){
-  rbFillOrig({model:rec.model,serial:rec.serial,date:rec.date,dept:rec.dept});
-  if(rec.serial){ const e=await rbErp('serial',rec.serial); if(e){ document.getElementById('rbo-asset').textContent=e.asset.asset_no||'-'; document.getElementById('rbo-biz').textContent=e.client.business_name||'-'; RB_CUR.asset_no=e.asset.asset_no||''; RB_CUR.business=e.client.business_name||''; } }
-}
 async function rbDirect(){
-  const v=document.getElementById('rb-direct').value.trim(); if(!v) return;
+  const v=document.getElementById('rb-direct').value.trim(); if(!v){ alert('자산번호 또는 시리얼을 입력하세요'); return; }
   let e=await rbErp('asset_no',v); if(!e) e=await rbErp('serial',v);
-  if(!e){ const hit=RB_SERIALS.find(x=>x.serial===v); if(hit){ document.getElementById('rb-person').value=hit.person; document.getElementById('rb-handler').value=hit.person; rbFillOrig({model:hit.model,serial:hit.serial,date:hit.date,dept:hit.dept}); } else alert('ERP·기록에서 못 찾음'); return; }
-  RB_CUR.asset_no=e.asset.asset_no||''; RB_CUR.business=e.client.business_name||'';
-  rbFillOrig({model:e.asset.model,serial:e.asset.device_sn,asset_no:e.asset.asset_no,business:e.client.business_name,date:'',dept:''});
+  if(!e){
+    const hit=RB_SERIALS.find(x=>x.serial===v || ('자산:'+x.serial)===v);
+    if(hit){ rbFillOrig({model:hit.model,serial:hit.serial,date:hit.date,dept:hit.dept,person:hit.person}); }
+    else alert('ERP·작업기록에서 못 찾음 — 자산번호/시리얼을 확인하세요');
+    return;
+  }
   const hit=RB_SERIALS.find(x=>x.serial===e.asset.device_sn);
-  if(hit){ document.getElementById('rb-person').value=hit.person; document.getElementById('rb-handler').value=hit.person; document.getElementById('rbo-date').textContent=hit.date||'-'; RB_CUR.origDate=hit.date||''; RB_CUR.origDept=hit.dept||''; RB_CUR.origPerson=hit.person||''; }
+  rbFillOrig({model:e.asset.model,serial:e.asset.device_sn,asset_no:e.asset.asset_no,business:e.client.business_name,date:hit?hit.date:'',dept:hit?hit.dept:'',person:hit?hit.person:''});
 }
 function rbAddFiles(list){
   for(const f of list){
@@ -2087,7 +2073,7 @@ async function rbSubmit(){
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
   try{
     const urls=await rbUploadFiles(RB_FILES, st); st.textContent='💾 저장 중…';
-    const rec={ id:Date.now(), reqDate:document.getElementById('rb-reqdate').value, asset_no:RB_CUR.asset_no||'', serial:RB_CUR.serial||serial, model:RB_CUR.model||document.getElementById('rbo-model').textContent, business:RB_CUR.business||'', origPerson:RB_CUR.origPerson||document.getElementById('rb-person').value||'', origDate:RB_CUR.origDate||'', origDept:RB_CUR.origDept||'', requester:requester, handler:handler, place:place, found:when, parts:parts, urgent:(document.querySelector('#mode-rebuild .rbchip.red.on')?'긴급':'보통'), symptom:symptom, files:urls, status:'요청', notified:false, createdAt:new Date().toISOString() };
+    const rec={ id:Date.now(), reqDate:document.getElementById('rb-reqdate').value, asset_no:RB_CUR.asset_no||'', serial:RB_CUR.serial||serial, model:RB_CUR.model||document.getElementById('rbo-model').textContent, business:RB_CUR.business||'', origPerson:RB_CUR.origPerson||'', origDate:RB_CUR.origDate||'', origDept:RB_CUR.origDept||'', requester:requester, handler:handler, place:place, found:when, parts:parts, urgent:(document.querySelector('#mode-rebuild .rbchip.red.on')?'긴급':'보통'), symptom:symptom, files:urls, status:'요청', notified:false, createdAt:new Date().toISOString() };
     try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
     RB_LIST.push(rec);
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
@@ -2128,7 +2114,7 @@ async function rbdInit(){
     const items=RB_LIST.filter(x=>x.handler===p && (x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
     wrap.style.display='block';
     if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; return; }
-    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.reqDate||'')+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
+    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbdPick(items[+el.dataset.i]); });
   });
   document.querySelectorAll('#rbd-form .rbslot').forEach(slot=>{
@@ -2142,7 +2128,7 @@ function rbdPick(rec){
   RBD_CUR=rec;
   document.getElementById('rbd-info-body').innerHTML=
     '<b>'+rbEsc(rec.model||'')+'</b> · 시리얼 '+rbEsc(rec.serial||rec.asset_no||'-')+'<br>'
-    +'요청일 '+rbEsc(rec.reqDate||'')+' · 요청자 '+rbEsc(rec.requester||'')+' · 긴급도: '+rbEsc(rec.urgent||'')+'<br>'
+    +'요청일 '+rbEsc(rbShort(rec.reqDate))+' · 요청자 '+rbEsc(rec.requester||'')+' · 긴급도: '+rbEsc(rec.urgent||'')+'<br>'
     +'부위: '+rbEsc((rec.parts||[]).join(', '))+'<br>증상: '+rbEsc(rec.symptom||'')+'<br>보관: '+rbEsc(rec.place||'');
   document.getElementById('rbd-info').classList.add('show');
   document.getElementById('rbd-form').style.display='block';
@@ -2188,13 +2174,13 @@ async function rbcInit(){
     const items=RB_LIST.filter(x=>x.requester===p && (x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
     wrap.style.display='block';
     if(!items.length){ box.innerHTML='<div class="rbempty">취소할 요청이 없습니다</div>'; return; }
-    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.reqDate||'')+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
+    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbcPick(items[+el.dataset.i]); });
   });
 }
 function rbcPick(rec){
   RBC_CUR=rec;
-  document.getElementById('rbc-info-body').innerHTML='<b>'+rbEsc(rec.model||'')+'</b> · '+rbEsc(rec.serial||rec.asset_no||'')+'<br>요청일 '+rbEsc(rec.reqDate||'')+' · 담당 '+rbEsc(rec.handler||'')+'<br>증상: '+rbEsc(rec.symptom||'');
+  document.getElementById('rbc-info-body').innerHTML='<b>'+rbEsc(rec.model||'')+'</b> · '+rbEsc(rec.serial||rec.asset_no||'')+'<br>요청일 '+rbEsc(rbShort(rec.reqDate))+' · 담당 '+rbEsc(rec.handler||'')+'<br>증상: '+rbEsc(rec.symptom||'');
   document.getElementById('rbc-info').classList.add('show');
 }
 async function rbCancelSubmit(){
