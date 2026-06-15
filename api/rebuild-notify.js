@@ -37,29 +37,41 @@ function cancelMsg(r){
     + '원 요청일: ' + (r.reqDate || '-');
 }
 
+function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=>d+=c); req.on('end',()=>resolve(d)); req.on('error',()=>resolve('')); }); }
+async function loadList(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
+async function saveList(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:list})}); }
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const r = await fetch(SUPA_URL + '/rest/v1/app_config?key=eq.rebuild_list&select=value', { headers: H });
-    const j = await r.json();
-    const list = (j && j[0] && Array.isArray(j[0].value)) ? j[0].value : [];
-    const messages = [];
-    let changed = false;
-    list.forEach(rec => {
-      if (rec.status !== '취소' && !rec.notified) { messages.push(reqMsg(rec)); rec.notified = true; changed = true; }
-      if (rec.status === '완료' && !rec.notifiedDone) { messages.push(doneMsg(rec)); rec.notifiedDone = true; changed = true; }
-      if (rec.status === '취소' && !rec.notifiedCancel) { messages.push(cancelMsg(rec)); rec.notifiedCancel = true; changed = true; }
-    });
-    if (changed) {
-      await fetch(SUPA_URL + '/rest/v1/app_config?on_conflict=key', {
-        method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates' },
-        body: JSON.stringify({ key: 'rebuild_list', value: list })
+    if (req.method === 'POST') {
+      // 전송확인(ack): 봇이 실제로 보낸 것만 '보냄' 처리 → 실패분은 다음에 재전송됨
+      let body = {}; const raw = await readBody(req); try { body = JSON.parse(raw); } catch (e) {}
+      const acks = (body && body.acks) || [];
+      const list = await loadList();
+      let changed = 0;
+      acks.forEach(a => {
+        const rec = list.find(x => String(x.id) === String(a.id)); if (!rec) return;
+        if (a.type === 'req') { rec.notified = true; changed++; }
+        else if (a.type === 'done') { rec.notifiedDone = true; changed++; }
+        else if (a.type === 'cancel') { rec.notifiedCancel = true; changed++; }
       });
+      if (changed) await saveList(list);
+      res.status(200).json({ ok: true, acked: changed });
+      return;
     }
+    // GET: 미전송 알림 목록 반환 (여기서는 '보냄' 표시 안 함 — 봇이 보낸 뒤 ack해야 표시됨)
+    const list = await loadList();
+    const items = [];
+    list.forEach(rec => {
+      if (rec.status !== '취소' && !rec.notified) items.push({ id: rec.id, type: 'req', text: reqMsg(rec) });
+      if (rec.status === '완료' && !rec.notifiedDone) items.push({ id: rec.id, type: 'done', text: doneMsg(rec) });
+      if (rec.status === '취소' && !rec.notifiedCancel) items.push({ id: rec.id, type: 'cancel', text: cancelMsg(rec) });
+    });
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.status(200).json({ ok: true, count: messages.length, messages });
+    res.status(200).json({ ok: true, count: items.length, items });
   } catch (e) {
-    res.status(200).json({ ok: false, error: String(e), messages: [] });
+    res.status(200).json({ ok: false, error: String(e), items: [] });
   }
 };
