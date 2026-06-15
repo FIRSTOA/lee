@@ -288,7 +288,7 @@ document.getElementById('btn-submit').onclick = async ()=>{
   const serial = document.getElementById('o-serial').textContent.replace('-','').trim();
   const symptom = document.getElementById('f-symptom').value.trim();
   const handler = document.getElementById('f-handler').value.trim();
-  if(!CUR.model && !serial){ toast('재수리할 기기를 먼저 선택/조회하세요'); return; }
+  if(!serial && !CUR.asset_no){ toast('시리얼 또는 자산번호가 있는 기기를 선택/조회하세요'); return; }
   if(!symptom){ toast('증상을 입력하세요'); return; }
   if(!handler){ toast('재수리 담당자를 입력하세요'); return; }
   let when = selChip('when'); if(when==='기타') when='기타: '+document.getElementById('whenEtc').value.trim();
