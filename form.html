@@ -303,6 +303,11 @@
       </div>
     </div>
     <div class="field">
+      <label>자산번호</label>
+      <input type="text" id="f-asset" placeholder="자산번호 입력 → ERP 임대리스트에서 시리얼·모델 자동매칭" autocomplete="off">
+      <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
+    </div>
+    <div class="field">
       <label>시리얼 번호</label>
       <div class="autocomplete-wrap">
         <input type="text" id="f-serial" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
@@ -951,6 +956,34 @@ function setupSerialAutocomplete() {
   input.addEventListener('blur', () => setTimeout(() => dropdown.classList.add('hidden'), 150));
 }
 setupSerialAutocomplete();
+
+// === 자산번호 → ERP(임대리스트 first_MPS) 자동매칭: 시리얼·모델·업체 자동완성 ===
+function setupAssetLookup() {
+  const el = document.getElementById('f-asset');
+  if (!el) return;
+  const status = document.getElementById('asset-status');
+  function esc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  async function lookup() {
+    const code = el.value.trim();
+    if (!code) { status.textContent = ''; return; }
+    status.textContent = '🔎 ERP 임대리스트 조회 중...'; status.style.color = '#718096';
+    try {
+      const r = await fetch('/api/asset?asset_no=' + encodeURIComponent(code));
+      const j = await r.json();
+      if (!r.ok || j.error) { status.textContent = '❌ ' + (j.error || '조회 실패 (자산번호 확인)'); status.style.color = '#c53030'; return; }
+      const a = j.asset || {}, c = j.client || {};
+      if (a.device_sn) document.getElementById('f-serial').value = a.device_sn;
+      if (a.model) document.getElementById('f-model').value = a.model;
+      const inc = document.getElementById('f-incoming');
+      if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
+      status.innerHTML = '✅ ' + esc(c.business_name || '') + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '');
+      status.style.color = '#2f855a';
+    } catch (e) { status.textContent = '❌ 네트워크 오류'; status.style.color = '#c53030'; }
+  }
+  el.addEventListener('change', lookup);
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup(); } });
+}
+setupAssetLookup();
 
 // === 담당자 자동완성 (이름+부서 표시, 선택 시 부서도 자동 선택) ===
 function setupPersonAutocomplete() {
