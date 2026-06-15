@@ -310,7 +310,7 @@
     <div class="field">
       <label>자산번호</label>
       <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 입력 → ERP 임대리스트에서 시리얼·모델 자동매칭" autocomplete="off">
-      <div class="warn-note">⚠️ 실물 자산번호 확인 필수!!</div>
+      <div class="warn-note">⚠️ 실물 자산번호 확인 필수!! (시리얼 없는 기기는 자산번호 꼭 입력)</div>
       <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
     </div>
     <div class="field">
@@ -319,7 +319,7 @@
         <input type="text" id="f-serial" class="warn-field" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
         <div id="serial-dropdown" class="autocomplete-dropdown hidden"></div>
       </div>
-      <div class="warn-note">⚠️ 실물 시리얼 번호 확인 필수!!</div>
+      <div class="warn-note">⚠️ 실물 시리얼 번호 확인 필수!! (없으면 위 자산번호 필수)</div>
     </div>
     <div class="field">
       <label>부품명</label>
@@ -1496,7 +1496,10 @@ function collectInputs() {
   const dept = document.querySelector('.dept-grid .chip.selected')?.dataset.dept || '';
   const incoming = document.getElementById('f-incoming').value.trim();
   const model = document.getElementById('f-model').value.trim();
-  const serial = document.getElementById('f-serial').value.trim();
+  let serial = document.getElementById('f-serial').value.trim();
+  const asset = document.getElementById('f-asset') ? document.getElementById('f-asset').value.trim() : '';
+  // 시리얼이 없는 기기는 자산번호를 식별값으로 시리얼 칸에 저장(예: 자산:A6156)
+  if (!serial && asset) serial = '자산:' + asset;
   const part = document.getElementById('f-part').value.trim();
   const overhaul = document.querySelector('.chip[data-overhaul].selected')?.dataset.overhaul || '';
   const repair = document.querySelector('.chip[data-repair].selected')?.dataset.repair || '';
@@ -1526,7 +1529,7 @@ function validate(d) {
   if (!d.person) errors.push({ field: 'f-person', msg: '담당자를 입력하세요' });
   if (!d.dept) errors.push({ field: 'dept-grid', msg: '부서를 선택하세요' });
   if (!d.model) errors.push({ field: 'f-model', msg: '모델명을 입력하세요' });
-  if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요' });
+  if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요 (시리얼 없는 기기는 자산번호 필수)' });
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
   // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
