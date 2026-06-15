@@ -2117,7 +2117,7 @@ function rbdPick(rec){
   RBD_CUR=rec;
   document.getElementById('rbd-info-body').innerHTML=
     '<b>'+rbEsc(rec.model||'')+'</b> · 시리얼 '+rbEsc(rec.serial||rec.asset_no||'-')+'<br>'
-    +'요청일 '+rbEsc(rec.reqDate||'')+' · 요청자 '+rbEsc(rec.requester||'')+' · 긴급 '+rbEsc(rec.urgent||'')+'<br>'
+    +'요청일 '+rbEsc(rec.reqDate||'')+' · 요청자 '+rbEsc(rec.requester||'')+' · 긴급도: '+rbEsc(rec.urgent||'')+'<br>'
     +'부위: '+rbEsc((rec.parts||[]).join(', '))+'<br>증상: '+rbEsc(rec.symptom||'')+'<br>보관: '+rbEsc(rec.place||'');
   document.getElementById('rbd-info').classList.add('show');
   document.getElementById('rbd-form').style.display='block';
