@@ -6,9 +6,11 @@ const SLINK_ASSET_URL = 'https://s-link-two.vercel.app/api/asset';
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const code = (req.query && (req.query.asset_no || req.query.q) || '').trim();
-  if (!code) { res.status(400).json({ error: '자산번호를 입력하세요.' }); return; }
+  const serial = (req.query && req.query.serial || '').trim();
+  if (!code && !serial) { res.status(400).json({ error: '자산번호 또는 시리얼을 입력하세요.' }); return; }
+  const qs = code ? ('asset_no=' + encodeURIComponent(code)) : ('serial=' + encodeURIComponent(serial));
   try {
-    const r = await fetch(SLINK_ASSET_URL + '?asset_no=' + encodeURIComponent(code), { redirect: 'follow' });
+    const r = await fetch(SLINK_ASSET_URL + '?' + qs, { redirect: 'follow' });
     const text = await r.text();
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
