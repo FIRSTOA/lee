@@ -276,6 +276,14 @@
   #mode-rebuild .rbthumb img, #mode-rebuild .rbthumb video { width:100%; height:100%; object-fit:cover; }
   #mode-rebuild .rbthumb .x { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:20px; height:20px; font-size:13px; line-height:20px; text-align:center; cursor:pointer; }
   #mode-rebuild .rbthumb .tag { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.55); color:#fff; font-size:10px; text-align:center; }
+  #mode-rebuild .rbslot-row { display:flex; gap:10px; }
+  #mode-rebuild .rbslot { flex:1; }
+  #mode-rebuild .rbslot-label { font-size:12px; font-weight:700; color:#374151; margin-bottom:6px; text-align:center; }
+  #mode-rebuild .rbslot-box { border:2px dashed #cbd5e0; border-radius:10px; min-height:96px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#718096; background:#fafafa; cursor:pointer; overflow:hidden; position:relative; }
+  #mode-rebuild .rbslot-box.has { border-style:solid; border-color:#16a34a; padding:0; }
+  #mode-rebuild .rbslot-box img, #mode-rebuild .rbslot-box video { width:100%; height:96px; object-fit:cover; }
+  #mode-rebuild .rbslot-box .rmv { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:20px; height:20px; font-size:13px; line-height:20px; text-align:center; }
+  @media(max-width:560px){ #mode-rebuild .rbslot-row{flex-direction:column} #mode-rebuild .rbslot-box img,#mode-rebuild .rbslot-box video{height:140px} }
   /* 실물 확인 필수 강조: 연한 빨강 */
   .warn-field { background: #fff5f5 !important; border-color: #fc8181 !important; }
   .warn-field:focus { border-color: #f56565 !important; box-shadow: 0 0 0 2px rgba(245,101,101,0.15) !important; }
@@ -304,12 +312,12 @@
 
   <div class="mode-toggle">
     <button type="button" id="tab-overhaul" class="mode-btn active" onclick="setMode('overhaul')">🛠 오버홀·수리 입력</button>
-    <button type="button" id="tab-rebuild" class="mode-btn" onclick="setMode('rebuild')">🔧 재수리 요청</button>
+    <button type="button" id="tab-rebuild" class="mode-btn" onclick="setMode('rebuild')">🔧 재수리</button>
   </div>
 
   <div id="mode-rebuild" style="display:none">
     <div class="rb-subtoggle">
-      <button type="button" id="rbsub-new" class="rb-subbtn active" onclick="setRbSub('new')">📝 새 재수리 요청</button>
+      <button type="button" id="rbsub-new" class="rb-subbtn active" onclick="setRbSub('new')">📝 재수리 요청</button>
       <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">✅ 재수리 완료 처리</button>
     </div>
     <div id="rb-mode-new">
@@ -435,7 +443,7 @@
       <div class="form-card" id="rbd-form" style="display:none">
         <div class="section-title">완료 내용</div>
         <div class="field">
-          <label>처리 내용 (무엇을 수리했는지)<span class="req">*</span></label>
+          <label>무엇을 수리했는지<span class="req">*</span></label>
           <textarea id="rbd-work" placeholder="예: 정착기 교체, 급지롤러 교체 후 정상 작동 확인"></textarea>
         </div>
         <div class="field">
@@ -443,10 +451,12 @@
           <input type="text" id="rbd-replaced" placeholder="예: 정착기, 픽업롤러">
         </div>
         <div class="field">
-          <label>완료 사진·동영상 <span style="font-weight:400;color:#718096">(선택, 여러 개)</span></label>
-          <div class="rbdrop" id="rbd-drop">📎 클릭하거나 파일을 끌어다 놓으세요</div>
-          <input type="file" id="rbd-file" accept="image/*,video/*" multiple style="display:none">
-          <div class="rbthumbs" id="rbd-thumbs"></div>
+          <label>완료 사진</label>
+          <div class="rbslot-row">
+            <div class="rbslot" data-slot="list"><div class="rbslot-label">오버홀재수리 리스트</div><div class="rbslot-box">📷 첨부</div></div>
+            <div class="rbslot" data-slot="before"><div class="rbslot-label">증상 전 사진</div><div class="rbslot-box">📷 첨부</div></div>
+            <div class="rbslot" data-slot="after"><div class="rbslot-label">증상 후 사진</div><div class="rbslot-box">📷 첨부</div></div>
+          </div>
         </div>
         <div class="field">
           <label>완료일<span class="req">*</span></label>
@@ -2067,7 +2077,7 @@ async function rbSubmit(){
 }
 
 // ----- 재수리 완료 처리 (재수리 요청건만 불러옴) -----
-let RB_SUB='new', RBD_FILES=[], RBD_CUR=null, rbdReady=false;
+let RB_SUB='new', RBD_SLOTS={list:null,before:null,after:null}, RBD_CUR=null, rbdReady=false;
 function setRbSub(s){
   RB_SUB=s;
   document.getElementById('rb-mode-new').style.display = s==='new'?'block':'none';
@@ -2097,11 +2107,12 @@ async function rbdInit(){
     box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.reqDate||'')+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbdPick(items[+el.dataset.i]); });
   });
-  const drop=document.getElementById('rbd-drop'),fi=document.getElementById('rbd-file');
-  drop.onclick=()=>fi.click(); fi.onchange=e=>rbdAddFiles(e.target.files);
-  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hover');}));
-  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hover');}));
-  drop.addEventListener('drop',e=>rbdAddFiles(e.dataTransfer.files));
+  document.querySelectorAll('#rbd-form .rbslot').forEach(slot=>{
+    const key=slot.dataset.slot, box=slot.querySelector('.rbslot-box');
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*,video/*'; inp.style.display='none'; slot.appendChild(inp);
+    box.onclick=(e)=>{ if(e.target.classList.contains('rmv')) return; inp.click(); };
+    inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; if(f.type.startsWith('video')&&f.size>42*1024*1024){ alert('동영상 40MB 초과'); inp.value=''; return; } RBD_SLOTS[key]=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); box.classList.add('has'); box.innerHTML=(isVid?'<video src="'+url+'" muted></video>':'<img src="'+url+'">')+'<div class="rmv">×</div>'; box.querySelector('.rmv').onclick=(ev)=>{ ev.stopPropagation(); RBD_SLOTS[key]=null; inp.value=''; box.classList.remove('has'); box.textContent='📷 첨부'; }; };
+  });
 }
 function rbdPick(rec){
   RBD_CUR=rec;
@@ -2111,16 +2122,6 @@ function rbdPick(rec){
     +'부위: '+rbEsc((rec.parts||[]).join(', '))+'<br>증상: '+rbEsc(rec.symptom||'')+'<br>보관: '+rbEsc(rec.place||'');
   document.getElementById('rbd-info').classList.add('show');
   document.getElementById('rbd-form').style.display='block';
-}
-function rbdAddFiles(list){
-  for(const f of list){
-    if(f.type.startsWith('video')&&f.size>42*1024*1024){ alert('동영상 '+f.name+'은 40MB 초과 — 제외'); continue; }
-    const url=URL.createObjectURL(f),isVid=f.type.startsWith('video'),idx=RBD_FILES.length; RBD_FILES.push(f);
-    const d=document.createElement('div'); d.className='rbthumb';
-    d.innerHTML=(isVid?'<video src="'+url+'" muted></video><div class="tag">동영상</div>':'<img src="'+url+'"><div class="tag">사진</div>')+'<div class="x">×</div>';
-    d.querySelector('.x').onclick=()=>{ RBD_FILES[idx]=null; d.remove(); };
-    document.getElementById('rbd-thumbs').appendChild(d);
-  }
 }
 async function rbDoneSubmit(){
   if(!RBD_CUR){ alert('처리할 재수리 요청을 선택하세요'); return; }
@@ -2132,7 +2133,10 @@ async function rbDoneSubmit(){
   if(!cdate){ alert('완료일을 입력하세요'); return; }
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
   try{
-    const urls=await rbUploadFiles(RBD_FILES, st); st.textContent='💾 저장 중…';
+    const slots=[['list','오버홀재수리 리스트'],['before','증상 전'],['after','증상 후']];
+    const urls=[];
+    for(const [k,label] of slots){ if(!RBD_SLOTS[k]) continue; st.textContent='📤 '+label+' 업로드…'; const u=await rbUploadFiles([RBD_SLOTS[k]], null); if(u[0]) urls.push({...u[0], label}); }
+    st.textContent='💾 저장 중…';
     try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
     const idx=RB_LIST.findIndex(x=>x.id===RBD_CUR.id);
     if(idx<0) throw new Error('요청을 찾을 수 없음(이미 처리됨?)');
