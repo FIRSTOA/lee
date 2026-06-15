@@ -78,12 +78,9 @@ module.exports = async (req, res) => {
     }
     // GET: 미전송 알림 목록 반환 (여기서는 '보냄' 표시 안 함 — 봇이 보낸 뒤 ack해야 표시됨)
     const list = await loadList();
-    const needDash = list.some(r => r.status !== '취소' && !r.notified && r.origPerson && r.model);
-    let rows = null;
-    if (needDash) { try { const dr = await fetch('https://lee-zeta-one.vercel.app/api/data'); const dj = await dr.json(); rows = (dj && dj.rows) || null; } catch (e) {} }
     const items = [];
     list.forEach(rec => {
-      if (rec.status !== '취소' && !rec.notified) items.push({ id: rec.id, type: 'req', text: reqMsg(rec, findOrigPhotos(rec, rows)) });
+      if (rec.status !== '취소' && !rec.notified) items.push({ id: rec.id, type: 'req', text: reqMsg(rec) });
       if (rec.status === '완료' && !rec.notifiedDone) items.push({ id: rec.id, type: 'done', text: doneMsg(rec) });
       if (rec.status === '취소' && !rec.notifiedCancel) items.push({ id: rec.id, type: 'cancel', text: cancelMsg(rec) });
     });
