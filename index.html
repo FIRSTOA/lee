@@ -142,6 +142,29 @@
   /* 파트 요약 카드 */
   .quota-part-summary { margin-bottom: 14px; }
   .quota-part-summary:empty { display: none; }
+  /* 재수리 통계 카드 */
+  .rebuild-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+  .rebuild-summary .rb-box { border:1px solid #edf2f7; border-radius:10px; padding:12px; text-align:center; background:#fafbfc; cursor:pointer; }
+  .rebuild-summary .rb-box:hover { border-color:#dd6b20; }
+  .rebuild-summary .rb-box.on { border-color:#dd6b20; background:#fff7ed; }
+  .rebuild-summary .rb-box .v { font-size:22px; font-weight:800; }
+  .rebuild-summary .rb-box .l { font-size:11px; color:#718096; margin-top:2px; }
+  .rebuild-summary .rb-box.req .v{color:#dd6b20;} .rebuild-summary .rb-box.prog .v{color:#3182ce;} .rebuild-summary .rb-box.done .v{color:#16a34a;} .rebuild-summary .rb-box.urg .v{color:#e53e3e;}
+  .rebuild-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:8px; }
+  .rebuild-subtitle { font-size:12.5px; font-weight:700; color:#4a5568; margin:14px 0 8px; }
+  .rebuild-bars .b { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12.5px; }
+  .rebuild-bars .b .nm { width:54px; color:#374151; font-weight:600; }
+  .rebuild-bars .b .tk { flex:1; background:#eef2f7; border-radius:6px; height:15px; overflow:hidden; }
+  .rebuild-bars .b .fl { height:100%; border-radius:6px; background:linear-gradient(90deg,#dd6b20,#f6ad55); }
+  .rebuild-bars .b .fl.bl { background:linear-gradient(90deg,#3182ce,#63b3ed); }
+  .rebuild-bars .b .vv { width:30px; text-align:right; color:#718096; }
+  #rebuildListTable tbody tr { cursor:pointer; }
+  #rebuildListTable tbody tr:hover { background:#fff7ed; }
+  .rb-urg { color:#e53e3e; font-weight:800; }
+  .rb-st { display:inline-block; border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700; }
+  .rb-st.req { background:#fef3c7; color:#92400e; } .rb-st.prog { background:#dbeafe; color:#1e40af; } .rb-st.done { background:#dcfce7; color:#166534; }
+  .rb-warn { background:#fff5f5; color:#c53030; border-radius:6px; padding:1px 7px; font-weight:700; }
+  @media (max-width:760px){ .rebuild-summary{grid-template-columns:repeat(2,1fr)} .rebuild-2col{grid-template-columns:1fr} }
   .qp-cards { display: flex; flex-wrap: wrap; gap: 10px; }
   .qp-card { flex: 1 1 150px; min-width: 140px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 13px; background: #f8fafc; }
   .qp-card .qp-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; color: #2b6cb0; }
@@ -327,6 +350,18 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+      <div class="card full-width" data-card-id="rebuildStats" data-card-name="재수리 통계">
+        <h3><span class="title-text">🔧 재수리 통계 <span style="font-size:11px;font-weight:400;color:#718096">(오버홀 통계와 분리 집계)</span></span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
+        <div id="rebuildSummary" class="rebuild-summary"></div>
+        <div class="rebuild-2col">
+          <div><div class="rebuild-subtitle">불량 부위별 분포</div><div id="rebuildParts" class="rebuild-bars"></div></div>
+          <div><div class="rebuild-subtitle">부서별 재수리 발생 <span style="font-weight:400;color:#a0aec0;font-size:10px">(원담당 부서)</span></div><div id="rebuildDepts" class="rebuild-bars"></div></div>
+        </div>
+        <div class="rebuild-subtitle">⚠️ 반복 재수리 기기 (2회 이상)</div>
+        <div class="scroll" style="max-height:200px"><table id="rebuildRepeat"><thead><tr><th style="text-align:left">시리얼/자산</th><th style="text-align:left">모델</th><th>원담당</th><th>횟수</th><th>최근</th></tr></thead><tbody></tbody></table></div>
+        <div class="rebuild-subtitle">재수리 요청 목록 <span id="rebuildListInfo" style="font-size:11px;color:#718096;font-weight:400"></span></div>
+        <div class="scroll" style="max-height:340px"><table id="rebuildListTable"><thead><tr><th>요청일</th><th style="text-align:left">시리얼/자산</th><th style="text-align:left">모델</th><th>부위</th><th>긴급</th><th>요청자</th><th>담당</th><th>보관</th><th>상태</th><th>첨부</th></tr></thead><tbody></tbody></table></div>
       </div>
       <div class="card full-width" data-card-id="modelTable" data-card-name="기종별 오버홀 통계">
         <h3><span class="title-text" id="modelTableTitle">기종별 오버홀 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
@@ -1285,6 +1320,8 @@ function render() {
   const restoreScroll = () => { if (Math.abs(window.scrollY - _prevScrollY) > 1) window.scrollTo(0, _prevScrollY); };
   requestAnimationFrame(restoreScroll);
   setTimeout(restoreScroll, 60);
+
+  try { renderRebuild(); } catch (e) {}
 }
 
 // Re-render on viewport change (mobile <-> desktop switch)
@@ -1550,9 +1587,106 @@ migrateQuotaCardTop();   // 정량목표 카드를 작업유형별 비중 위로
 applyLayout();
 initCardControls();
 
+// ===== 재수리 통계 카드 =====
+let REBUILD_DATA = [];
+let rbStatusFilter = '';
+function rbEscH(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rbDriveId(url){ const m = /\/d\/([^/]+)/.exec(url||''); return m ? m[1] : ''; }
+function rbDevKey(rec){ return rec.serial || (rec.asset_no ? '자산:'+rec.asset_no : '(미상)'); }
+async function loadRebuild(){
+  try {
+    const r = await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value', { headers: { apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY } });
+    const j = await r.json();
+    REBUILD_DATA = (j && j[0] && Array.isArray(j[0].value)) ? j[0].value : [];
+  } catch(e){ REBUILD_DATA = []; }
+  try { renderRebuild(); } catch(e){}
+}
+function rbInPeriod(rec){
+  const m = /^(\d{4})-(\d{1,2})/.exec(String(rec.reqDate||'')); if(!m) return true;
+  const y = parseInt(m[1]), mo = parseInt(m[2]);
+  const ys = filterState['년'], ms = filterState['월'];
+  if (ys && ys.size>0 && ![...ys].some(v=>parseInt(v)===y)) return false;
+  if (ms && ms.size>0 && ![...ms].some(v=>parseInt(v)===mo)) return false;
+  return true;
+}
+function rbBars(obj, blue){
+  const ent = Object.entries(obj).sort((a,b)=>b[1]-a[1]); if(!ent.length) return '<div style="color:#a0aec0;font-size:12px">데이터 없음</div>';
+  const max = ent[0][1] || 1;
+  return ent.map(([k,v])=>'<div class="b"><span class="nm">'+rbEscH(k)+'</span><span class="tk"><span class="fl'+(blue?' bl':'')+'" style="width:'+Math.round(v/max*100)+'%"></span></span><span class="vv">'+v+'</span></div>').join('');
+}
+function renderRebuild(){
+  const card = document.querySelector('[data-card-id="rebuildStats"]'); if(!card) return;
+  const list = REBUILD_DATA.filter(rbInPeriod);
+  const req = list.filter(x=>(x.status||'요청')==='요청').length;
+  const done = list.filter(x=>x.status==='완료').length;
+  const urg = list.filter(x=>x.urgent==='긴급' && x.status!=='완료').length;
+  const box = (cls,label,val,fval)=>'<div class="rb-box '+cls+(rbStatusFilter===fval?' on':'')+'" data-f="'+fval+'"><div class="v">'+val+'</div><div class="l">'+label+'</div></div>';
+  document.getElementById('rebuildSummary').innerHTML = box('','전체',list.length,'')+box('req','요청',req,'요청')+box('done','완료',done,'완료')+box('urg','긴급(미완)',urg,'긴급');
+  document.querySelectorAll('#rebuildSummary .rb-box').forEach(b=>b.onclick=()=>{ rbStatusFilter = (rbStatusFilter===b.dataset.f?'':b.dataset.f); renderRebuild(); });
+  // 부위별 / 부서별
+  const pc={}, dc={};
+  list.forEach(x=>{ (x.parts||[]).forEach(p=>{ const k=String(p).split(':')[0].trim(); if(k) pc[k]=(pc[k]||0)+1; }); const d=x.origDept||'(미상)'; dc[d]=(dc[d]||0)+1; });
+  document.getElementById('rebuildParts').innerHTML = rbBars(pc,false);
+  document.getElementById('rebuildDepts').innerHTML = rbBars(dc,true);
+  // 반복 재수리 기기
+  const dev={}; list.forEach(x=>{ const k=rbDevKey(x); if(!dev[k]) dev[k]={count:0,model:x.model||'',person:x.origPerson||'',last:''}; dev[k].count++; if((x.reqDate||'')>dev[k].last) dev[k].last=x.reqDate||''; });
+  const rep = Object.entries(dev).filter(([k,v])=>v.count>=2).sort((a,b)=>b[1].count-a[1].count);
+  document.querySelector('#rebuildRepeat tbody').innerHTML = rep.length ? rep.map(([k,v])=>'<tr><td style="text-align:left">'+rbEscH(k)+'</td><td style="text-align:left">'+rbEscH(v.model)+'</td><td>'+rbEscH(v.person)+'</td><td><span class="rb-warn">'+v.count+'회</span></td><td>'+rbEscH(v.last)+'</td></tr>').join('') : '<tr><td colspan="5" style="color:#a0aec0">반복 재수리 기기 없음</td></tr>';
+  // 목록
+  let rows = list.slice();
+  if(rbStatusFilter==='긴급') rows = rows.filter(x=>x.urgent==='긴급');
+  else if(rbStatusFilter) rows = rows.filter(x=>(x.status||'요청')===rbStatusFilter);
+  rows.sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||'')||((b.id||0)-(a.id||0)));
+  document.getElementById('rebuildListInfo').textContent = '(' + rows.length + '건' + (rbStatusFilter?' · '+rbStatusFilter+' 필터':'') + ')';
+  document.querySelector('#rebuildListTable tbody').innerHTML = rows.length ? rows.map(x=>{
+    const ph=(x.files||[]).filter(f=>f.type==='photo').length, vd=(x.files||[]).filter(f=>f.type==='video').length;
+    const att=(ph?'📷'+ph:'')+(vd?' 🎬'+vd:'')||'-';
+    const st=x.status||'요청'; const stc=st==='완료'?'done':(st==='처리중'?'prog':'req');
+    return '<tr data-id="'+x.id+'"><td>'+rbEscH(x.reqDate)+'</td><td style="text-align:left">'+rbEscH(rbDevKey(x))+'</td><td style="text-align:left">'+rbEscH(x.model)+'</td><td>'+rbEscH((x.parts||[]).map(p=>String(p).split(':')[0]).join('·'))+'</td><td>'+(x.urgent==='긴급'?'<span class="rb-urg">긴급</span>':'보통')+'</td><td>'+rbEscH(x.requester||'')+'</td><td>'+rbEscH(x.handler||'')+'</td><td>'+rbEscH(x.place||'')+'</td><td><span class="rb-st '+stc+'">'+rbEscH(st)+'</span></td><td>'+att+'</td></tr>';
+  }).join('') : '<tr><td colspan="10" style="color:#a0aec0">재수리 요청 없음</td></tr>';
+  document.querySelectorAll('#rebuildListTable tbody tr[data-id]').forEach(tr=>tr.onclick=()=>openRebuildDetail(+tr.dataset.id));
+}
+function openRebuildDetail(id){
+  const x = REBUILD_DATA.find(r=>r.id===id); if(!x) return;
+  const files = (x.files||[]).map(f=>{
+    const fid = rbDriveId(f.url);
+    if(f.type==='photo' && fid) return '<a href="'+f.url+'" target="_blank" rel="noopener"><img src="https://drive.google.com/thumbnail?id='+fid+'&sz=w160" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0"></a>';
+    return '<a href="'+f.url+'" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#edf2f7;border-radius:8px;font-size:12px;margin:2px">'+(f.type==='video'?'🎬 동영상':'📎 파일')+' 열기</a>';
+  }).join(' ') || '<span style="color:#a0aec0">첨부 없음</span>';
+  const row=(k,v)=>'<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px"><b style="width:90px;color:#718096;flex-shrink:0">'+k+'</b><span>'+rbEscH(v||'-')+'</span></div>';
+  document.getElementById('rb-detail-body').innerHTML =
+    row('요청일', x.reqDate) + row('상태', (x.status||'요청')) + row('긴급도', x.urgent) +
+    row('자산번호', x.asset_no) + row('시리얼', x.serial) + row('모델', x.model) + row('업체', x.business) +
+    row('원 담당자', x.origPerson) + row('원 작업일', x.origDate) + row('원 부서', x.origDept) +
+    row('요청자', x.requester) + row('재수리 담당', x.handler) + row('보관 장소', x.place) +
+    row('발견 시점', x.found) + row('불량 부위', (x.parts||[]).join(', ')) +
+    '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px"><b style="color:#718096">증상</b><div style="margin-top:4px;white-space:pre-wrap">'+rbEscH(x.symptom)+'</div></div>' +
+    '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>';
+  document.getElementById('rb-detail-title').textContent = '재수리 상세 — ' + rbDevKey(x) + ' (' + (x.model||'') + ')';
+  document.getElementById('rebuildDetailModal').classList.remove('hidden');
+}
+
 loadData();
 syncQuotaConfigFromServer(); // 정량 목표를 서버(Supabase) 공유값으로 동기화
 loadHrRoster();              // 조직도(인사DB) 인원/부서 실시간 반영
+loadRebuild();               // 재수리 통계 (Supabase rebuild_list)
+</script>
+<!-- 재수리 상세 모달 -->
+<div id="rebuildDetailModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 id="rb-detail-title" style="margin:0;font-size:16px">재수리 상세</h2>
+      <button id="rb-detail-close" style="background:#e2e8f0;border:none;border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>
+    </div>
+    <div id="rb-detail-body"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const m = document.getElementById('rebuildDetailModal');
+  document.getElementById('rb-detail-close').onclick = ()=>m.classList.add('hidden');
+  m.onclick = (e)=>{ if(e.target===m) m.classList.add('hidden'); };
+})();
 </script>
 </body>
 </html>
