@@ -1633,7 +1633,7 @@ function rbBars(obj, blue){
 }
 function renderRebuild(){
   const card = document.querySelector('[data-card-id="rebuildStats"]'); if(!card) return;
-  const list = REBUILD_DATA.filter(rbInPeriod);
+  const list = REBUILD_DATA.filter(rbInPeriod).filter(x=>x.status!=='취소');
   const req = list.filter(x=>(x.status||'요청')==='요청').length;
   const done = list.filter(x=>x.status==='완료').length;
   const urg = list.filter(x=>x.urgent==='긴급' && x.status!=='완료').length;
@@ -1678,9 +1678,24 @@ function openRebuildDetail(id){
     row('요청자', x.requester) + row('재수리 담당', x.handler) + row('보관 장소', x.place) +
     row('발견 시점', x.found) + row('불량 부위', (x.parts||[]).join(', ')) +
     '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px"><b style="color:#718096">증상</b><div style="margin-top:4px;white-space:pre-wrap">'+rbEscH(x.symptom)+'</div></div>' +
-    '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>';
+    '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>'
+    + ((x.status!=='완료' && x.status!=='취소') ? '<div style="margin-top:14px;text-align:right"><button id="rb-cancel-btn" style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:700">🗑 이 재수리 요청 취소</button></div>' : '');
+  const cb=document.getElementById('rb-cancel-btn'); if(cb) cb.onclick=()=>rbCancelRequest(x.id);
   document.getElementById('rb-detail-title').textContent = '재수리 상세 — ' + rbDevKey(x) + ' (' + (x.model||'') + ')';
   document.getElementById('rebuildDetailModal').classList.remove('hidden');
+}
+async function rbCancelRequest(id){
+  if(!confirm('이 재수리 요청을 취소할까요? (목록·통계에서 제외됩니다)')) return;
+  try{
+    const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}});
+    const j=await r.json(); let list=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[];
+    const idx=list.findIndex(z=>z.id===id); if(idx<0) throw new Error('요청을 찾을 수 없음');
+    list[idx].status='취소'; list[idx].notified=true; list[idx].canceledAt=new Date().toISOString();
+    const up=await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:list})});
+    if(!up.ok) throw new Error('저장 실패('+up.status+')');
+    REBUILD_DATA=list; document.getElementById('rebuildDetailModal').classList.add('hidden'); renderRebuild();
+    alert('재수리 요청이 취소되었습니다.');
+  }catch(e){ alert('취소 실패: '+e); }
 }
 
 loadData();

@@ -2091,7 +2091,7 @@ function setRbSub(s){
 async function rbdInit(){
   document.getElementById('rbd-date').value=new Date().toISOString().slice(0,10);
   try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
-  const pending=RB_LIST.filter(x=>(x.status||'요청')!=='완료');
+  const pending=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소');
   const handlers=[...new Set(pending.map(x=>x.handler).filter(Boolean))].sort();
   const sel=document.getElementById('rbd-person'); sel.innerHTML='<option value="">담당자 선택…</option>';
   handlers.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
@@ -2100,7 +2100,7 @@ async function rbdInit(){
     const p=e.target.value,wrap=document.getElementById('rbd-listwrap'),box=document.getElementById('rbd-list');
     document.getElementById('rbd-info').classList.remove('show'); document.getElementById('rbd-form').style.display='none'; RBD_CUR=null;
     if(!p){ wrap.style.display='none'; return; }
-    const items=RB_LIST.filter(x=>x.handler===p && (x.status||'요청')!=='완료').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
+    const items=RB_LIST.filter(x=>x.handler===p && (x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
     wrap.style.display='block';
     if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; return; }
     box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(x.reqDate||'')+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
