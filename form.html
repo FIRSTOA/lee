@@ -246,6 +246,8 @@
   #tab-rebuild.active { background:#ff7a18; color:#fff; border-color:#ff7a18; }
   /* 재수리 블록 (스코프: #mode-rebuild) */
   #mode-rebuild select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; background:#fff; }
+  #mode-rebuild textarea, #mode-rebuild input[type=text], #mode-rebuild input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; }
+  #mode-rebuild textarea { min-height:72px; resize:vertical; }
   #mode-rebuild .rbchips { display:flex; flex-wrap:wrap; gap:8px; }
   #mode-rebuild .rbchip { border:1.5px solid #e5e7eb; border-radius:20px; padding:7px 14px; font-size:13px; cursor:pointer; background:#fff; user-select:none; }
   #mode-rebuild .rbchip.on { border-color:#ff7a18; background:#fff7ed; color:#9a3412; font-weight:700; }
@@ -379,13 +381,27 @@
       <div class="section-title">요청 정보</div>
       <div class="row-2">
         <div class="field">
-          <label>재수리 담당자<span class="req">*</span></label>
-          <input type="text" id="rb-handler" placeholder="기본=원 담당자">
+          <label>요청자 (재수리 요청한 사람)<span class="req">*</span></label>
+          <input type="text" id="rb-requester" placeholder="요청자 이름">
         </div>
         <div class="field">
-          <label>요청일<span class="req">*</span></label>
-          <input type="date" id="rb-reqdate">
+          <label>재수리 담당자 (원 오버홀 담당자)<span class="req">*</span></label>
+          <input type="text" id="rb-handler" placeholder="기본=원 담당자">
         </div>
+      </div>
+      <div class="field">
+        <label>재수리 기기 보관 장소<span class="req">*</span></label>
+        <div class="rbchips" id="rb-place">
+          <div class="rbchip on" onclick="rbSingle(this)">1수리실</div>
+          <div class="rbchip" onclick="rbSingle(this)">2수리실</div>
+          <div class="rbchip" onclick="rbSingle(this)">3수리실</div>
+          <div class="rbchip" data-etc="rb-placeEtc" onclick="rbSingle(this)">기타</div>
+        </div>
+        <textarea class="rbetc" id="rb-placeEtc" placeholder="보관 장소 직접 입력"></textarea>
+      </div>
+      <div class="field">
+        <label>요청일<span class="req">*</span></label>
+        <input type="date" id="rb-reqdate">
       </div>
       <div id="rb-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
     </div>
@@ -1979,16 +1995,19 @@ async function rbSubmit(){
   const serial=document.getElementById('rbo-serial').textContent.replace('-','').trim();
   const symptom=document.getElementById('rb-symptom').value.trim();
   const handler=document.getElementById('rb-handler').value.trim();
+  const requester=document.getElementById('rb-requester').value.trim();
   const st=document.getElementById('rb-status');
   if(!serial && !RB_CUR.asset_no){ alert('시리얼 또는 자산번호가 있는 기기를 선택/조회하세요'); return; }
-  if(!symptom){ alert('증상을 입력하세요'); return; }
+  if(!requester){ alert('요청자(재수리 요청한 사람)를 입력하세요'); return; }
   if(!handler){ alert('재수리 담당자를 입력하세요'); return; }
+  if(!symptom){ alert('증상을 입력하세요'); return; }
   let when=rbSelOne('rb-when'); if(when==='기타') when='기타: '+document.getElementById('rb-whenEtc').value.trim();
+  let place=rbSelOne('rb-place'); if(place==='기타') place='기타: '+document.getElementById('rb-placeEtc').value.trim();
   let parts=rbSelMany('rb-part').map(p=>p==='기타'?('기타: '+document.getElementById('rb-partEtc').value.trim()):p);
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
   try{
     const urls=await rbUpload(); st.textContent='💾 저장 중…';
-    const rec={ id:Date.now(), reqDate:document.getElementById('rb-reqdate').value, asset_no:RB_CUR.asset_no||'', serial:RB_CUR.serial||serial, model:RB_CUR.model||document.getElementById('rbo-model').textContent, business:RB_CUR.business||'', origPerson:RB_CUR.origPerson||document.getElementById('rb-person').value||'', origDate:RB_CUR.origDate||'', origDept:RB_CUR.origDept||'', handler:handler, found:when, parts:parts, urgent:(document.querySelector('#mode-rebuild .rbchip.red.on')?'긴급':'보통'), symptom:symptom, files:urls, status:'요청', notified:false, createdAt:new Date().toISOString() };
+    const rec={ id:Date.now(), reqDate:document.getElementById('rb-reqdate').value, asset_no:RB_CUR.asset_no||'', serial:RB_CUR.serial||serial, model:RB_CUR.model||document.getElementById('rbo-model').textContent, business:RB_CUR.business||'', origPerson:RB_CUR.origPerson||document.getElementById('rb-person').value||'', origDate:RB_CUR.origDate||'', origDept:RB_CUR.origDept||'', requester:requester, handler:handler, place:place, found:when, parts:parts, urgent:(document.querySelector('#mode-rebuild .rbchip.red.on')?'긴급':'보통'), symptom:symptom, files:urls, status:'요청', notified:false, createdAt:new Date().toISOString() };
     try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
     RB_LIST.push(rec);
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
