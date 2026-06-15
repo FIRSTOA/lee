@@ -2084,16 +2084,11 @@ async function rbSubmit(){
   const btn=document.getElementById('btn-rb-submit'); btn.disabled=true; btn.textContent='등록 중…';
   try{
     const urls=await rbUploadFiles(RB_FILES, st); st.textContent='💾 저장 중…';
-    // 오버홀 당시 사진 찾기 (같은 담당자+모델+날짜 매칭) — 그때 제대로 했는지 대조용
+    // 오버홀 당시 사진 찾기 — 시리얼로 정확히 (Apps Script serialPhotos)
     let origPhotos=[];
     try {
-      if(RB_CUR.origPerson && RB_CUR.model){
-        const dr=await fetch('/api/data'); const dj=await dr.json(); const rows=(dj&&dj.rows)||[];
-        const ymd=s=>{ const m=/(\d{2,4})[\/-](\d{1,2})[\/-](\d{1,2})/.exec(String(s||'')); if(!m) return ''; let y=+m[1]; if(y<100)y+=2000; return y+'-'+(+m[2])+'-'+(+m[3]); };
-        const oy=ymd(RB_CUR.origDate);
-        rows.forEach((row,idx)=>{ if(idx<2||!row) return; if((row[4]||'')===RB_CUR.origPerson && (row[6]||'')===RB_CUR.model && (!oy||ymd(row[1])===oy)){ const u=String(row[16]||'').match(/https?:\/\/[^\s|]+/g); if(u) origPhotos.push.apply(origPhotos,u); } });
-        origPhotos=origPhotos.filter((v,i)=>origPhotos.indexOf(v)===i);
-      }
+      const sn=RB_CUR.serial||serial;
+      if(sn){ const pr=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'serialPhotos',serial:sn}),redirect:'follow'}); const pj=await pr.json(); if(pj&&pj.ok&&Array.isArray(pj.photos)) origPhotos=pj.photos; }
     } catch(e){}
     const rec={ id:Date.now(), reqDate:document.getElementById('rb-reqdate').value, asset_no:RB_CUR.asset_no||'', serial:RB_CUR.serial||serial, model:RB_CUR.model||document.getElementById('rbo-model').textContent, business:RB_CUR.business||'', origPerson:RB_CUR.origPerson||'', origDate:RB_CUR.origDate||'', origDept:RB_CUR.origDept||'', origPhotos:origPhotos, requester:requester, handler:handler, place:place, found:when, parts:parts, urgent:(document.querySelector('#mode-rebuild .rbchip.red.on')?'긴급':'보통'), symptom:symptom, files:urls, status:'요청', notified:false, createdAt:new Date().toISOString() };
     try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
