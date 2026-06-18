@@ -626,7 +626,7 @@
     <div class="section-title">작업 대상</div>
     <div class="field">
       <label>입고일</label>
-      <input type="text" id="ck-indate" placeholder="예: 26.3.27">
+      <input type="date" id="ck-indate">
     </div>
     <div class="field">
       <label>자산번호</label>
@@ -2605,6 +2605,8 @@ function saveCkImage(){
 }
 // 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
+// 날짜 칸: 어디를 눌러도 달력 열기 (입고일·날짜)
+['ck-indate','f-date'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.addEventListener('click', function(){ try{ this.showPicker(); }catch(err){} }); e.addEventListener('focus', function(){ try{ this.showPicker(); }catch(err){} }); } });
 async function saveChecklist(d, row){
   var pm = {};
   document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){ if(cb.checked) pm[cb.dataset.pm]=true; });
