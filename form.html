@@ -5,23 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="theme-color" content="#2b6cb0">
 <title>오버홀/수리 입력</title>
-<script>
-/* 뒤로가기 종료 방지 가드 — 본문 스크립트 오류와 무관하게 항상 설치되도록 head에서 먼저 실행 */
-(function(){
-  var seq=0;
-  function pushGuard(){ try { history.pushState({_g:++seq},''); } catch(e){} }
-  function install(){ pushGuard(); pushGuard(); pushGuard(); }
-  if (document.readyState === 'loading') { install(); } else { install(); }
-  window.addEventListener('popstate', function(){
-    if (window.__allowExit) return;
-    if (window.__ckOpen && window.__ckOpen()) { if(window.__ckClose) window.__ckClose(); pushGuard(); return; }
-    var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
-    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); pushGuard(); return; }
-    pushGuard(); pushGuard();
-  });
-  window.addEventListener('pageshow', function(){ if(!window.__allowExit) pushGuard(); });
-})();
-</script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 글자 짤림·겹침·한 글자 줄바꿈 방지 (전역) */
@@ -352,7 +335,8 @@
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
   #ck-overlay #ck-scaler{margin:12px auto;}
   #ck-overlay #ck-print-sheet{display:block;background:#fff;width:210mm;min-height:297mm;margin:0;padding:10mm;border-radius:4px;box-shadow:0 1px 8px rgba(0,0,0,.12);transform-origin:top left;}
-  @page{ size:A4 portrait; margin:8mm; }
+  @page{ size:A4 portrait; margin:0; }
+  #ck-print-img{display:none;}
   .ck-sheet h2{text-align:center;font-size:30px;letter-spacing:6px;margin:4px 0 16px;color:#000;font-weight:800;}
   .ck-sheet table.cf{width:100%;border-collapse:collapse;}
   .ck-sheet table.cf td{border:1.2px solid #333;padding:9px 8px;font-size:14px;height:34px;vertical-align:middle;color:#000;text-align:center;}
@@ -366,12 +350,9 @@
   .ck-sheet table.ctr .cl{display:block;font-weight:700;font-size:12px;margin-bottom:3px;}
   .ck-sheet table.ctr .cv{display:block;min-height:16px;}
   @media print{
-    body * { visibility:hidden; }
-    #ck-overlay, #ck-overlay #ck-print-sheet, #ck-overlay #ck-print-sheet * { visibility:visible; }
-    #ck-overlay{position:absolute;left:0;top:0;background:#fff;overflow:visible;}
-    #ck-overlay .ck-bar{display:none!important;}
-    #ck-overlay #ck-scaler{width:auto!important;height:auto!important;margin:0;}
-    #ck-overlay #ck-print-sheet{position:absolute;left:0;top:0;width:100%;margin:0;padding:8px;box-shadow:none;transform:none!important;}
+    html,body{margin:0!important;padding:0!important;background:#fff!important;}
+    body * { visibility:hidden!important; }
+    #ck-print-img{ visibility:visible!important; display:block!important; position:fixed; left:0; top:0; width:210mm; height:297mm; object-fit:contain; }
   }
 </style>
 </head>
@@ -390,8 +371,6 @@
   <div id="header-actions" style="position:absolute;right:14px;top:14px;display:flex;gap:6px;align-items:center">
     <button type="button" id="log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 저장 로그</button>
     <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
-    <a href="login.html" id="admin-login-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">🔐 관리자 로그인</a>
-    <button type="button" id="btn-close-form" style="background:rgba(255,255,255,0.28);color:#fff;border:1px solid rgba(255,255,255,0.45);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:800">✕ 닫기</button>
   </div>
 </header>
 <div class="container">
@@ -779,6 +758,7 @@
   </div>
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
+<img id="ck-print-img" alt="">
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
 </div>
@@ -2388,18 +2368,20 @@ function buildCkSheet(){
    +'<tr>'+cc('흑','ck-co-bk')+cc('컬','ck-co-c')+cc('큰','ck-co-bc')+cc('합','ck-co-sum')+'</tr>'
    +'</table>';
   var html='<h2>오버홀 체크 리스트</h2>'
-   +'<table class="cf"><tr>'
+   +'<table class="cf">'
+   +'<tr>'
    +'<td class="l">작성자</td><td>'+ckEsc(d.person)+'</td>'
    +'<td class="l">파트장</td><td></td>'
+   +'<td class="l">오버홀 난이도</td><td>'+ckEsc(oh)+'</td>'
    +'<td class="l">수리 난이도</td><td>'+ckEsc(rp)+'</td>'
-   +'<td class="l" style="text-align:left;white-space:nowrap">사무완료</td><td style="font-weight:800;color:#c00;font-size:18px">'+(CK_USE.indexOf('사무')>=0?'✔':'')+'</td>'
-   +'<td class="l" style="text-align:left;white-space:nowrap">현장완료</td><td style="font-weight:800;color:#c00;font-size:18px">'+(CK_USE.indexOf('현장')>=0?'✔':'')+'</td>'
+   +'</tr><tr>'
+   +'<td class="l">구분</td><td style="font-weight:800;color:#c00">'+ckEsc(CK_USE)+(CK_USE.indexOf('현장')>=0||CK_USE.indexOf('사무')>=0?' 완료 ✔':'')+'</td>'
+   +'<td class="l">비고</td><td colspan="5"></td>'
    +'</tr></table>'
    +'<table class="cf">'
    +'<tr><td class="l">입고처</td><td>'+ckEsc(d.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
-   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td><td colspan="2" rowspan="3" class="ctd">'+ctr+'</td></tr>'
-   +'<tr><td class="l">수리 소요시간</td><td></td><td class="l">수리 완료일</td><td></td></tr>'
-   +'<tr><td class="l">오버홀 소요시간</td><td>'+ckEsc(d.time||ckVal('f-time'))+'</td><td class="l">오버홀 완료일</td><td>'+ckEsc(d.date)+'</td></tr>'
+   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td><td colspan="2" rowspan="2" class="ctd">'+ctr+'</td></tr>'
+   +'<tr><td class="l">소요시간</td><td>'+ckEsc(d.time||ckVal('f-time'))+'</td><td class="l">완료일</td><td>'+ckEsc(d.date)+'</td></tr>'
    +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:80px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-symptom'))+'</td></tr>'
    +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:105px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-work'))+'</td></tr></table>'
    +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀')+'</table>'
@@ -2432,29 +2414,42 @@ function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if
   function closeOv(){ if(ov){ ov.classList.remove('show'); document.body.classList.remove('ck-open'); } }
   var b=document.getElementById('btn-ck-print'); if(b) b.onclick=openOv;
   var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
-  var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ resetCkScale(); window.print(); setTimeout(fitCk,500); };
+  var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ printCk(); };
   var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
+  // 리스트가 열린 상태에서 뒤로가기 → 페이지 종료 대신 리스트만 닫기
+  window.addEventListener('popstate', function(){ if(ov && ov.classList.contains('show')) closeOv(); });
   window.addEventListener('resize', function(){ if(ov&&ov.classList.contains('show')) fitCk(); });
   window.addEventListener('orientationchange', function(){ if(ov&&ov.classList.contains('show')) setTimeout(fitCk,200); });
   window.__ckOpen=function(){ return ov && ov.classList.contains('show'); };
   window.__ckClose=closeOv;
 })();
-// 리스트 이미지 저장 (카톡 공유 가능)
-function saveCkImage(){
+// html2canvas로 리스트를 캡처 (보기 화면 그대로) → 콜백
+function captureCk(cb){
   var sheet=document.getElementById('ck-print-sheet');
-  function dl(canvas){ try{ var nm=(document.getElementById('f-person')?document.getElementById('f-person').value.trim():'')||'담당미입력'; var dt=(document.getElementById('f-date')?document.getElementById('f-date').value.trim():'')||(function(){var k=new Date(Date.now()+9*3600*1000);return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0');})(); var fn=(nm+'_'+dt).replace(/[\\/:*?"<>|]/g,'_'); var a=document.createElement('a'); a.download=fn+'.jpg'; a.href=canvas.toDataURL('image/jpeg',0.92); document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch(e){ alert('저장 실패: '+e); } fitCk(); }
-  function cap(){ resetCkScale(); window.html2canvas(sheet,{scale:2,backgroundColor:'#fff',windowWidth:sheet.scrollWidth}).then(dl).catch(function(e){ fitCk(); alert('저장 실패: '+e); }); }
-  if(window.html2canvas){ cap(); return; }
+  function go(){ resetCkScale(); window.html2canvas(sheet,{scale:2,backgroundColor:'#fff',windowWidth:sheet.scrollWidth}).then(function(c){ fitCk(); cb(c); }).catch(function(e){ fitCk(); alert('처리 실패: '+e); }); }
+  if(window.html2canvas){ go(); return; }
   var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-  s.onload=function(){ cap(); };
-  s.onerror=function(){ alert('이미지 변환 모듈 로드 실패(인터넷 확인). 대신 [출력]에서 PDF로 저장하세요.'); };
+  s.onload=go;
+  s.onerror=function(){ alert('이미지 변환 모듈 로드 실패(인터넷 확인).'); };
   document.head.appendChild(s);
+}
+// 출력 = 보기 화면을 이미지로 떠서 A4 한 장에 꽉 채워 인쇄 (보는 것 = 출력물 = 1페이지)
+function printCk(){
+  captureCk(function(canvas){
+    var img=document.getElementById('ck-print-img');
+    img.onload=function(){ img.onload=null; window.print(); };
+    img.src=canvas.toDataURL('image/png');
+    if(img.complete && img.naturalWidth){ img.onload=null; window.print(); }
+  });
+}
+// 리스트 이미지 저장 (카톡 공유 가능) — JPG, 파일명 작성자_날짜
+function saveCkImage(){
+  captureCk(function(canvas){
+    try{ var nm=(document.getElementById('f-person')?document.getElementById('f-person').value.trim():'')||'담당미입력'; var dt=(document.getElementById('f-date')?document.getElementById('f-date').value.trim():'')||(function(){var k=new Date(Date.now()+9*3600*1000);return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0');})(); var fn=(nm+'_'+dt).replace(/[\\/:*?"<>|]/g,'_'); var a=document.createElement('a'); a.download=fn+'.jpg'; a.href=canvas.toDataURL('image/jpeg',0.92); document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch(e){ alert('저장 실패: '+e); }
+  });
 }
 // 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
-// 뒤로가기 종료 방지 가드는 head 스크립트에서 이미 설치됨
-// 닫기 버튼 (명시적 종료)
-(function(){ var c=document.getElementById('btn-close-form'); if(c) c.onclick=function(){ if(!confirm('입력 화면을 닫을까요?')) return; window.__allowExit=true; try{ window.close(); }catch(e){} setTimeout(function(){ try{ history.go(-12); }catch(e){} }, 100); }; })();
 async function saveChecklist(d, row){
   var pm = {};
   document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){ if(cb.checked) pm[cb.dataset.pm]=true; });
