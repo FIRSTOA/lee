@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="theme-color" content="#2b6cb0">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="오버홀입력">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>오버홀/수리 입력</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -330,6 +337,30 @@
   #ck-overlay .ck-hint{text-align:center;font-size:12px;color:#64748b;padding:6px 8px;background:#fff;border-bottom:1px solid #eef1f5;}
   body.ck-open .footer-bar{display:none!important;}
   body.ck-open{overflow:hidden;}
+  /* 조회 / 재출력 모달 */
+  #lookup-overlay{display:none;position:fixed;inset:0;background:#eef2f7;z-index:99000;overflow:hidden;flex-direction:column;}
+  #lookup-overlay.show{display:flex;}
+  #lookup-overlay .lk-bar{display:flex;align-items:center;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  #lookup-overlay .lk-tabs{display:flex;gap:6px;flex:1;}
+  #lookup-overlay .lk-tab{flex:1;padding:11px 8px;border:1px solid #cbd5e0;border-radius:9px;background:#fff;font-size:13.5px;font-weight:700;color:#64748b;cursor:pointer;}
+  #lookup-overlay .lk-tab.on{background:#2b6cb0;color:#fff;border-color:#2b6cb0;}
+  #lookup-overlay .lk-x{padding:11px 14px;border:none;border-radius:9px;background:#64748b;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}
+  #lookup-overlay .lk-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px;max-width:640px;width:100%;margin:0 auto;}
+  #lookup-overlay .lk-search{width:100%;padding:12px 14px;border:1.5px solid #cbd5e0;border-radius:10px;font-size:15px;margin-bottom:12px;}
+  #lookup-overlay .lk-search:focus{outline:none;border-color:#2b6cb0;box-shadow:0 0 0 3px rgba(43,108,176,.15);}
+  #lookup-overlay .lk-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  #lookup-overlay .lk-card .lk-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  #lookup-overlay .lk-card .lk-model{font-weight:800;font-size:15px;color:#1a202c;}
+  #lookup-overlay .lk-card .lk-sn{font-family:monospace;font-size:12px;color:#2563eb;margin-top:2px;}
+  #lookup-overlay .lk-card .lk-meta{font-size:12.5px;color:#64748b;margin-top:5px;line-height:1.5;}
+  #lookup-overlay .lk-card .lk-print{border:none;border-radius:8px;background:#16a34a;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap;}
+  #lookup-overlay .lk-kb{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  #lookup-overlay .lk-kb .s{font-weight:700;color:#0c4a6e;font-size:14px;}
+  #lookup-overlay .lk-kb .a{color:#334155;margin-top:4px;font-size:13.5px;white-space:pre-wrap;}
+  #lookup-overlay .lk-kb .m{color:#94a3b8;font-size:12px;margin-top:5px;}
+  #lookup-overlay .lk-kb .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px;margin-right:6px;}
+  #lookup-overlay .lk-kb .tag.oh{background:#dcfce7;color:#166534;} #lookup-overlay .lk-kb .tag.re{background:#fee2e2;color:#991b1b;}
+  #lookup-overlay .lk-empty{text-align:center;color:#94a3b8;padding:30px 10px;font-size:14px;}
   #ck-overlay.show{display:block;}
   #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
@@ -370,6 +401,7 @@
   </div>
   <div id="header-actions" style="position:absolute;right:14px;top:14px;display:flex;gap:6px;align-items:center">
     <button type="button" id="log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 저장 로그</button>
+    <button type="button" id="btn-lookup" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 조회</button>
     <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
   </div>
 </header>
@@ -759,6 +791,25 @@
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
 <img id="ck-print-img" alt="">
+<div id="lookup-overlay">
+  <div class="lk-bar">
+    <div class="lk-tabs">
+      <button type="button" id="lk-tab-list" class="lk-tab on">📋 리스트 재출력</button>
+      <button type="button" id="lk-tab-manual" class="lk-tab">🔧 증상·처리내용</button>
+    </div>
+    <button type="button" id="lk-close" class="lk-x">✕ 닫기</button>
+  </div>
+  <div class="lk-body">
+    <div id="lk-panel-list">
+      <input type="text" id="lk-q1" class="lk-search" placeholder="🔍 시리얼 · 자산번호 · 모델 · 담당자 · 날짜 검색" autocomplete="off">
+      <div id="lk-results-list" class="lk-results"></div>
+    </div>
+    <div id="lk-panel-manual" style="display:none">
+      <input type="text" id="lk-q2" class="lk-search" placeholder="🔍 증상 · 처리내용 · 모델 검색 (예: 정착, 화상, SC541)" autocomplete="off">
+      <div id="lk-results-manual" class="lk-results"></div>
+    </div>
+  </div>
+</div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
 </div>
@@ -2351,46 +2402,150 @@ let CK_USE = '현장용';
 function ckVal(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
 function ckEsc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function ckGradeNum(sel){ var el=document.querySelector(sel); if(!el)return ''; var m=/(\d+)/.exec(el.dataset.overhaul||el.dataset.repair||el.textContent||''); return m?m[1]:''; }
-function ckRows3(g){
-  var a=CK_PM[g], on={}; document.querySelectorAll('#ck-pm input[data-pm]:checked').forEach(function(cb){on[cb.dataset.pm]=true;});
+function ckRows3(g, on){
+  var a=CK_PM[g];
+  if(!on){ on={}; document.querySelectorAll('#ck-pm input[data-pm]:checked').forEach(function(cb){on[cb.dataset.pm]=true;}); }
   var h='';
   for(var i=0;i<a.length;i+=3){ h+='<tr>'; for(var j=0;j<3;j++){ var it=a[i+j]; if(it===undefined){h+='<td></td><td></td>';continue;} h+='<td>'+ckEsc(it)+'</td><td class="cc">'+(on[it]?'✔':'')+'</td>'; } h+='</tr>'; }
   return h;
 }
-function buildCkSheet(){
+function ckGnum(v){ var m=/(\d+)/.exec(String(v||'')); return m?m[1]:''; }
+// 현재 입력폼 → 출력 데이터
+function ckCurData(){
   var d=collectInputs();
-  var oh=ckGradeNum('.chip[data-overhaul].selected'), rp=ckGradeNum('.chip[data-repair].selected');
-  function cc(lab,id){ return '<td><span class="cl">'+lab+'</span><span class="cv">'+ckEsc(ckVal(id))+'</span></td>'; }
+  return {
+    person:d.person, oh:ckGradeNum('.chip[data-overhaul].selected'), rp:ckGradeNum('.chip[data-repair].selected'),
+    use:CK_USE, incoming:d.incoming, indate:ckVal('ck-indate'), reason:ckVal('ck-reason'),
+    model:d.model, serial:d.serial, time:(d.time||ckVal('f-time')), date:d.date,
+    ci:{bk:ckVal('ck-ci-bk'),c:ckVal('ck-ci-c'),bc:ckVal('ck-ci-bc'),sum:ckVal('ck-ci-sum')},
+    co:{bk:ckVal('ck-co-bk'),c:ckVal('ck-co-c'),bc:ckVal('ck-co-bc'),sum:ckVal('ck-co-sum')},
+    toner:{bk:ckVal('ck-t-bk'),c:ckVal('ck-t-c'),m:ckVal('ck-t-m'),y:ckVal('ck-t-y'),w:ckVal('ck-t-w')},
+    symptom:ckVal('ck-symptom'), work:ckVal('ck-work'), etc:ckVal('ck-etc'),
+    pm:(function(){var o={};document.querySelectorAll('#ck-pm input[data-pm]:checked').forEach(function(cb){o[cb.dataset.pm]=true;});return o;})()
+  };
+}
+// 저장된 기록 → 출력 데이터 (재출력용)
+function ckRecData(rec){
+  var t=rec.toner||{};
+  return {
+    person:rec.person, oh:ckGnum(rec.overhaul), rp:ckGnum(rec.repair),
+    use:rec.use||'', incoming:rec.incoming, indate:rec.indate, reason:rec.reason,
+    model:rec.model, serial:rec.serial, time:rec.time, date:rec.date,
+    ci:rec.counterIn||{}, co:rec.counterOut||{},
+    toner:{bk:t.bk,c:t.c,m:t.m,y:t.y,w:t.waste},
+    symptom:rec.symptom, work:rec.work, etc:rec.etc, pm:rec.pm||{}
+  };
+}
+function buildCkSheet(S){
+  if(!S) S=ckCurData();
+  function cc(lab,v){ return '<td><span class="cl">'+lab+'</span><span class="cv">'+ckEsc(v||'')+'</span></td>'; }
+  var ci=S.ci||{}, co=S.co||{}, tn=S.toner||{};
   var ctr='<table class="ctr">'
    +'<tr><td colspan="4" class="ch">입고시 카운터</td></tr>'
-   +'<tr>'+cc('흑','ck-ci-bk')+cc('컬','ck-ci-c')+cc('큰','ck-ci-bc')+cc('합','ck-ci-sum')+'</tr>'
+   +'<tr>'+cc('흑',ci.bk)+cc('컬',ci.c)+cc('큰',ci.bc)+cc('합',ci.sum)+'</tr>'
    +'<tr><td colspan="4" class="ch">수리완료 카운터</td></tr>'
-   +'<tr>'+cc('흑','ck-co-bk')+cc('컬','ck-co-c')+cc('큰','ck-co-bc')+cc('합','ck-co-sum')+'</tr>'
+   +'<tr>'+cc('흑',co.bk)+cc('컬',co.c)+cc('큰',co.bc)+cc('합',co.sum)+'</tr>'
    +'</table>';
+  var u=S.use||'';
   var html='<h2>오버홀 체크 리스트</h2>'
    +'<table class="cf">'
    +'<tr>'
-   +'<td class="l" style="width:70px">작성자</td><td style="height:48px;vertical-align:middle;width:135px">'+ckEsc(d.person)+'</td>'
+   +'<td class="l" style="width:70px">작성자</td><td style="height:48px;vertical-align:middle;width:135px">'+ckEsc(S.person)+'</td>'
    +'<td class="l" style="width:70px">파트장</td><td style="height:48px;vertical-align:middle;width:135px"></td>'
-   +'<td class="l" style="width:88px">오버홀 난이도</td><td style="width:60px">'+ckEsc(oh)+'</td>'
-   +'<td class="l" style="width:80px">수리 난이도</td><td style="width:60px">'+ckEsc(rp)+'</td>'
+   +'<td class="l" style="width:88px">오버홀 난이도</td><td style="width:60px">'+ckEsc(S.oh)+'</td>'
+   +'<td class="l" style="width:80px">수리 난이도</td><td style="width:60px">'+ckEsc(S.rp)+'</td>'
    +'</tr><tr>'
-   +'<td class="l">구분</td><td style="font-weight:800;color:#c00">'+ckEsc(CK_USE)+(CK_USE.indexOf('현장')>=0||CK_USE.indexOf('사무')>=0?' 완료 ✔':'')+'</td>'
+   +'<td class="l">구분</td><td style="font-weight:800;color:#c00">'+ckEsc(u)+(u.indexOf('현장')>=0||u.indexOf('사무')>=0?' 완료 ✔':'')+'</td>'
    +'<td class="l">비고</td><td colspan="5"></td>'
    +'</tr></table>'
    +'<table class="cf">'
-   +'<tr><td class="l">입고처</td><td>'+ckEsc(d.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
-   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td><td colspan="2" rowspan="2" class="ctd">'+ctr+'</td></tr>'
-   +'<tr><td class="l">소요시간</td><td>'+ckEsc(d.time||ckVal('f-time'))+'</td><td class="l">완료일</td><td>'+ckEsc(d.date)+'</td></tr>'
-   +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:80px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-symptom'))+'</td></tr>'
-   +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:105px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-work'))+'</td></tr></table>'
-   +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀')+'</table>'
-   +'<div class="sectt">B급 오버홀</div><table class="cf">'+ckRows3('B급 오버홀')+'</table>'
-   +'<div class="sectt">A급 오버홀</div><table class="cf">'+ckRows3('A급 오버홀')+'</table>'
-   +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(ckVal('ck-t-bk'))+'</td><td>C '+ckEsc(ckVal('ck-t-c'))+'</td><td>M '+ckEsc(ckVal('ck-t-m'))+'</td><td>Y '+ckEsc(ckVal('ck-t-y'))+'</td><td class="l">폐통 '+ckEsc(ckVal('ck-t-w'))+'</td></tr>'
-   +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
+   +'<tr><td class="l">입고처</td><td>'+ckEsc(S.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(S.indate)+'</td><td class="l">입고사유</td><td>'+ckEsc(S.reason)+'</td></tr>'
+   +'<tr><td class="l">모델명</td><td>'+ckEsc(S.model)+'</td><td class="l">S/N</td><td>'+ckEsc(S.serial)+'</td><td colspan="2" rowspan="2" class="ctd">'+ctr+'</td></tr>'
+   +'<tr><td class="l">소요시간</td><td>'+ckEsc(S.time)+'</td><td class="l">완료일</td><td>'+ckEsc(S.date)+'</td></tr>'
+   +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:80px;text-align:left;vertical-align:top">'+ckEsc(S.symptom)+'</td></tr>'
+   +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:105px;text-align:left;vertical-align:top">'+ckEsc(S.work)+'</td></tr></table>'
+   +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀',S.pm)+'</table>'
+   +'<div class="sectt">B급 오버홀</div><table class="cf">'+ckRows3('B급 오버홀',S.pm)+'</table>'
+   +'<div class="sectt">A급 오버홀</div><table class="cf">'+ckRows3('A급 오버홀',S.pm)+'</table>'
+   +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(tn.bk)+'</td><td>C '+ckEsc(tn.c)+'</td><td>M '+ckEsc(tn.m)+'</td><td>Y '+ckEsc(tn.y)+'</td><td class="l">폐통 '+ckEsc(tn.w)+'</td></tr>'
+   +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(S.etc)+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
 }
+// 저장된 기록으로 리스트 보기 열기 (재출력)
+function openCkFromRec(rec){
+  buildCkSheet(ckRecData(rec));
+  var ov=document.getElementById('ck-overlay');
+  if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
+}
+// === 조회 / 재출력 모달 ===
+(function(){
+  var ov=document.getElementById('lookup-overlay'); if(!ov) return;
+  var listCache=null, manualCache=null;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  // 동의어 그룹: 같은 뜻은 무엇으로 검색해도 함께 나옴
+  var SYN=[
+    ['색감','화상불량','화상','색상','컬러','색깔','색번짐','색틀어짐','화질'],
+    ['걸림','잼','용지걸림','용지걸림','지터','급지불량','피딩'],
+    ['정착','정착기','퓨저','fuser','정착불량'],
+    ['줄','선','라인','세로줄','가로줄','흰줄','검은줄'],
+    ['소음','잡음','소리','노이즈'],
+    ['번짐','흐림','농도','진하게','연하게']
+  ];
+  function expandTerms(q){
+    var terms=[q];
+    SYN.forEach(function(g){
+      if(g.some(function(t){ return q.indexOf(t)>=0 || t.indexOf(q)>=0; })){
+        g.forEach(function(t){ if(terms.indexOf(t)<0) terms.push(t); });
+      }
+    });
+    return terms;
+  }
+  function openLk(){ ov.classList.add('show'); document.body.classList.add('ck-open'); loadData(); }
+  function closeLk(){ ov.classList.remove('show'); var ck=document.getElementById('ck-overlay'); if(!ck||!ck.classList.contains('show')) document.body.classList.remove('ck-open'); }
+  async function loadData(){
+    if(listCache===null){
+      document.getElementById('lk-results-list').innerHTML='<div class="lk-empty">불러오는 중...</div>';
+      try{ var r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value',{headers:RB_SUPA_H}); var j=await r.json(); listCache=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value.slice().reverse():[]; }catch(e){ listCache=[]; }
+      try{ var r2=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value',{headers:RB_SUPA_H}); var j2=await r2.json(); manualCache=(j2&&j2[0]&&Array.isArray(j2[0].value))?j2[0].value.slice().reverse():[]; }catch(e){ manualCache=[]; }
+    }
+    renderList(); renderManual();
+  }
+  function renderList(){
+    var q=(document.getElementById('lk-q1').value||'').trim().toLowerCase();
+    var box=document.getElementById('lk-results-list');
+    var arr=(listCache||[]).filter(function(r){ if(!q) return true; return ((r.model||'')+' '+(r.serial||'')+' '+(r.asset_no||'')+' '+(r.person||'')+' '+(r.date||'')+' '+(r.incoming||'')).toLowerCase().indexOf(q)>=0; });
+    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 오버홀 기록이 없습니다')+'</div>'; return; }
+    box.innerHTML=arr.slice(0,100).map(function(r){
+      var idx=(listCache||[]).indexOf(r);
+      return '<div class="lk-card"><div class="lk-top"><div style="min-width:0"><div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
+        +'<div class="lk-sn">'+esc(r.serial||r.asset_no||'')+'</div>'
+        +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
+        +'<button type="button" class="lk-print" data-idx="'+idx+'">🖨 재출력</button></div></div>'; }).join('');
+    box.querySelectorAll('.lk-print').forEach(function(b){ b.onclick=function(){ var rec=listCache[+b.dataset.idx]; if(rec) openCkFromRec(rec); }; });
+  }
+  function renderManual(){
+    var q=(document.getElementById('lk-q2').value||'').trim().toLowerCase();
+    var box=document.getElementById('lk-results-manual');
+    var terms=q?expandTerms(q):[];
+    var arr=(manualCache||[]).filter(function(r){ if(!q) return true; var txt=((r.symptom||'')+' '+(r.work||'')+' '+(r.model||'')+' '+(r.person||'')).toLowerCase(); return terms.some(function(t){ return t && txt.indexOf(t)>=0; }); });
+    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 처리내용이 없습니다')+'</div>'; return; }
+    box.innerHTML=arr.slice(0,150).map(function(r){
+      var tag=(r.src==='재수리')?'<span class="tag re">재수리</span>':'<span class="tag oh">오버홀</span>';
+      return '<div class="lk-kb"><div class="s">'+tag+'증상: '+esc(r.symptom||'-')+'</div><div class="a">처리: '+esc(r.work||'-')+'</div><div class="m">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.model?' · '+esc(r.model):'')+'</div></div>'; }).join('');
+  }
+  function showTab(which){
+    document.getElementById('lk-tab-list').classList.toggle('on',which==='list');
+    document.getElementById('lk-tab-manual').classList.toggle('on',which==='manual');
+    document.getElementById('lk-panel-list').style.display=which==='list'?'block':'none';
+    document.getElementById('lk-panel-manual').style.display=which==='manual'?'block':'none';
+  }
+  var bl=document.getElementById('btn-lookup'); if(bl) bl.onclick=openLk;
+  var lc=document.getElementById('lk-close'); if(lc) lc.onclick=closeLk;
+  document.getElementById('lk-tab-list').onclick=function(){ showTab('list'); };
+  document.getElementById('lk-tab-manual').onclick=function(){ showTab('manual'); };
+  document.getElementById('lk-q1').addEventListener('input', renderList);
+  document.getElementById('lk-q2').addEventListener('input', renderManual);
+})();
 // A4 시트 전체가 화면에 꽉 차게 자동 맞춤 (가로·세로 모두 들어오도록)
 function fitCk(){
   var sheet=document.getElementById('ck-print-sheet'), sc=document.getElementById('ck-scaler');
@@ -2480,6 +2635,12 @@ async function saveChecklist(d, row){
       await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'tech_manual',value:ml})});
     }
   } catch(e){}
+}
+</script>
+<script>
+// PWA 서비스워커 등록 (앱 설치 지원)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
 }
 </script>
 </body>
