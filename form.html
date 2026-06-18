@@ -330,7 +330,8 @@
   #ck-overlay.show{display:block;}
   #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
-  #ck-overlay #ck-print-sheet{display:block;background:#fff;width:210mm;min-height:297mm;margin:12px auto;padding:10mm;border-radius:4px;box-shadow:0 1px 8px rgba(0,0,0,.12);}
+  #ck-overlay #ck-scaler{margin:12px auto;}
+  #ck-overlay #ck-print-sheet{display:block;background:#fff;width:210mm;min-height:297mm;margin:0;padding:10mm;border-radius:4px;box-shadow:0 1px 8px rgba(0,0,0,.12);transform-origin:top left;}
   @page{ size:A4 portrait; margin:8mm; }
   .ck-sheet h2{text-align:center;font-size:30px;letter-spacing:6px;margin:4px 0 16px;color:#000;font-weight:800;}
   .ck-sheet table.cf{width:100%;border-collapse:collapse;}
@@ -349,7 +350,8 @@
     #ck-overlay, #ck-overlay #ck-print-sheet, #ck-overlay #ck-print-sheet * { visibility:visible; }
     #ck-overlay{position:absolute;left:0;top:0;background:#fff;overflow:visible;}
     #ck-overlay .ck-bar{display:none!important;}
-    #ck-overlay #ck-print-sheet{position:absolute;left:0;top:0;width:100%;margin:0;padding:8px;box-shadow:none;}
+    #ck-overlay #ck-scaler{width:auto!important;height:auto!important;margin:0;}
+    #ck-overlay #ck-print-sheet{position:absolute;left:0;top:0;width:100%;margin:0;padding:8px;box-shadow:none;transform:none!important;}
   }
 </style>
 </head>
@@ -751,11 +753,13 @@
 </div>
 <div id="ck-overlay">
   <div class="ck-bar">
+    <button id="btn-ck-zoomout" style="background:#475569;flex:0 0 46px">➖</button>
+    <button id="btn-ck-zoomin" style="background:#475569;flex:0 0 46px">➕</button>
     <button id="btn-ck-out" style="background:#2b6cb0">🖨 출력</button>
-    <button id="btn-ck-save" style="background:#16a34a">💾 이미지 저장</button>
+    <button id="btn-ck-save" style="background:#16a34a">💾 저장</button>
     <button id="btn-ck-close" style="background:#64748b">✕ 닫기</button>
   </div>
-  <div id="ck-print-sheet" class="ck-sheet"></div>
+  <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
@@ -2387,24 +2391,50 @@ function buildCkSheet(){
    +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
 }
+// A4 시트를 화면 폭에 맞춰 자동 축소 + ➕➖ 확대/축소
+var ckBase=1, ckZoom=1;
+function applyCkScale(){
+  var sheet=document.getElementById('ck-print-sheet'), sc=document.getElementById('ck-scaler');
+  if(!sheet||!sc) return;
+  var scale=ckBase*ckZoom;
+  var sw=sheet.offsetWidth, sh=sheet.offsetHeight;
+  sheet.style.transform='scale('+scale+')';
+  sc.style.width=Math.round(sw*scale)+'px';
+  sc.style.height=Math.round(sh*scale)+'px';
+}
+function fitCk(){
+  var sheet=document.getElementById('ck-print-sheet'), sc=document.getElementById('ck-scaler');
+  if(!sheet||!sc) return;
+  sheet.style.transform='none'; sc.style.width=''; sc.style.height='';
+  var vw=document.documentElement.clientWidth;
+  var sw=sheet.offsetWidth;
+  ckBase=Math.min(1,(vw-16)/sw); ckZoom=1;
+  applyCkScale();
+}
+function ckZoomBy(f){ ckZoom=Math.max(0.4,Math.min(4,ckZoom*f)); applyCkScale(); }
+function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if(sheet) sheet.style.transform='none'; }
 (function(){
   var ov=document.getElementById('ck-overlay');
-  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); try{ history.pushState({_ck:1},''); }catch(e){} } }
+  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); } }
   function closeOv(){ if(ov) ov.classList.remove('show'); }
   var b=document.getElementById('btn-ck-print'); if(b) b.onclick=openOv;
   var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
-  var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ window.print(); };
+  var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ resetCkScale(); window.print(); setTimeout(fitCk,500); };
   var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
+  var zi=document.getElementById('btn-ck-zoomin'); if(zi) zi.onclick=function(){ ckZoomBy(1.25); };
+  var zo=document.getElementById('btn-ck-zoomout'); if(zo) zo.onclick=function(){ ckZoomBy(0.8); };
+  window.addEventListener('resize', function(){ if(ov&&ov.classList.contains('show')) fitCk(); });
   window.__ckOpen=function(){ return ov && ov.classList.contains('show'); };
   window.__ckClose=closeOv;
 })();
 // 리스트 이미지 저장 (카톡 공유 가능)
 function saveCkImage(){
   var sheet=document.getElementById('ck-print-sheet');
-  function dl(canvas){ try{ var nm=(document.getElementById('f-person')?document.getElementById('f-person').value.trim():'')||'담당미입력'; var dt=(document.getElementById('f-date')?document.getElementById('f-date').value.trim():'')||(function(){var k=new Date(Date.now()+9*3600*1000);return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0');})(); var fn=(nm+'_'+dt).replace(/[\\/:*?"<>|]/g,'_'); var a=document.createElement('a'); a.download=fn+'.jpg'; a.href=canvas.toDataURL('image/jpeg',0.92); document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch(e){ alert('저장 실패: '+e); } }
-  if(window.html2canvas){ window.html2canvas(sheet,{scale:2,backgroundColor:'#fff'}).then(dl).catch(function(e){ alert('저장 실패: '+e); }); return; }
+  function dl(canvas){ try{ var nm=(document.getElementById('f-person')?document.getElementById('f-person').value.trim():'')||'담당미입력'; var dt=(document.getElementById('f-date')?document.getElementById('f-date').value.trim():'')||(function(){var k=new Date(Date.now()+9*3600*1000);return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0');})(); var fn=(nm+'_'+dt).replace(/[\\/:*?"<>|]/g,'_'); var a=document.createElement('a'); a.download=fn+'.jpg'; a.href=canvas.toDataURL('image/jpeg',0.92); document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch(e){ alert('저장 실패: '+e); } fitCk(); }
+  function cap(){ resetCkScale(); window.html2canvas(sheet,{scale:2,backgroundColor:'#fff',windowWidth:sheet.scrollWidth}).then(dl).catch(function(e){ fitCk(); alert('저장 실패: '+e); }); }
+  if(window.html2canvas){ cap(); return; }
   var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-  s.onload=function(){ window.html2canvas(sheet,{scale:2,backgroundColor:'#fff'}).then(dl).catch(function(e){ alert('저장 실패: '+e); }); };
+  s.onload=function(){ cap(); };
   s.onerror=function(){ alert('이미지 변환 모듈 로드 실패(인터넷 확인). 대신 [출력]에서 PDF로 저장하세요.'); };
   document.head.appendChild(s);
 }
