@@ -2440,19 +2440,27 @@ function saveCkImage(){
 }
 // 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
-// 모바일 뒤로가기: 페이지가 꺼지지 않게 (모달 열려있으면 닫기, 아니면 유지)
+// 모바일 뒤로가기: 페이지가 꺼지지 않게 (모달/리스트 열려있으면 닫기, 아니면 유지)
 (function(){
-  try { history.pushState({_g:1},''); } catch(e){}
+  var seq=0;
+  function pushGuard(){ try { history.pushState({_g:++seq},''); } catch(e){} }
+  // 시작 시 버퍼를 여러 개 쌓아 빠른 연타에도 안 꺼지게
+  pushGuard(); pushGuard(); pushGuard();
   window.addEventListener('popstate', function(){
     if (window.__allowExit) return;
-    if (window.__ckOpen && window.__ckOpen()) { window.__ckClose(); try { history.pushState({_g:1},''); } catch(e){} return; }
+    // 1) 리스트 보기 열려있으면 닫기
+    if (window.__ckOpen && window.__ckOpen()) { window.__ckClose(); pushGuard(); return; }
+    // 2) 열린 모달 닫기
     var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
-    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); }
-    try { history.pushState({_g:1},''); } catch(e){}
+    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); pushGuard(); return; }
+    // 3) 그 외엔 항상 다시 채워 페이지 종료 방지 (연타 대비 2개)
+    pushGuard(); pushGuard();
   });
+  // 혹시 버퍼가 소진될 때를 대비해 화면 복귀 시 재충전
+  window.addEventListener('pageshow', function(){ if(!window.__allowExit){ pushGuard(); } });
 })();
 // 닫기 버튼 (명시적 종료)
-(function(){ var c=document.getElementById('btn-close-form'); if(c) c.onclick=function(){ if(!confirm('입력 화면을 닫을까요?')) return; window.__allowExit=true; window.close(); setTimeout(function(){ try{ history.back(); }catch(e){} }, 150); }; })();
+(function(){ var c=document.getElementById('btn-close-form'); if(c) c.onclick=function(){ if(!confirm('입력 화면을 닫을까요?')) return; window.__allowExit=true; try{ window.close(); }catch(e){} setTimeout(function(){ try{ history.go(-12); }catch(e){} }, 100); }; })();
 async function saveChecklist(d, row){
   var pm = {};
   document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){ if(cb.checked) pm[cb.dataset.pm]=true; });
