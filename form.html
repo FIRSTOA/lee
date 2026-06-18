@@ -5,6 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="theme-color" content="#2b6cb0">
 <title>오버홀/수리 입력</title>
+<script>
+/* 뒤로가기 종료 방지 가드 — 본문 스크립트 오류와 무관하게 항상 설치되도록 head에서 먼저 실행 */
+(function(){
+  var seq=0;
+  function pushGuard(){ try { history.pushState({_g:++seq},''); } catch(e){} }
+  function install(){ pushGuard(); pushGuard(); pushGuard(); }
+  if (document.readyState === 'loading') { install(); } else { install(); }
+  window.addEventListener('popstate', function(){
+    if (window.__allowExit) return;
+    if (window.__ckOpen && window.__ckOpen()) { if(window.__ckClose) window.__ckClose(); pushGuard(); return; }
+    var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
+    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); pushGuard(); return; }
+    pushGuard(); pushGuard();
+  });
+  window.addEventListener('pageshow', function(){ if(!window.__allowExit) pushGuard(); });
+})();
+</script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 글자 짤림·겹침·한 글자 줄바꿈 방지 (전역) */
@@ -760,7 +777,6 @@
     <button id="btn-ck-save" style="background:#16a34a">💾 저장</button>
     <button id="btn-ck-close" style="background:#64748b">✕ 닫기</button>
   </div>
-  <div class="ck-hint">두 손가락으로 확대/축소 · 한 손가락으로 스크롤</div>
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
@@ -2376,8 +2392,8 @@ function buildCkSheet(){
    +'<td class="l">작성자</td><td>'+ckEsc(d.person)+'</td>'
    +'<td class="l">파트장</td><td></td>'
    +'<td class="l">수리 난이도</td><td>'+ckEsc(rp)+'</td>'
-   +'<td class="l" style="text-align:left;white-space:nowrap">사무완료:</td><td></td>'
-   +'<td class="l" style="text-align:left;white-space:nowrap">현장완료:</td><td></td>'
+   +'<td class="l" style="text-align:left;white-space:nowrap">사무완료</td><td style="font-weight:800;color:#c00;font-size:18px">'+(CK_USE.indexOf('사무')>=0?'✔':'')+'</td>'
+   +'<td class="l" style="text-align:left;white-space:nowrap">현장완료</td><td style="font-weight:800;color:#c00;font-size:18px">'+(CK_USE.indexOf('현장')>=0?'✔':'')+'</td>'
    +'</tr></table>'
    +'<table class="cf">'
    +'<tr><td class="l">입고처</td><td>'+ckEsc(d.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
@@ -2393,27 +2409,22 @@ function buildCkSheet(){
    +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
 }
-// A4 시트를 화면 폭에 맞춰 자동 축소 + ➕➖ 확대/축소
-var ckBase=1, ckZoom=1;
-function applyCkScale(){
-  var sheet=document.getElementById('ck-print-sheet'), sc=document.getElementById('ck-scaler');
-  if(!sheet||!sc) return;
-  var scale=ckBase*ckZoom;
-  var sw=sheet.offsetWidth, sh=sheet.offsetHeight;
-  sheet.style.transform='scale('+scale+')';
-  sc.style.width=Math.round(sw*scale)+'px';
-  sc.style.height=Math.round(sh*scale)+'px';
-}
+// A4 시트 전체가 화면에 꽉 차게 자동 맞춤 (가로·세로 모두 들어오도록)
 function fitCk(){
   var sheet=document.getElementById('ck-print-sheet'), sc=document.getElementById('ck-scaler');
   if(!sheet||!sc) return;
   sheet.style.transform='none'; sc.style.width=''; sc.style.height='';
+  var bar=document.querySelector('#ck-overlay .ck-bar');
   var vw=document.documentElement.clientWidth;
-  var sw=sheet.offsetWidth;
-  ckBase=Math.min(1,(vw-16)/sw); ckZoom=1;
-  applyCkScale();
+  var vh=window.innerHeight||document.documentElement.clientHeight;
+  var barH=bar?bar.offsetHeight:0;
+  var sw=sheet.offsetWidth, sh=sheet.offsetHeight;
+  var scale=Math.min((vw-10)/sw,(vh-barH-12)/sh);
+  if(scale>1) scale=1;
+  sheet.style.transform='scale('+scale+')';
+  sc.style.width=Math.round(sw*scale)+'px';
+  sc.style.height=Math.round(sh*scale)+'px';
 }
-function ckZoomBy(f){ ckZoom=Math.max(0.4,Math.min(4,ckZoom*f)); applyCkScale(); }
 function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if(sheet) sheet.style.transform='none'; }
 (function(){
   var ov=document.getElementById('ck-overlay');
@@ -2423,16 +2434,8 @@ function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if
   var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
   var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ resetCkScale(); window.print(); setTimeout(fitCk,500); };
   var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
-  // 두 손가락(핀치) 확대/축소
-  var startDist=0, startZoom=1, pinching=false;
-  function dist(t){ var dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.sqrt(dx*dx+dy*dy); }
-  if(ov){
-    ov.addEventListener('touchstart', function(e){ if(e.touches.length===2){ pinching=true; startDist=dist(e.touches); startZoom=ckZoom; e.preventDefault(); } }, {passive:false});
-    ov.addEventListener('touchmove', function(e){ if(pinching && e.touches.length===2){ var d=dist(e.touches); if(startDist>0){ ckZoom=Math.max(0.4,Math.min(5,startZoom*(d/startDist))); applyCkScale(); } e.preventDefault(); } }, {passive:false});
-    ov.addEventListener('touchend', function(e){ if(e.touches.length<2) pinching=false; });
-    ov.addEventListener('touchcancel', function(){ pinching=false; });
-  }
   window.addEventListener('resize', function(){ if(ov&&ov.classList.contains('show')) fitCk(); });
+  window.addEventListener('orientationchange', function(){ if(ov&&ov.classList.contains('show')) setTimeout(fitCk,200); });
   window.__ckOpen=function(){ return ov && ov.classList.contains('show'); };
   window.__ckClose=closeOv;
 })();
@@ -2449,25 +2452,7 @@ function saveCkImage(){
 }
 // 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
-// 모바일 뒤로가기: 페이지가 꺼지지 않게 (모달/리스트 열려있으면 닫기, 아니면 유지)
-(function(){
-  var seq=0;
-  function pushGuard(){ try { history.pushState({_g:++seq},''); } catch(e){} }
-  // 시작 시 버퍼를 여러 개 쌓아 빠른 연타에도 안 꺼지게
-  pushGuard(); pushGuard(); pushGuard();
-  window.addEventListener('popstate', function(){
-    if (window.__allowExit) return;
-    // 1) 리스트 보기 열려있으면 닫기
-    if (window.__ckOpen && window.__ckOpen()) { window.__ckClose(); pushGuard(); return; }
-    // 2) 열린 모달 닫기
-    var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
-    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); pushGuard(); return; }
-    // 3) 그 외엔 항상 다시 채워 페이지 종료 방지 (연타 대비 2개)
-    pushGuard(); pushGuard();
-  });
-  // 혹시 버퍼가 소진될 때를 대비해 화면 복귀 시 재충전
-  window.addEventListener('pageshow', function(){ if(!window.__allowExit){ pushGuard(); } });
-})();
+// 뒤로가기 종료 방지 가드는 head 스크립트에서 이미 설치됨
 // 닫기 버튼 (명시적 종료)
 (function(){ var c=document.getElementById('btn-close-form'); if(c) c.onclick=function(){ if(!confirm('입력 화면을 닫을까요?')) return; window.__allowExit=true; try{ window.close(); }catch(e){} setTimeout(function(){ try{ history.go(-12); }catch(e){} }, 100); }; })();
 async function saveChecklist(d, row){
