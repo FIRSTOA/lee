@@ -326,7 +326,10 @@
     .toner-grid .tg input{padding:9px 2px;}
   }
   /* 오버홀 리스트 보기/출력 양식 */
-  #ck-overlay{display:none;position:fixed;inset:0;background:#f0f3f8;z-index:99999;overflow:auto;-webkit-overflow-scrolling:touch;}
+  #ck-overlay{display:none;position:fixed;inset:0;background:#f0f3f8;z-index:99999;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;}
+  #ck-overlay .ck-hint{text-align:center;font-size:12px;color:#64748b;padding:6px 8px;background:#fff;border-bottom:1px solid #eef1f5;}
+  body.ck-open .footer-bar{display:none!important;}
+  body.ck-open{overflow:hidden;}
   #ck-overlay.show{display:block;}
   #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
@@ -753,12 +756,11 @@
 </div>
 <div id="ck-overlay">
   <div class="ck-bar">
-    <button id="btn-ck-zoomout" style="background:#475569;flex:0 0 46px">➖</button>
-    <button id="btn-ck-zoomin" style="background:#475569;flex:0 0 46px">➕</button>
     <button id="btn-ck-out" style="background:#2b6cb0">🖨 출력</button>
     <button id="btn-ck-save" style="background:#16a34a">💾 저장</button>
     <button id="btn-ck-close" style="background:#64748b">✕ 닫기</button>
   </div>
+  <div class="ck-hint">두 손가락으로 확대/축소 · 한 손가락으로 스크롤</div>
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
@@ -2415,14 +2417,21 @@ function ckZoomBy(f){ ckZoom=Math.max(0.4,Math.min(4,ckZoom*f)); applyCkScale();
 function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if(sheet) sheet.style.transform='none'; }
 (function(){
   var ov=document.getElementById('ck-overlay');
-  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); } }
-  function closeOv(){ if(ov) ov.classList.remove('show'); }
+  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); } }
+  function closeOv(){ if(ov){ ov.classList.remove('show'); document.body.classList.remove('ck-open'); } }
   var b=document.getElementById('btn-ck-print'); if(b) b.onclick=openOv;
   var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
   var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ resetCkScale(); window.print(); setTimeout(fitCk,500); };
   var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
-  var zi=document.getElementById('btn-ck-zoomin'); if(zi) zi.onclick=function(){ ckZoomBy(1.25); };
-  var zo=document.getElementById('btn-ck-zoomout'); if(zo) zo.onclick=function(){ ckZoomBy(0.8); };
+  // 두 손가락(핀치) 확대/축소
+  var startDist=0, startZoom=1, pinching=false;
+  function dist(t){ var dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  if(ov){
+    ov.addEventListener('touchstart', function(e){ if(e.touches.length===2){ pinching=true; startDist=dist(e.touches); startZoom=ckZoom; e.preventDefault(); } }, {passive:false});
+    ov.addEventListener('touchmove', function(e){ if(pinching && e.touches.length===2){ var d=dist(e.touches); if(startDist>0){ ckZoom=Math.max(0.4,Math.min(5,startZoom*(d/startDist))); applyCkScale(); } e.preventDefault(); } }, {passive:false});
+    ov.addEventListener('touchend', function(e){ if(e.touches.length<2) pinching=false; });
+    ov.addEventListener('touchcancel', function(){ pinching=false; });
+  }
   window.addEventListener('resize', function(){ if(ov&&ov.classList.contains('show')) fitCk(); });
   window.__ckOpen=function(){ return ov && ov.classList.contains('show'); };
   window.__ckClose=closeOv;
