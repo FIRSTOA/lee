@@ -309,6 +309,13 @@
   .toner-grid .tg input{text-align:center;padding:9px 4px;width:100%;}
   #mode-overhaul textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e0;border-radius:9px;font-size:14px;font-family:inherit;min-height:60px;resize:vertical;box-sizing:border-box;}
   #ck-work{min-height:120px;}
+  .pm-item{word-break:keep-all;}
+  /* 모바일: PM 체크 1칸, 토너 화면폭 맞춤 — 글자 밀림 방지 */
+  @media (max-width:560px){
+    .pm-grid{grid-template-columns:1fr;}
+    .toner-grid{grid-template-columns:repeat(5,1fr);gap:5px;}
+    .toner-grid .tg input{padding:9px 2px;}
+  }
 </style>
 </head>
 <body>
