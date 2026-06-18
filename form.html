@@ -299,7 +299,7 @@
   .use-chips .uc{flex:1;border:1.5px solid #cbd5e0;border-radius:9px;padding:11px;text-align:center;font-weight:700;font-size:13px;cursor:pointer;background:#fff;color:#64748b;}
   .use-chips .uc.on{background:#ebf8ff;border-color:#2b6cb0;color:#2c5282;}
   .cnt-tbl{width:100%;border-collapse:collapse;}
-  .cnt-tbl th,.cnt-tbl td{border:1px solid #e2e8f0;text-align:center;font-size:12px;}
+  .cnt-tbl th,.cnt-tbl td{border:1.4px solid #475569;text-align:center;font-size:12px;}
   .cnt-tbl th{background:#f1f5f9;font-weight:700;padding:6px 2px;}
   .cnt-tbl td.rh{background:#f8fafc;font-weight:700;width:54px;padding:6px 2px;}
   .cnt-tbl input{border:none;text-align:center;padding:9px 2px;width:100%;font-size:13px;}
@@ -352,7 +352,7 @@
   @media print{
     html,body{margin:0!important;padding:0!important;background:#fff!important;height:auto!important;}
     body > *{ display:none !important; }
-    #ck-print-img{ display:block !important; position:static; margin:0; width:210mm; height:297mm; object-fit:contain; page-break-after:avoid; page-break-inside:avoid; }
+    #ck-print-img{ display:block !important; position:static; margin:0; width:210mm; height:297mm; object-fit:fill; page-break-after:avoid; page-break-inside:avoid; }
   }
 </style>
 </head>
@@ -2370,8 +2370,8 @@ function buildCkSheet(){
   var html='<h2>오버홀 체크 리스트</h2>'
    +'<table class="cf">'
    +'<tr>'
-   +'<td class="l">작성자</td><td>'+ckEsc(d.person)+'</td>'
-   +'<td class="l">파트장</td><td></td>'
+   +'<td class="l">작성자</td><td style="height:62px;vertical-align:bottom">'+ckEsc(d.person)+'</td>'
+   +'<td class="l">파트장</td><td style="height:62px;vertical-align:bottom"></td>'
    +'<td class="l">오버홀 난이도</td><td>'+ckEsc(oh)+'</td>'
    +'<td class="l">수리 난이도</td><td>'+ckEsc(rp)+'</td>'
    +'</tr><tr>'
