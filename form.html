@@ -309,11 +309,16 @@
   .toner-grid .tg input{text-align:center;padding:9px 4px;width:100%;}
   #mode-overhaul textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e0;border-radius:9px;font-size:14px;font-family:inherit;min-height:60px;resize:vertical;box-sizing:border-box;}
   #ck-work{min-height:120px;}
-  .pm-item{word-break:keep-all;}
-  /* 모바일: PM 체크 1칸, 토너 화면폭 맞춤 — 글자 밀림 방지 */
+  .pm-item{word-break:keep-all;line-height:1.3;}
+  .photo-grid4{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  #mode-overhaul .photo-slot{padding:14px 8px;}
+  #mode-overhaul .photo-label{font-size:12px;}
+  /* 모바일: 2칸 유지 + compact (글자 한 자 밀림 방지, 공간 절약) */
   @media (max-width:560px){
-    .pm-grid{grid-template-columns:1fr;}
-    .toner-grid{grid-template-columns:repeat(5,1fr);gap:5px;}
+    .pm-grid{gap:6px;}
+    .pm-item{padding:8px 8px;font-size:11.5px;gap:6px;}
+    .pm-item input{width:15px;height:15px;}
+    .toner-grid{gap:5px;}
     .toner-grid .tg input{padding:9px 2px;}
   }
 </style>
@@ -676,29 +681,23 @@
 
   <div class="form-card">
     <div class="section-title">증빙 사진</div>
-    <div style="margin-bottom: 14px;">
-      <div class="photo-label">
-        <span>오버홀 리스트</span>
-        <span class="photo-tag">사진 1</span>
+    <div class="photo-grid4">
+      <div>
+        <div class="photo-label"><span>전면 앞커버</span><span class="photo-tag">사진 1</span></div>
+        <label class="photo-slot" id="slot-front-cover"><input type="file" accept="image/*" data-slot="front-cover"><div class="placeholder-icon">📷</div><div class="placeholder-text">탭하여 촬영/선택</div><div class="placeholder-sub">전면 앞커버 열린상태</div></label>
       </div>
-      <label class="photo-slot" id="slot-overhaul-list">
-        <input type="file" accept="image/*" data-slot="overhaul-list">
-        <div class="placeholder-icon">📋</div>
-        <div class="placeholder-text">탭하여 사진 촬영/선택</div>
-        <div class="placeholder-sub">오버홀 리스트를 찍어주세요</div>
-      </label>
-    </div>
-    <div>
-      <div class="photo-label">
-        <span>4색 색상표</span>
-        <span class="photo-tag">사진 2</span>
+      <div>
+        <div class="photo-label"><span>측면 도어</span><span class="photo-tag">사진 2</span></div>
+        <label class="photo-slot" id="slot-side-door"><input type="file" accept="image/*" data-slot="side-door"><div class="placeholder-icon">📷</div><div class="placeholder-text">탭하여 촬영/선택</div><div class="placeholder-sub">측면 도어 열린상태</div></label>
       </div>
-      <label class="photo-slot" id="slot-color-chart">
-        <input type="file" accept="image/*" data-slot="color-chart">
-        <div class="placeholder-icon">🎨</div>
-        <div class="placeholder-text">탭하여 사진 촬영/선택</div>
-        <div class="placeholder-sub">4색 색상표를 찍어주세요</div>
-      </label>
+      <div>
+        <div class="photo-label"><span>ADF 커버</span><span class="photo-tag">사진 3</span></div>
+        <label class="photo-slot" id="slot-adf-cover"><input type="file" accept="image/*" data-slot="adf-cover"><div class="placeholder-icon">📷</div><div class="placeholder-text">탭하여 촬영/선택</div><div class="placeholder-sub">ADF 커버 열린상태</div></label>
+      </div>
+      <div>
+        <div class="photo-label"><span>4색 색상표</span><span class="photo-tag">사진 4</span></div>
+        <label class="photo-slot" id="slot-color-chart"><input type="file" accept="image/*" data-slot="color-chart"><div class="placeholder-icon">🎨</div><div class="placeholder-text">탭하여 촬영/선택</div><div class="placeholder-sub">4색 색상표</div></label>
+      </div>
     </div>
   </div>
 
@@ -879,10 +878,7 @@ function enterEditMode(row, formData) {
     c.classList.toggle('selected', c.dataset.repair === formData.repair);
   });
   // 사진 슬롯: 비워두고 "기존 사진 유지" 표시
-  photoData['overhaul-list'] = null;
-  photoData['color-chart'] = null;
-  resetPhotoSlot('overhaul-list');
-  resetPhotoSlot('color-chart');
+  Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
   // 배너 표시
   const bar = document.getElementById('edit-mode-bar');
   const txt = document.getElementById('edit-mode-text');
@@ -1684,7 +1680,7 @@ timeInput.addEventListener('input', updateTimeDisplay);
 updateTimeDisplay();
 
 // === 사진 처리 ===
-const photoData = { 'overhaul-list': null, 'color-chart': null };
+const photoData = { 'front-cover': null, 'side-door': null, 'adf-cover': null, 'color-chart': null };
 
 // 이미지 압축: 긴 변 1280px 이내, JPEG 85% 품질. 실패 시 원본 그대로.
 function compressImageDataUrl(dataUrl, maxDim, quality) {
@@ -1748,8 +1744,9 @@ document.querySelectorAll('.photo-slot input[type="file"]').forEach(input => {
 
 function resetPhotoSlot(slot) {
   const slotEl = document.getElementById('slot-' + slot);
-  const labelText = slot === 'overhaul-list' ? '오버홀 리스트를 찍어주세요' : '4색 색상표를 찍어주세요';
-  const icon = slot === 'overhaul-list' ? '📋' : '🎨';
+  const M = {'front-cover':['전면 앞커버 열린상태','📷'],'side-door':['측면 도어 열린상태','📷'],'adf-cover':['ADF 커버 열린상태','📷'],'color-chart':['4색 색상표','🎨']};
+  const labelText = (M[slot]||['사진','📷'])[0];
+  const icon = (M[slot]||['사진','📷'])[1];
   slotEl.innerHTML = `
     <input type="file" accept="image/*" data-slot="${slot}">
     <div class="placeholder-icon">${icon}</div>
@@ -1842,15 +1839,8 @@ function validate(d) {
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
   // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
   if (!editingRow) {
-    if (isPartsTask) {
-      // 부품제조/부품정리 — 두 사진 중 하나만 있어도 통과
-      if (!photoData['overhaul-list'] && !photoData['color-chart']) {
-        errors.push({ field: 'slot-overhaul-list', msg: '사진 1장 이상 첨부하세요 (오버홀 리스트 또는 4색 색상표)' });
-      }
-    } else {
-      if (!photoData['overhaul-list']) errors.push({ field: 'slot-overhaul-list', msg: '오버홀 리스트 사진을 첨부하세요' });
-      if (!photoData['color-chart']) errors.push({ field: 'slot-color-chart', msg: '4색 색상표 사진을 첨부하세요' });
-    }
+    var anyPhoto = Object.keys(photoData).some(function(s){ return photoData[s]; });
+    if (!anyPhoto) errors.push({ field: 'slot-front-cover', msg: '사진을 1장 이상 첨부하세요' });
   }
   return errors;
 }
@@ -1914,7 +1904,9 @@ function showPreview() {
     <div class="preview-row"><span class="key">시간</span><span class="val">${d.time}분 (${(d.time/60).toFixed(1)}시간)</span></div>
 
     <div class="modal-section-title">증빙 사진</div>
-    ${photoHtml('overhaul-list', '오버홀 리스트')}
+    ${photoHtml('front-cover', '전면 앞커버')}
+    ${photoHtml('side-door', '측면 도어')}
+    ${photoHtml('adf-cover', 'ADF 커버')}
     ${photoHtml('color-chart', '4색 색상표')}
   `;
 
@@ -2027,10 +2019,7 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
       ['f-person', 'f-incoming', 'f-model', 'f-serial', 'f-part', 'f-time'].forEach(id => document.getElementById(id).value = '');
       updateTimeDisplay();
       document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
-      photoData['overhaul-list'] = null;
-      photoData['color-chart'] = null;
-      resetPhotoSlot('overhaul-list');
-      resetPhotoSlot('color-chart');
+      Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
     } else {
       showToast('❌ 저장 실패: ' + result.error, 'error');
     }
@@ -2059,10 +2048,7 @@ document.getElementById('btn-reset').onclick = () => {
   updateTimeDisplay();
   document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.error, .error-border').forEach(el => el.classList.remove('error', 'error-border'));
-  photoData['overhaul-list'] = null;
-  photoData['color-chart'] = null;
-  resetPhotoSlot('overhaul-list');
-  resetPhotoSlot('color-chart');
+  Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
 };
 </script>
 <script>
