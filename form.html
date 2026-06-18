@@ -350,9 +350,9 @@
   .ck-sheet table.ctr .cl{display:block;font-weight:700;font-size:12px;margin-bottom:3px;}
   .ck-sheet table.ctr .cv{display:block;min-height:16px;}
   @media print{
-    html,body{margin:0!important;padding:0!important;background:#fff!important;}
-    body * { visibility:hidden!important; }
-    #ck-print-img{ visibility:visible!important; display:block!important; position:fixed; left:0; top:0; width:210mm; height:297mm; object-fit:contain; }
+    html,body{margin:0!important;padding:0!important;background:#fff!important;height:auto!important;}
+    body > *{ display:none !important; }
+    #ck-print-img{ display:block !important; position:static; margin:0; width:210mm; height:297mm; object-fit:contain; page-break-after:avoid; page-break-inside:avoid; }
   }
 </style>
 </head>
