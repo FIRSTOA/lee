@@ -321,6 +321,24 @@
     .toner-grid{gap:5px;}
     .toner-grid .tg input{padding:9px 2px;}
   }
+  /* 오버홀 리스트 출력 양식 */
+  #ck-print-sheet{display:none;}
+  .ck-sheet h2{text-align:center;font-size:20px;letter-spacing:3px;margin:2px 0 8px;color:#000;}
+  .ck-sheet .ck-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .ck-sheet .gubun{font-weight:800;border:2px solid #333;padding:3px 14px;font-size:14px;}
+  .ck-sheet .sgt{border-collapse:collapse;}
+  .ck-sheet .sgt td{border:1px solid #333;text-align:center;font-size:11px;padding:4px 6px;color:#000;}
+  .ck-sheet .sgt .h{background:#f2f2f2;font-weight:700;} .ck-sheet .sgt .v{height:62px;width:120px;color:#999;vertical-align:bottom;}
+  .ck-sheet table.cf{width:100%;border-collapse:collapse;}
+  .ck-sheet table.cf td{border:1px solid #333;padding:4px 6px;font-size:11.5px;vertical-align:middle;color:#000;}
+  .ck-sheet table.cf .l{background:#f2f2f2;font-weight:700;text-align:center;white-space:nowrap;width:78px;}
+  .ck-sheet .sectt{text-align:center;font-weight:800;background:#e8e8e8;border:1px solid #333;border-top:none;padding:4px;font-size:12px;color:#000;}
+  .ck-sheet .cc{text-align:center;width:28px;font-weight:800;color:#1558b0;}
+  @media print{
+    body * { visibility:hidden; }
+    #ck-print-sheet, #ck-print-sheet * { visibility:visible; }
+    #ck-print-sheet{display:block!important;position:absolute;left:0;top:0;width:100%;padding:8px;}
+  }
 </style>
 </head>
 <body>
@@ -339,6 +357,7 @@
     <button type="button" id="log-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">📋 저장 로그</button>
     <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
     <a href="login.html" id="admin-login-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">🔐 관리자 로그인</a>
+    <button type="button" id="btn-close-form" style="background:rgba(255,255,255,0.28);color:#fff;border:1px solid rgba(255,255,255,0.45);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:800">✕ 닫기</button>
   </div>
 </header>
 <div class="container">
@@ -546,10 +565,6 @@
       </div>
     </div>
     <div class="field">
-      <label>입고일</label>
-      <input type="text" id="ck-indate" placeholder="예: 26.3.27">
-    </div>
-    <div class="field">
       <label>부서<span class="req">*</span></label>
       <div class="dept-grid" id="dept-grid">
         <div class="chip" data-dept="CSS">CSS</div>
@@ -565,6 +580,16 @@
   <div class="form-card">
     <div class="section-title">작업 대상</div>
     <div class="field">
+      <label>입고일</label>
+      <input type="text" id="ck-indate" placeholder="예: 26.3.27">
+    </div>
+    <div class="field">
+      <label>자산번호</label>
+      <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 입력 → ERP에서 시리얼·모델 자동매칭 (소문자도 OK)" autocomplete="off">
+      <div class="warn-note">⚠️ 실물 자산번호 확인 필수!! (시리얼 없는 기기는 자산번호 꼭 입력)</div>
+      <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
+    </div>
+    <div class="field">
       <label>입고처</label>
       <input type="text" id="f-incoming" class="warn-field" placeholder="예: 강남 OO지점, 본사 등">
       <div class="warn-note">⚠️ 자동입력될 수 있어요 — 실제 입고처 꼭 확인!!</div>
@@ -579,12 +604,6 @@
         <input type="text" id="f-model" placeholder="예: 3220 입력 → 자동완성" autocomplete="off">
         <div id="model-dropdown" class="autocomplete-dropdown hidden"></div>
       </div>
-    </div>
-    <div class="field">
-      <label>자산번호</label>
-      <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 입력 → ERP 임대리스트에서 시리얼·모델 자동매칭" autocomplete="off">
-      <div class="warn-note">⚠️ 실물 자산번호 확인 필수!! (시리얼 없는 기기는 자산번호 꼭 입력)</div>
-      <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
     </div>
     <div class="field">
       <label>시리얼 번호</label>
@@ -715,8 +734,10 @@
 
 <div class="footer-bar" id="overhaul-footer">
   <button class="btn btn-secondary" id="btn-reset">초기화</button>
+  <button class="btn" id="btn-ck-print" style="background:#16a34a;color:#fff">🖨 리스트 출력</button>
   <button class="btn btn-primary" id="btn-submit">미리보기</button>
 </div>
+<div id="ck-print-sheet" class="ck-sheet"></div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
 </div>
@@ -1291,11 +1312,13 @@ function setupAssetLookup() {
   async function lookup(param, val) {
     val = (val || '').trim();
     if (!val) return;
+    if (param === 'asset_no') val = val.toUpperCase(); // 소문자로 입력해도 검색되게
     status.textContent = '🔎 ERP 임대리스트 조회 중...'; status.style.color = '#718096';
     try {
       const r = await fetch('/api/asset?' + param + '=' + encodeURIComponent(val));
       const j = await r.json();
       if (!r.ok || j.error) { status.textContent = '❌ ' + (j.error || '조회 실패'); status.style.color = '#c53030'; return; }
+      if (param === 'asset_no') assetEl.value = (j.asset && j.asset.asset_no) || val;
       show(j);
     } catch (e) { status.textContent = '❌ 네트워크 오류'; status.style.color = '#c53030'; }
   }
@@ -2305,6 +2328,51 @@ let CK_USE = '현장용';
   if (uc) uc.querySelectorAll('.uc').forEach(function(c){ c.onclick=function(){ uc.querySelectorAll('.uc').forEach(function(x){x.classList.remove('on');}); c.classList.add('on'); CK_USE=c.dataset.use; }; });
 })();
 function ckVal(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+function ckEsc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function ckGradeNum(sel){ var el=document.querySelector(sel); if(!el)return ''; var m=/(\d+)/.exec(el.dataset.overhaul||el.dataset.repair||el.textContent||''); return m?m[1]:''; }
+function ckRows3(g){
+  var a=CK_PM[g], on={}; document.querySelectorAll('#ck-pm input[data-pm]:checked').forEach(function(cb){on[cb.dataset.pm]=true;});
+  var h='';
+  for(var i=0;i<a.length;i+=3){ h+='<tr>'; for(var j=0;j<3;j++){ var it=a[i+j]; if(it===undefined){h+='<td></td><td></td>';continue;} h+='<td>'+ckEsc(it)+'</td><td class="cc">'+(on[it]?'✔':'')+'</td>'; } h+='</tr>'; }
+  return h;
+}
+function buildCkSheet(){
+  var d=collectInputs();
+  var oh=ckGradeNum('.chip[data-overhaul].selected'), rp=ckGradeNum('.chip[data-repair].selected');
+  var html='<h2>오버홀 체크 리스트</h2>'
+   +'<div class="ck-top"><span class="gubun">구분: '+ckEsc(CK_USE)+'</span>'
+   +'<table class="sgt"><tr><td class="h">작성자</td><td class="h">파트장</td></tr><tr><td class="v">(서명)</td><td class="v">(서명)</td></tr></table></div>'
+   +'<table class="cf">'
+   +'<tr><td class="l">작성자</td><td>'+ckEsc(d.person)+'</td><td class="l">오버홀난이도</td><td>'+ckEsc(oh)+'</td><td class="l">수리난이도</td><td>'+ckEsc(rp)+'</td></tr>'
+   +'<tr><td class="l">완료일</td><td>'+ckEsc(d.date)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
+   +'<tr><td class="l">입고처</td><td colspan="5">'+ckEsc(d.incoming)+'</td></tr>'
+   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">자산번호</td><td>'+ckEsc(ckVal('f-asset'))+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td></tr>'
+   +'<tr><td class="l">입고카운터</td><td>흑 '+ckEsc(ckVal('ck-ci-bk'))+'</td><td>컬 '+ckEsc(ckVal('ck-ci-c'))+'</td><td>큰컬 '+ckEsc(ckVal('ck-ci-bc'))+'</td><td class="l">합</td><td>'+ckEsc(ckVal('ck-ci-sum'))+'</td></tr>'
+   +'<tr><td class="l">완료카운터</td><td>흑 '+ckEsc(ckVal('ck-co-bk'))+'</td><td>컬 '+ckEsc(ckVal('ck-co-c'))+'</td><td>큰컬 '+ckEsc(ckVal('ck-co-bc'))+'</td><td class="l">합</td><td>'+ckEsc(ckVal('ck-co-sum'))+'</td></tr>'
+   +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:38px">'+ckEsc(ckVal('ck-symptom'))+'</td></tr>'
+   +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:54px">'+ckEsc(ckVal('ck-work'))+'</td></tr></table>'
+   +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀')+'</table>'
+   +'<div class="sectt">B급 오버홀</div><table class="cf">'+ckRows3('B급 오버홀')+'</table>'
+   +'<div class="sectt">A급 오버홀</div><table class="cf">'+ckRows3('A급 오버홀')+'</table>'
+   +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(ckVal('ck-t-bk'))+'</td><td>C '+ckEsc(ckVal('ck-t-c'))+'</td><td>M '+ckEsc(ckVal('ck-t-m'))+'</td><td>Y '+ckEsc(ckVal('ck-t-y'))+'</td><td class="l">폐통</td><td>'+ckEsc(ckVal('ck-t-w'))+'</td></tr>'
+   +'<tr><td class="l">기타사항</td><td colspan="6" style="white-space:pre-wrap;height:38px">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
+  document.getElementById('ck-print-sheet').innerHTML=html;
+}
+(function(){ var b=document.getElementById('btn-ck-print'); if(b) b.onclick=function(){ buildCkSheet(); window.print(); }; })();
+// 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
+['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
+// 모바일 뒤로가기: 페이지가 꺼지지 않게 (모달 열려있으면 닫기, 아니면 유지)
+(function(){
+  try { history.pushState({_g:1},''); } catch(e){}
+  window.addEventListener('popstate', function(){
+    if (window.__allowExit) return;
+    var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
+    if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); }
+    try { history.pushState({_g:1},''); } catch(e){}
+  });
+})();
+// 닫기 버튼 (명시적 종료)
+(function(){ var c=document.getElementById('btn-close-form'); if(c) c.onclick=function(){ if(!confirm('입력 화면을 닫을까요?')) return; window.__allowExit=true; window.close(); setTimeout(function(){ try{ history.back(); }catch(e){} }, 150); }; })();
 async function saveChecklist(d, row){
   var pm = {};
   document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){ if(cb.checked) pm[cb.dataset.pm]=true; });
@@ -2325,6 +2393,16 @@ async function saveChecklist(d, row){
   try { var r = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value', {headers:RB_SUPA_H}); var j = await r.json(); list = (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; } catch(e){}
   list.push(rec);
   await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'overhaul_checklist',value:list})});
+  // 기술 매뉴얼: 담당자·증상·처리내용만 따로 저장(증상 조회용)
+  try {
+    if (rec.symptom || rec.work) {
+      var ml = [];
+      var mr = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value', {headers:RB_SUPA_H});
+      var mj = await mr.json(); ml = (mj&&mj[0]&&Array.isArray(mj[0].value))?mj[0].value:[];
+      ml.push({ id: rec.id, person: rec.person, symptom: rec.symptom, work: rec.work, model: rec.model, date: rec.date, src: '오버홀' });
+      await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'tech_manual',value:ml})});
+    }
+  } catch(e){}
 }
 </script>
 </body>
