@@ -7,6 +7,10 @@
 <title>오버홀/수리 입력</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* 글자 짤림·겹침·한 글자 줄바꿈 방지 (전역) */
+  label, .chip, .pm-item, .pm-item *, button, td, th, .section-title, .field label, .ck-sheet, .ck-sheet * {
+    word-break: keep-all; overflow-wrap: break-word; }
+  input::placeholder, textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html, body { margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: #f5f7fa; color: #222; min-height: 100vh; -webkit-text-size-adjust: 100%; }
   .status-bar { background: #fef3c7; color: #92400e; padding: 6px 10px; font-size: 11px; text-align: center; border-bottom: 1px solid #fde68a; }
@@ -321,23 +325,31 @@
     .toner-grid{gap:5px;}
     .toner-grid .tg input{padding:9px 2px;}
   }
-  /* 오버홀 리스트 출력 양식 */
-  #ck-print-sheet{display:none;}
-  .ck-sheet h2{text-align:center;font-size:20px;letter-spacing:3px;margin:2px 0 8px;color:#000;}
-  .ck-sheet .ck-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-  .ck-sheet .gubun{font-weight:800;border:2px solid #333;padding:3px 14px;font-size:14px;}
-  .ck-sheet .sgt{border-collapse:collapse;}
-  .ck-sheet .sgt td{border:1px solid #333;text-align:center;font-size:11px;padding:4px 6px;color:#000;}
-  .ck-sheet .sgt .h{background:#f2f2f2;font-weight:700;} .ck-sheet .sgt .v{height:62px;width:120px;color:#999;vertical-align:bottom;}
+  /* 오버홀 리스트 보기/출력 양식 */
+  #ck-overlay{display:none;position:fixed;inset:0;background:#f0f3f8;z-index:99999;overflow:auto;-webkit-overflow-scrolling:touch;}
+  #ck-overlay.show{display:block;}
+  #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
+  #ck-overlay #ck-print-sheet{display:block;background:#fff;width:210mm;min-height:297mm;margin:12px auto;padding:10mm;border-radius:4px;box-shadow:0 1px 8px rgba(0,0,0,.12);}
+  @page{ size:A4 portrait; margin:8mm; }
+  .ck-sheet h2{text-align:center;font-size:30px;letter-spacing:6px;margin:4px 0 16px;color:#000;font-weight:800;}
   .ck-sheet table.cf{width:100%;border-collapse:collapse;}
-  .ck-sheet table.cf td{border:1px solid #333;padding:4px 6px;font-size:11.5px;vertical-align:middle;color:#000;}
-  .ck-sheet table.cf .l{background:#f2f2f2;font-weight:700;text-align:center;white-space:nowrap;width:78px;}
-  .ck-sheet .sectt{text-align:center;font-weight:800;background:#e8e8e8;border:1px solid #333;border-top:none;padding:4px;font-size:12px;color:#000;}
-  .ck-sheet .cc{text-align:center;width:28px;font-weight:800;color:#1558b0;}
+  .ck-sheet table.cf td{border:1.2px solid #333;padding:9px 8px;font-size:14px;height:34px;vertical-align:middle;color:#000;text-align:center;}
+  .ck-sheet table.cf .l{background:#f2f2f2;font-weight:700;text-align:center;white-space:nowrap;width:88px;}
+  .ck-sheet .sectt{text-align:center;font-weight:800;background:#e8e8e8;border:1.2px solid #333;border-top:none;padding:8px;font-size:16px;letter-spacing:2px;color:#000;}
+  .ck-sheet .cc{text-align:center;width:34px;font-weight:800;color:#1558b0;font-size:16px;}
+  .ck-sheet td.ctd{padding:0!important;vertical-align:top;}
+  .ck-sheet table.ctr{width:100%;height:100%;border-collapse:collapse;}
+  .ck-sheet table.ctr td{border:1.2px solid #333;font-size:13px;padding:6px 4px;text-align:center;color:#000;width:25%;}
+  .ck-sheet table.ctr td.ch{background:#f2f2f2;font-weight:700;}
+  .ck-sheet table.ctr .cl{display:block;font-weight:700;font-size:12px;margin-bottom:3px;}
+  .ck-sheet table.ctr .cv{display:block;min-height:16px;}
   @media print{
     body * { visibility:hidden; }
-    #ck-print-sheet, #ck-print-sheet * { visibility:visible; }
-    #ck-print-sheet{display:block!important;position:absolute;left:0;top:0;width:100%;padding:8px;}
+    #ck-overlay, #ck-overlay #ck-print-sheet, #ck-overlay #ck-print-sheet * { visibility:visible; }
+    #ck-overlay{position:absolute;left:0;top:0;background:#fff;overflow:visible;}
+    #ck-overlay .ck-bar{display:none!important;}
+    #ck-overlay #ck-print-sheet{position:absolute;left:0;top:0;width:100%;margin:0;padding:8px;box-shadow:none;}
   }
 </style>
 </head>
@@ -585,7 +597,7 @@
     </div>
     <div class="field">
       <label>자산번호</label>
-      <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 입력 → ERP에서 시리얼·모델 자동매칭 (소문자도 OK)" autocomplete="off">
+      <input type="text" id="f-asset" class="warn-field" placeholder="자산번호 (소문자 OK)" autocomplete="off">
       <div class="warn-note">⚠️ 실물 자산번호 확인 필수!! (시리얼 없는 기기는 자산번호 꼭 입력)</div>
       <div id="asset-status" style="font-size:12px;margin-top:4px;"></div>
     </div>
@@ -608,7 +620,7 @@
     <div class="field">
       <label>시리얼 번호</label>
       <div class="autocomplete-wrap">
-        <input type="text" id="f-serial" class="warn-field" placeholder="자동완성 (알파벳 대.소문자 구별)" autocomplete="off">
+        <input type="text" id="f-serial" class="warn-field" placeholder="자동완성 (대소문자 구별)" autocomplete="off">
         <div id="serial-dropdown" class="autocomplete-dropdown hidden"></div>
       </div>
       <div class="warn-note">⚠️ 실물 시리얼 번호 확인 필수!! (없으면 위 자산번호 필수)</div>
@@ -734,10 +746,17 @@
 
 <div class="footer-bar" id="overhaul-footer">
   <button class="btn btn-secondary" id="btn-reset">초기화</button>
-  <button class="btn" id="btn-ck-print" style="background:#16a34a;color:#fff">🖨 리스트 출력</button>
+  <button class="btn" id="btn-ck-print" style="background:#16a34a;color:#fff">📋 리스트 보기</button>
   <button class="btn btn-primary" id="btn-submit">미리보기</button>
 </div>
-<div id="ck-print-sheet" class="ck-sheet"></div>
+<div id="ck-overlay">
+  <div class="ck-bar">
+    <button id="btn-ck-out" style="background:#2b6cb0">🖨 출력</button>
+    <button id="btn-ck-save" style="background:#16a34a">💾 이미지 저장</button>
+    <button id="btn-ck-close" style="background:#64748b">✕ 닫기</button>
+  </div>
+  <div id="ck-print-sheet" class="ck-sheet"></div>
+</div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
 </div>
@@ -2339,26 +2358,56 @@ function ckRows3(g){
 function buildCkSheet(){
   var d=collectInputs();
   var oh=ckGradeNum('.chip[data-overhaul].selected'), rp=ckGradeNum('.chip[data-repair].selected');
+  function cc(lab,id){ return '<td><span class="cl">'+lab+'</span><span class="cv">'+ckEsc(ckVal(id))+'</span></td>'; }
+  var ctr='<table class="ctr">'
+   +'<tr><td colspan="4" class="ch">입고시 카운터</td></tr>'
+   +'<tr>'+cc('흑','ck-ci-bk')+cc('컬','ck-ci-c')+cc('큰','ck-ci-bc')+cc('합','ck-ci-sum')+'</tr>'
+   +'<tr><td colspan="4" class="ch">수리완료 카운터</td></tr>'
+   +'<tr>'+cc('흑','ck-co-bk')+cc('컬','ck-co-c')+cc('큰','ck-co-bc')+cc('합','ck-co-sum')+'</tr>'
+   +'</table>';
   var html='<h2>오버홀 체크 리스트</h2>'
-   +'<div class="ck-top"><span class="gubun">구분: '+ckEsc(CK_USE)+'</span>'
-   +'<table class="sgt"><tr><td class="h">작성자</td><td class="h">파트장</td></tr><tr><td class="v">(서명)</td><td class="v">(서명)</td></tr></table></div>'
+   +'<table class="cf"><tr>'
+   +'<td class="l">작성자</td><td>'+ckEsc(d.person)+'</td>'
+   +'<td class="l">파트장</td><td></td>'
+   +'<td class="l">수리 난이도</td><td>'+ckEsc(rp)+'</td>'
+   +'<td class="l" style="text-align:left;white-space:nowrap">사무완료:</td><td></td>'
+   +'<td class="l" style="text-align:left;white-space:nowrap">현장완료:</td><td></td>'
+   +'</tr></table>'
    +'<table class="cf">'
-   +'<tr><td class="l">작성자</td><td>'+ckEsc(d.person)+'</td><td class="l">오버홀난이도</td><td>'+ckEsc(oh)+'</td><td class="l">수리난이도</td><td>'+ckEsc(rp)+'</td></tr>'
-   +'<tr><td class="l">완료일</td><td>'+ckEsc(d.date)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
-   +'<tr><td class="l">입고처</td><td colspan="5">'+ckEsc(d.incoming)+'</td></tr>'
-   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">자산번호</td><td>'+ckEsc(ckVal('f-asset'))+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td></tr>'
-   +'<tr><td class="l">입고카운터</td><td>흑 '+ckEsc(ckVal('ck-ci-bk'))+'</td><td>컬 '+ckEsc(ckVal('ck-ci-c'))+'</td><td>큰컬 '+ckEsc(ckVal('ck-ci-bc'))+'</td><td class="l">합</td><td>'+ckEsc(ckVal('ck-ci-sum'))+'</td></tr>'
-   +'<tr><td class="l">완료카운터</td><td>흑 '+ckEsc(ckVal('ck-co-bk'))+'</td><td>컬 '+ckEsc(ckVal('ck-co-c'))+'</td><td>큰컬 '+ckEsc(ckVal('ck-co-bc'))+'</td><td class="l">합</td><td>'+ckEsc(ckVal('ck-co-sum'))+'</td></tr>'
-   +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:38px">'+ckEsc(ckVal('ck-symptom'))+'</td></tr>'
-   +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:54px">'+ckEsc(ckVal('ck-work'))+'</td></tr></table>'
+   +'<tr><td class="l">입고처</td><td>'+ckEsc(d.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(ckVal('ck-indate'))+'</td><td class="l">입고사유</td><td>'+ckEsc(ckVal('ck-reason'))+'</td></tr>'
+   +'<tr><td class="l">모델명</td><td>'+ckEsc(d.model)+'</td><td class="l">S/N</td><td>'+ckEsc(d.serial)+'</td><td colspan="2" rowspan="3" class="ctd">'+ctr+'</td></tr>'
+   +'<tr><td class="l">수리 소요시간</td><td></td><td class="l">수리 완료일</td><td></td></tr>'
+   +'<tr><td class="l">오버홀 소요시간</td><td>'+ckEsc(d.time||ckVal('f-time'))+'</td><td class="l">오버홀 완료일</td><td>'+ckEsc(d.date)+'</td></tr>'
+   +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:80px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-symptom'))+'</td></tr>'
+   +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:105px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-work'))+'</td></tr></table>'
    +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀')+'</table>'
    +'<div class="sectt">B급 오버홀</div><table class="cf">'+ckRows3('B급 오버홀')+'</table>'
    +'<div class="sectt">A급 오버홀</div><table class="cf">'+ckRows3('A급 오버홀')+'</table>'
-   +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(ckVal('ck-t-bk'))+'</td><td>C '+ckEsc(ckVal('ck-t-c'))+'</td><td>M '+ckEsc(ckVal('ck-t-m'))+'</td><td>Y '+ckEsc(ckVal('ck-t-y'))+'</td><td class="l">폐통</td><td>'+ckEsc(ckVal('ck-t-w'))+'</td></tr>'
-   +'<tr><td class="l">기타사항</td><td colspan="6" style="white-space:pre-wrap;height:38px">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
+   +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(ckVal('ck-t-bk'))+'</td><td>C '+ckEsc(ckVal('ck-t-c'))+'</td><td>M '+ckEsc(ckVal('ck-t-m'))+'</td><td>Y '+ckEsc(ckVal('ck-t-y'))+'</td><td class="l">폐통 '+ckEsc(ckVal('ck-t-w'))+'</td></tr>'
+   +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(ckVal('ck-etc'))+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
 }
-(function(){ var b=document.getElementById('btn-ck-print'); if(b) b.onclick=function(){ buildCkSheet(); window.print(); }; })();
+(function(){
+  var ov=document.getElementById('ck-overlay');
+  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); try{ history.pushState({_ck:1},''); }catch(e){} } }
+  function closeOv(){ if(ov) ov.classList.remove('show'); }
+  var b=document.getElementById('btn-ck-print'); if(b) b.onclick=openOv;
+  var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
+  var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ window.print(); };
+  var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
+  window.__ckOpen=function(){ return ov && ov.classList.contains('show'); };
+  window.__ckClose=closeOv;
+})();
+// 리스트 이미지 저장 (카톡 공유 가능)
+function saveCkImage(){
+  var sheet=document.getElementById('ck-print-sheet');
+  function dl(canvas){ try{ var nm=(document.getElementById('f-person')?document.getElementById('f-person').value.trim():'')||'담당미입력'; var dt=(document.getElementById('f-date')?document.getElementById('f-date').value.trim():'')||(function(){var k=new Date(Date.now()+9*3600*1000);return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0');})(); var fn=(nm+'_'+dt).replace(/[\\/:*?"<>|]/g,'_'); var a=document.createElement('a'); a.download=fn+'.jpg'; a.href=canvas.toDataURL('image/jpeg',0.92); document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch(e){ alert('저장 실패: '+e); } }
+  if(window.html2canvas){ window.html2canvas(sheet,{scale:2,backgroundColor:'#fff'}).then(dl).catch(function(e){ alert('저장 실패: '+e); }); return; }
+  var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  s.onload=function(){ window.html2canvas(sheet,{scale:2,backgroundColor:'#fff'}).then(dl).catch(function(e){ alert('저장 실패: '+e); }); };
+  s.onerror=function(){ alert('이미지 변환 모듈 로드 실패(인터넷 확인). 대신 [출력]에서 PDF로 저장하세요.'); };
+  document.head.appendChild(s);
+}
 // 카운터·토너: 모바일 숫자 키패드 + 숫자 유지 (한글/영어 전환 방지)
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
 // 모바일 뒤로가기: 페이지가 꺼지지 않게 (모달 열려있으면 닫기, 아니면 유지)
@@ -2366,6 +2415,7 @@ function buildCkSheet(){
   try { history.pushState({_g:1},''); } catch(e){}
   window.addEventListener('popstate', function(){
     if (window.__allowExit) return;
+    if (window.__ckOpen && window.__ckOpen()) { window.__ckClose(); try { history.pushState({_g:1},''); } catch(e){} return; }
     var open = document.querySelectorAll('.modal-overlay:not(.hidden)');
     if (open.length) { open.forEach(function(m){ m.classList.add('hidden'); }); }
     try { history.pushState({_g:1},''); } catch(e){}
