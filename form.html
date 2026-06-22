@@ -260,6 +260,7 @@
   #rbsub-new.active { background:#fff7ed; color:#9a3412; border-color:#ff7a18; }
   #rbsub-done.active { background:#f0fdf4; color:#166534; border-color:#16a34a; }
   #rbsub-cancel.active { background:#fef2f2; color:#c53030; border-color:#e53e3e; }
+  #rbsub-resend.active { background:#eef3fb; color:#1d4ed8; border-color:#2b6cb0; }
   /* 재수리 블록 (스코프: #mode-rebuild) */
   #mode-rebuild select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; background:#fff; }
   #mode-rebuild textarea, #mode-rebuild input[type=text], #mode-rebuild input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; }
@@ -418,6 +419,7 @@
       <button type="button" id="rbsub-new" class="rb-subbtn active" onclick="setRbSub('new')">📝 재수리 요청</button>
       <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">✅ 완료 처리</button>
       <button type="button" id="rbsub-cancel" class="rb-subbtn" onclick="setRbSub('cancel')">🗑 취소</button>
+      <button type="button" id="rbsub-resend" class="rb-subbtn" onclick="setRbSub('resend')">🔔 재발송</button>
     </div>
     <div id="rb-mode-new">
     <div class="form-card">
@@ -583,6 +585,13 @@
           <div id="rbc-info-body" style="font-size:13px"></div>
         </div>
         <div id="rbc-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
+      </div>
+    </div>
+    <div id="rb-mode-resend" style="display:none">
+      <div class="form-card">
+        <div class="section-title" style="color:#1d4ed8">🔔 재수리 알림 재발송</div>
+        <p style="font-size:12.5px;color:#64748b;margin:-4px 0 10px">등록된 재수리 목록입니다. 카톡 알림이 안 갔으면 해당 건의 <b>재발송</b>을 누르세요.</p>
+        <div class="rbreclist" id="rbr-list"><div class="rbempty">불러오는 중…</div></div>
       </div>
     </div>
   </div>
@@ -999,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (typeof updateTimeDisplay === 'function') updateTimeDisplay();
     document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
+    if (typeof updateCkBtnForRefurb === 'function') updateCkBtnForRefurb();
   };
 });
 
@@ -1747,11 +1757,19 @@ function setupChips(selector) {
       if (!wasSelected) c.classList.add('selected');
       document.getElementById('overhaul-chips').classList.remove('error-border');
       document.getElementById('repair-chips').classList.remove('error-border');
+      updateCkBtnForRefurb();
     };
   });
 }
+// 부품제조 선택 시 오버홀 리스트 불필요 → 리스트 보기 버튼 숨김
+function updateCkBtnForRefurb(){
+  var btn=document.getElementById('btn-ck-print'); if(!btn) return;
+  var refurb=document.querySelector('.chip[data-repair="부품제조"].selected');
+  btn.style.display = refurb ? 'none' : '';
+}
 setupChips('.chip[data-overhaul]');
 setupChips('.chip[data-repair]');
+updateCkBtnForRefurb();
 
 // === 시간 누적 ===
 const timeInput = document.getElementById('f-time');
@@ -2266,15 +2284,44 @@ function setRbSub(s){
   document.getElementById('rb-mode-new').style.display = s==='new'?'block':'none';
   document.getElementById('rb-mode-done').style.display = s==='done'?'block':'none';
   document.getElementById('rb-mode-cancel').style.display = s==='cancel'?'block':'none';
+  document.getElementById('rb-mode-resend').style.display = s==='resend'?'block':'none';
   document.getElementById('rbsub-new').classList.toggle('active', s==='new');
   document.getElementById('rbsub-done').classList.toggle('active', s==='done');
   document.getElementById('rbsub-cancel').classList.toggle('active', s==='cancel');
+  document.getElementById('rbsub-resend').classList.toggle('active', s==='resend');
   const btn=document.getElementById('btn-rb-submit');
-  if(s==='cancel'){ btn.textContent='재수리 요청 취소'; btn.style.background='#e53e3e'; }
-  else if(s==='done'){ btn.textContent='재수리 완료 등록'; btn.style.background='#16a34a'; }
-  else { btn.textContent='재수리 요청 등록 + 채팅방 알림'; btn.style.background='#ff7a18'; }
+  const foot=document.getElementById('rebuild-footer');
+  if(s==='resend'){ if(foot) foot.style.display='none'; }
+  else {
+    if(foot) foot.style.display='flex';
+    if(s==='cancel'){ btn.textContent='재수리 요청 취소'; btn.style.background='#e53e3e'; }
+    else if(s==='done'){ btn.textContent='재수리 완료 등록'; btn.style.background='#16a34a'; }
+    else { btn.textContent='재수리 요청 등록 + 채팅방 알림'; btn.style.background='#ff7a18'; }
+  }
   if(s==='done') rbdInit();
   if(s==='cancel') rbcInit();
+  if(s==='resend') rbrInit();
+}
+async function rbrInit(){
+  const box=document.getElementById('rbr-list');
+  box.innerHTML='<div class="rbempty">불러오는 중…</div>';
+  try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
+  const items=RB_LIST.filter(x=>x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
+  if(!items.length){ box.innerHTML='<div class="rbempty">등록된 재수리가 없습니다</div>'; return; }
+  box.innerHTML=items.map(x=>{
+    var st=x.status||'요청'; var col= st==='완료'?'#16a34a':'#c05621';
+    return '<div class="rbit" style="cursor:default;align-items:center"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+(x.urgent==='긴급'?' 🔴':'')+' · <b style="color:'+col+'">'+rbEsc(st)+'</b><br><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span> · 담당 '+rbEsc(x.handler||'')+'</span>'
+      +'<button type="button" data-id="'+rbEsc(String(x.id))+'" style="background:#2b6cb0;color:#fff;padding:9px 13px;font-size:12.5px;white-space:nowrap;border:none;border-radius:8px;font-weight:700;cursor:pointer">🔔 재발송</button></div>';
+  }).join('');
+  box.querySelectorAll('button[data-id]').forEach(b=>{ b.onclick=()=>rbrResend(b.dataset.id, b); });
+}
+async function rbrResend(id, btn){
+  if(!confirm('이 재수리 알림을 채팅방에 다시 보낼까요?')) return;
+  btn.disabled=true; var old=btn.textContent; btn.textContent='재발송 중…';
+  try{ const r=await fetch('/api/rebuild-resend?id='+encodeURIComponent(id)); const j=await r.json();
+    alert(j&&j.ok?'✅ 재발송 요청됨 — 최대 1분 내 재수리방에 알림이 다시 갑니다':'재발송 실패');
+  }catch(e){ alert('재발송 실패: '+e); }
+  btn.disabled=false; btn.textContent=old;
 }
 async function rbdInit(){
   document.getElementById('rbd-date').value=new Date().toISOString().slice(0,10);
