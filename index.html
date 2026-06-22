@@ -1704,6 +1704,20 @@ function openRebuildDetail(id){
     '<div style="padding:10px 0"><b style="color:#718096;font-size:13px">첨부 사진·동영상</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">'+files+'</div></div>' +
     doneHtml;
   document.getElementById('rb-detail-title').textContent = '재수리 상세 — ' + rbDevKey(x) + ' (' + (x.model||'') + ')';
+  (function(){
+    var body=document.getElementById('rb-detail-body');
+    if(x.status!=='취소'){
+      body.insertAdjacentHTML('beforeend','<button id="rb-resend-btn" style="margin-top:14px;width:100%;padding:13px;border:none;border-radius:10px;background:#2b6cb0;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🔔 이 건 카톡 알림 다시 보내기</button><div style="font-size:11.5px;color:#94a3b8;margin-top:6px;text-align:center">알림이 안 갔을 때 누르면 재수리방으로 다시 전송됩니다</div>');
+      var btn=document.getElementById('rb-resend-btn');
+      btn.onclick=function(){
+        if(!confirm('이 재수리 알림을 채팅방에 다시 보낼까요?')) return;
+        btn.disabled=true; btn.textContent='재발송 중…';
+        fetch('/api/rebuild-resend?id='+encodeURIComponent(x.id)).then(function(r){return r.json();}).then(function(j){
+          alert(j&&j.ok?'✅ 재발송 요청됨 — 최대 1분 내 재수리방에 알림이 다시 갑니다':'재발송 실패');
+        }).catch(function(e){ alert('재발송 실패: '+e); }).then(function(){ btn.disabled=false; btn.textContent='🔔 이 건 카톡 알림 다시 보내기'; });
+      };
+    }
+  })();
   document.getElementById('rebuildDetailModal').classList.remove('hidden');
 }
 
