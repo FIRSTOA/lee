@@ -255,8 +255,9 @@
   .mode-btn { flex:1; padding:12px; border:1px solid #cbd5e0; border-radius:10px; background:#fff; font-size:14px; font-weight:700; cursor:pointer; color:#64748b; }
   #tab-overhaul.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
   #tab-rebuild.active { background:#ff7a18; color:#fff; border-color:#ff7a18; }
-  .rb-subtoggle { display:flex; gap:6px; margin-bottom:12px; }
-  .rb-subbtn { flex:1; padding:9px; border:1px solid #cbd5e0; border-radius:8px; background:#fff; font-size:13px; font-weight:700; cursor:pointer; color:#64748b; }
+  .rb-subtoggle { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .rb-subbtn { flex:1 1 80px; padding:9px 6px; border:1px solid #cbd5e0; border-radius:8px; background:#fff; font-size:13px; font-weight:700; cursor:pointer; color:#64748b; white-space:nowrap; }
+  #rbsub-complete.active { background:#f0fdf4; color:#166534; border-color:#16a34a; }
   #rbsub-new.active { background:#fff7ed; color:#9a3412; border-color:#ff7a18; }
   #rbsub-done.active { background:#f0fdf4; color:#166534; border-color:#16a34a; }
   #rbsub-cancel.active { background:#fef2f2; color:#c53030; border-color:#e53e3e; }
@@ -417,9 +418,9 @@
   <div id="mode-rebuild" style="display:none">
     <div class="rb-subtoggle">
       <button type="button" id="rbsub-new" class="rb-subbtn active" onclick="setRbSub('new')">📝 재수리 요청</button>
-      <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">✅ 완료 처리</button>
+      <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">⏳ 재수리 대기</button>
+      <button type="button" id="rbsub-complete" class="rb-subbtn" onclick="setRbSub('complete')">✅ 완료 내역</button>
       <button type="button" id="rbsub-cancel" class="rb-subbtn" onclick="setRbSub('cancel')">🗑 취소</button>
-      <button type="button" id="rbsub-resend" class="rb-subbtn" onclick="setRbSub('resend')">🔔 재발송</button>
     </div>
     <div id="rb-mode-new">
     <div class="form-card">
@@ -519,9 +520,9 @@
 
     <div id="rb-mode-done" style="display:none">
       <div class="form-card">
-        <div class="section-title" style="color:#16a34a">✅ 재수리 완료 처리</div>
+        <div class="section-title" style="color:#c05621">⏳ 재수리 대기 — 선택해 완료 처리</div>
         <div class="field">
-          <label>처리할 재수리 요청 — 선택하세요<span class="req">*</span></label>
+          <label>대기중인 재수리 — 선택하세요<span class="req">*</span></label>
           <div class="rbreclist" id="rbd-list"></div>
         </div>
         <div class="rborig" id="rbd-info">
@@ -556,7 +557,6 @@
         <div class="field">
           <label>완료 사진</label>
           <div class="rbslot-row">
-            <div class="rbslot" data-slot="list"><div class="rbslot-label">오버홀재수리 리스트</div><div class="rbslot-box">📷 첨부</div></div>
             <div class="rbslot" data-slot="before"><div class="rbslot-label">증상 전 사진</div><div class="rbslot-box">📷 첨부</div></div>
             <div class="rbslot" data-slot="after"><div class="rbslot-label">증상 후 사진</div><div class="rbslot-box">📷 첨부</div></div>
           </div>
@@ -566,6 +566,14 @@
           <input type="date" id="rbd-date">
         </div>
         <div id="rbd-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div id="rb-mode-complete" style="display:none">
+      <div class="form-card">
+        <div class="section-title" style="color:#16a34a">✅ 재수리 완료 내역</div>
+        <p style="font-size:12.5px;color:#64748b;margin:-4px 0 10px">완료 처리된 재수리 기록입니다 (보관용).</p>
+        <div class="rbreclist" id="rbf-list"><div class="rbempty">불러오는 중…</div></div>
       </div>
     </div>
 
@@ -585,13 +593,6 @@
           <div id="rbc-info-body" style="font-size:13px"></div>
         </div>
         <div id="rbc-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
-      </div>
-    </div>
-    <div id="rb-mode-resend" style="display:none">
-      <div class="form-card">
-        <div class="section-title" style="color:#1d4ed8">🔔 재수리 알림 재발송</div>
-        <p style="font-size:12.5px;color:#64748b;margin:-4px 0 10px">등록된 재수리 목록입니다. 카톡 알림이 안 갔으면 해당 건의 <b>재발송</b>을 누르세요.</p>
-        <div class="rbreclist" id="rbr-list"><div class="rbempty">불러오는 중…</div></div>
       </div>
     </div>
   </div>
@@ -2284,14 +2285,14 @@ function setRbSub(s){
   document.getElementById('rb-mode-new').style.display = s==='new'?'block':'none';
   document.getElementById('rb-mode-done').style.display = s==='done'?'block':'none';
   document.getElementById('rb-mode-cancel').style.display = s==='cancel'?'block':'none';
-  document.getElementById('rb-mode-resend').style.display = s==='resend'?'block':'none';
+  document.getElementById('rb-mode-complete').style.display = s==='complete'?'block':'none';
   document.getElementById('rbsub-new').classList.toggle('active', s==='new');
   document.getElementById('rbsub-done').classList.toggle('active', s==='done');
+  document.getElementById('rbsub-complete').classList.toggle('active', s==='complete');
   document.getElementById('rbsub-cancel').classList.toggle('active', s==='cancel');
-  document.getElementById('rbsub-resend').classList.toggle('active', s==='resend');
   const btn=document.getElementById('btn-rb-submit');
   const foot=document.getElementById('rebuild-footer');
-  if(s==='resend'){ if(foot) foot.style.display='none'; }
+  if(s==='complete'){ if(foot) foot.style.display='none'; }
   else {
     if(foot) foot.style.display='flex';
     if(s==='cancel'){ btn.textContent='재수리 요청 취소'; btn.style.background='#e53e3e'; }
@@ -2300,20 +2301,24 @@ function setRbSub(s){
   }
   if(s==='done') rbdInit();
   if(s==='cancel') rbcInit();
-  if(s==='resend') rbrInit();
+  if(s==='complete') rbfInit();
 }
-async function rbrInit(){
-  const box=document.getElementById('rbr-list');
+async function rbfInit(){
+  const box=document.getElementById('rbf-list');
   box.innerHTML='<div class="rbempty">불러오는 중…</div>';
   try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:RB_SUPA_H}); const j=await r.json(); RB_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
-  const items=RB_LIST.filter(x=>x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
-  if(!items.length){ box.innerHTML='<div class="rbempty">등록된 재수리가 없습니다</div>'; return; }
-  box.innerHTML=items.map(x=>{
-    var st=x.status||'요청'; var col= st==='완료'?'#16a34a':'#c05621';
-    return '<div class="rbit" style="cursor:default;align-items:center"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+(x.urgent==='긴급'?' 🔴':'')+' · <b style="color:'+col+'">'+rbEsc(st)+'</b><br><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span> · 담당 '+rbEsc(x.handler||'')+'</span>'
-      +'<button type="button" data-id="'+rbEsc(String(x.id))+'" style="background:#2b6cb0;color:#fff;padding:9px 13px;font-size:12.5px;white-space:nowrap;border:none;border-radius:8px;font-weight:700;cursor:pointer">🔔 재발송</button></div>';
-  }).join('');
-  box.querySelectorAll('button[data-id]').forEach(b=>{ b.onclick=()=>rbrResend(b.dataset.id, b); });
+  const items=RB_LIST.filter(x=>x.status==='완료').sort((a,b)=>(b.completedDate||b.reqDate||'').localeCompare(a.completedDate||a.reqDate||''));
+  if(!items.length){ box.innerHTML='<div class="rbempty">완료된 재수리가 없습니다</div>'; return; }
+  box.innerHTML=items.map((x,i)=>'<div class="rbit" style="cursor:default;display:block">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="flex:1;min-width:0">'
+    +'<div style="font-weight:700">'+rbEsc(rbShort(x.completedDate||x.reqDate))+' · '+rbEsc(x.model||'')+(x.cause==='오버홀 불량'?' <span style="color:#b91c1c;font-size:11px">[오버홀불량]</span>':'')+'</div>'
+    +'<div class="s" style="margin:2px 0">'+rbEsc(x.serial||x.asset_no||'')+'</div>'
+    +'<div style="font-size:12.5px;color:#475569">처리자 '+rbEsc(x.completedBy||x.handler||'-')+' · 사유 '+rbEsc(x.cause||'-')+'</div>'
+    +(x.workDone?'<div style="font-size:12.5px;color:#334155;margin-top:3px;white-space:pre-wrap">처리: '+rbEsc(x.workDone)+'</div>':'')
+    +'</div>'
+    +'<button type="button" class="rbf-print" data-i="'+i+'" style="background:#16a34a;color:#fff;padding:8px 11px;font-size:12px;border:none;border-radius:7px;font-weight:700;cursor:pointer;white-space:nowrap">🖨 리스트</button></div>'
+    +'</div>').join('');
+  box.querySelectorAll('.rbf-print').forEach(b=>{ b.onclick=()=>openRbSheet(items[+b.dataset.i]); });
 }
 async function rbrResend(id, btn){
   if(!confirm('이 재수리 알림을 채팅방에 다시 보낼까요?')) return;
@@ -2331,8 +2336,12 @@ async function rbdInit(){
   const items=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
   if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; }
   else {
-    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'"><span>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+' · 담당 '+rbEsc(x.handler||'')+'</span><span class="s">'+rbEsc(x.serial||x.asset_no||'')+'</span></div>').join('');
+    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'" style="align-items:center;gap:8px"><div style="flex:1;min-width:0">'
+      +'<div>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+' · 담당 '+rbEsc(x.handler||'')+'</div>'
+      +'<div class="s">'+rbEsc(x.serial||x.asset_no||'')+'</div></div>'
+      +'<button type="button" class="rbr-btn" data-id="'+rbEsc(String(x.id))+'" style="background:#2b6cb0;color:#fff;padding:8px 11px;font-size:12px;border:none;border-radius:7px;font-weight:700;cursor:pointer;white-space:nowrap">🔔 재발송</button></div>').join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbdPick(items[+el.dataset.i]); });
+    box.querySelectorAll('.rbr-btn').forEach(b=>{ b.onclick=(e)=>{ e.stopPropagation(); rbrResend(b.dataset.id, b); }; });
   }
   if(rbdReady) return; rbdReady=true;
   document.querySelectorAll('#rbd-form .rbslot').forEach(slot=>{
@@ -2377,7 +2386,9 @@ async function rbDoneSubmit(){
     RB_LIST[idx].cause=cause; RB_LIST[idx].workDone=work; RB_LIST[idx].replacedParts=replaced; RB_LIST[idx].completedFiles=urls; RB_LIST[idx].completedAt=new Date().toISOString();
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
     if(!up.ok) throw new Error('저장 실패('+up.status+')');
-    st.innerHTML='<b style="color:#16a34a">✅ 재수리 완료 등록!</b>'; btn.textContent='완료!'; setTimeout(()=>location.reload(),1600);
+    st.innerHTML='<b style="color:#16a34a">✅ 재수리 완료 등록! 재수리 리스트를 띄웁니다…</b>'; btn.textContent='완료!';
+    var _doneRec=RB_LIST[idx];
+    setTimeout(function(){ openRbSheet(_doneRec); }, 600);
   }catch(e){ st.innerHTML='<b style="color:#c53030">❌ '+rbEsc(String(e))+'</b>'; btn.disabled=false; btn.textContent='재수리 완료 등록'; }
 }
 
@@ -2522,6 +2533,41 @@ function buildCkSheet(S){
 // 저장된 기록으로 리스트 보기 열기 (재출력)
 function openCkFromRec(rec){
   buildCkSheet(ckRecData(rec));
+  var ov=document.getElementById('ck-overlay');
+  if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
+}
+// === 오버홀 재수리 리스트 (완료건 출력) ===
+function rbPartsFmt(rec){
+  return (rec.parts||[]).map(function(p){ p=String(p); var i=p.indexOf(':'); return i>=0 ? p.slice(0,i)+'('+p.slice(i+1)+')' : p; }).join(' · ');
+}
+function buildRbSheet(rec){
+  function v(x){ return ckEsc(x==null?'':x); }
+  var cnt=0; try{ var key=(rec.serial||rec.asset_no||''); if(key) cnt=RB_LIST.filter(function(z){ return (z.serial||z.asset_no||'')===key; }).length; }catch(e){}
+  var urg = rec.urgent==='긴급';
+  var bad = rec.cause==='오버홀 불량';
+  var html='<h2>오버홀 재수리 리스트</h2>'
+   +'<table class="cf"><tr>'
+   +'<td class="l" style="width:70px">처리자</td><td style="height:46px;width:135px">'+v(rec.completedBy||rec.handler)+'</td>'
+   +'<td class="l" style="width:70px">파트장</td><td style="height:46px;width:135px"></td>'
+   +'<td class="l">긴급도</td><td'+(urg?' style="color:#c00;font-weight:800"':'')+'>'+v(rec.urgent)+'</td>'
+   +'</tr></table>'
+   +'<table class="cf">'
+   +'<tr><td class="l">모델명</td><td>'+v(rec.model)+'</td><td class="l">S/N</td><td>'+v(rec.serial)+'</td><td class="l">자산번호</td><td>'+v(rec.asset_no)+'</td></tr>'
+   +'<tr><td class="l">업체</td><td colspan="5" style="text-align:left">'+v(rec.business)+'</td></tr>'
+   +'<tr><td class="l">원 담당자</td><td>'+v(rec.origPerson)+'</td><td class="l">원 작업일</td><td>'+v(rec.origDate)+'</td><td class="l">원 부서</td><td>'+v(rec.origDept)+'</td></tr>'
+   +'<tr><td class="l">요청자</td><td>'+v(rec.requester)+'</td><td class="l">재수리 담당</td><td>'+v(rec.handler)+'</td><td class="l">보관장소</td><td>'+v(rec.place)+'</td></tr>'
+   +'<tr><td class="l">요청일</td><td>'+v(rec.reqDate)+'</td><td class="l">완료일</td><td>'+v(rec.completedDate)+'</td><td class="l">발견시점</td><td>'+v(rec.found)+'</td></tr>'
+   +'<tr><td class="l">누적 재수리</td><td>'+cnt+'회</td><td class="l">재수리 사유</td><td colspan="3" style="text-align:left'+(bad?';color:#c00;font-weight:800':'')+'">'+v(rec.cause)+'</td></tr>'
+   +'<tr><td class="l">불량 부위</td><td colspan="5" style="text-align:left">'+v(rbPartsFmt(rec))+'</td></tr>'
+   +'<tr><td class="l">증상</td><td colspan="5" style="text-align:left;white-space:pre-wrap;height:70px;vertical-align:top">'+v(rec.symptom)+'</td></tr>'
+   +'<tr><td class="l">처리내용</td><td colspan="5" style="text-align:left;white-space:pre-wrap;height:95px;vertical-align:top">'+v(rec.workDone)+'</td></tr>'
+   +'<tr><td class="l">교체 부품</td><td colspan="5" style="text-align:left">'+v(rec.replacedParts)+'</td></tr>'
+   +'<tr><td class="l">기타사항</td><td colspan="5" style="text-align:left;white-space:pre-wrap;height:80px;vertical-align:top"></td></tr>'
+   +'</table>';
+  document.getElementById('ck-print-sheet').innerHTML=html;
+}
+function openRbSheet(rec){
+  buildRbSheet(rec);
   var ov=document.getElementById('ck-overlay');
   if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
 }
