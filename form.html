@@ -2611,11 +2611,36 @@ function openRbSheet(rec){
     if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 오버홀 기록이 없습니다')+'</div>'; return; }
     box.innerHTML=arr.slice(0,100).map(function(r){
       var idx=(listCache||[]).indexOf(r);
+      var sn=r.serial||'';
       return '<div class="lk-card"><div class="lk-top"><div style="min-width:0"><div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
         +'<div class="lk-sn">'+esc(r.serial||r.asset_no||'')+'</div>'
         +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
-        +'<button type="button" class="lk-print" data-idx="'+idx+'">🖨 재출력</button></div></div>'; }).join('');
+        +'<div style="display:flex;flex-direction:column;gap:6px">'
+        +(sn?'<button type="button" class="lk-photo" data-sn="'+esc(sn)+'" style="border:none;border-radius:8px;background:#2b6cb0;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap">📷 사진</button>':'')
+        +'<button type="button" class="lk-print" data-idx="'+idx+'">🖨 재출력</button>'
+        +'</div></div>'
+        +'<div class="lk-photos" style="display:none;margin-top:10px"></div></div>'; }).join('');
     box.querySelectorAll('.lk-print').forEach(function(b){ b.onclick=function(){ var rec=listCache[+b.dataset.idx]; if(rec) openCkFromRec(rec); }; });
+    box.querySelectorAll('.lk-photo').forEach(function(b){ b.onclick=function(){ lkShowPhotos(b); }; });
+  }
+  async function lkShowPhotos(btn){
+    var card=btn.closest('.lk-card'); var strip=card.querySelector('.lk-photos');
+    if(strip.dataset.loaded==='1'){ strip.style.display = (strip.style.display==='none'?'block':'none'); return; }
+    strip.style.display='block'; strip.innerHTML='<div style="font-size:12px;color:#94a3b8">사진 불러오는 중…</div>'; btn.disabled=true;
+    try{
+      var r=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'serialPhotos',serial:btn.dataset.sn}),redirect:'follow'});
+      var j=await r.json(); var urls=(j&&j.ok&&Array.isArray(j.photos))?j.photos:[];
+      if(!urls.length){ strip.innerHTML='<div style="font-size:12px;color:#94a3b8">저장된 사진이 없습니다</div>'; }
+      else {
+        strip.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+urls.map(function(u){
+          var m=/[-\w]{25,}/.exec(u); var id=m?m[0]:'';
+          var thumb=id?('https://drive.google.com/thumbnail?id='+id+'&sz=w220'):u;
+          return '<a href="'+u+'" target="_blank" rel="noopener"><img src="'+thumb+'" style="width:96px;height:76px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#000"></a>';
+        }).join('')+'</div>';
+      }
+      strip.dataset.loaded='1';
+    }catch(e){ strip.innerHTML='<div style="font-size:12px;color:#c53030">사진 불러오기 실패</div>'; }
+    btn.disabled=false;
   }
   function renderManual(){
     var q=(document.getElementById('lk-q2').value||'').trim().toLowerCase();
