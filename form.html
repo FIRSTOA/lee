@@ -300,6 +300,10 @@
   #mode-rebuild .rbslot-box .rmv { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:20px; height:20px; font-size:13px; line-height:20px; text-align:center; }
   @media(max-width:560px){ #mode-rebuild .rbslot-row{flex-direction:column} #mode-rebuild .rbslot-box img,#mode-rebuild .rbslot-box video{height:140px} }
   /* 실물 확인 필수 강조: 연한 빨강 */
+  .sym-cat { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .sym-cat .sc { border:1.5px solid #e2e8f0; border-radius:20px; padding:6px 13px; font-size:13px; cursor:pointer; background:#fff; color:#475569; user-select:none; }
+  .sym-cat .sc.on { background:#2b6cb0; color:#fff; border-color:#2b6cb0; font-weight:700; }
+  .sym-cat.cat-err { outline:2px solid #e53e3e; outline-offset:3px; border-radius:8px; }
   .warn-field { background: #fffafa !important; border-color: #f6c2c2 !important; }
   .warn-field:focus { border-color: #eda3a3 !important; box-shadow: 0 0 0 2px rgba(237,163,163,0.18) !important; }
   .warn-note { font-size: 11.5px; color: #d98a8a; margin-top: 4px; font-weight: 600; }
@@ -364,6 +368,9 @@
   #lookup-overlay .lk-kb .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px;margin-right:6px;}
   #lookup-overlay .lk-kb .tag.oh{background:#dcfce7;color:#166534;} #lookup-overlay .lk-kb .tag.re{background:#fee2e2;color:#991b1b;}
   #lookup-overlay .lk-empty{text-align:center;color:#94a3b8;padding:30px 10px;font-size:14px;}
+  #lookup-overlay .lk-catfilter{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px;}
+  #lookup-overlay .lk-catfilter .lc{border:1.5px solid #cbd5e0;border-radius:20px;padding:6px 13px;font-size:13px;cursor:pointer;background:#fff;color:#475569;user-select:none;}
+  #lookup-overlay .lk-catfilter .lc.on{background:#2b6cb0;color:#fff;border-color:#2b6cb0;font-weight:700;}
   #ck-overlay.show{display:block;}
   #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
@@ -708,7 +715,16 @@
 
   <div class="form-card">
     <div class="section-title">증상 · 처리내용</div>
-    <div class="field"><label>증상 / 에러</label><textarea id="ck-symptom" placeholder="예: 컬러 현상 불량(흐림)"></textarea></div>
+    <div class="field"><label>증상 분류 <span class="req">*</span> <span style="font-weight:400;color:#718096">(다중 선택)</span></label>
+      <div class="sym-cat" id="ck-symptom-cat">
+        <span class="sc" onclick="ckSymCat(this)">화상불량</span>
+        <span class="sc" onclick="ckSymCat(this)">용지걸림</span>
+        <span class="sc" onclick="ckSymCat(this)">소음</span>
+        <span class="sc" onclick="ckSymCat(this)">에러</span>
+        <span class="sc" onclick="ckSymCat(this)">파손</span>
+      </div>
+      <label style="margin-top:4px">증상 / 에러 상세</label>
+      <textarea id="ck-symptom" placeholder="예: 컬러 현상 불량(흐림)"></textarea></div>
     <div class="field" style="margin:0"><label>처리내용</label><textarea id="ck-work" placeholder="예: 정착기 교체 후 정상 작동 확인" style="min-height:120px"></textarea></div>
   </div>
 
@@ -817,6 +833,13 @@
     </div>
     <div id="lk-panel-manual" style="display:none">
       <input type="text" id="lk-q2" class="lk-search" placeholder="🔍 증상 · 처리내용 · 모델 검색 (예: 정착, 화상, SC541)" autocomplete="off">
+      <div class="lk-catfilter" id="lk-catfilter">
+        <span class="lc" data-cat="화상불량">화상불량</span>
+        <span class="lc" data-cat="용지걸림">용지걸림</span>
+        <span class="lc" data-cat="소음">소음</span>
+        <span class="lc" data-cat="에러">에러</span>
+        <span class="lc" data-cat="파손">파손</span>
+      </div>
       <div id="lk-results-manual" class="lk-results"></div>
     </div>
   </div>
@@ -1952,6 +1975,7 @@ function validate(d) {
   if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요 (시리얼 없는 기기는 자산번호 필수)' });
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
+  if (!ckSymCats().length) { errors.push({ field: 'ck-symptom-cat', msg: '증상 분류를 1개 이상 선택하세요' }); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.add('cat-err'); }
   // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
   if (!editingRow) {
     var anyPhoto = Object.keys(photoData).some(function(s){ return photoData[s]; });
@@ -2459,6 +2483,9 @@ let CK_USE = '현장용';
   if (uc) uc.querySelectorAll('.uc').forEach(function(c){ c.onclick=function(){ uc.querySelectorAll('.uc').forEach(function(x){x.classList.remove('on');}); c.classList.add('on'); CK_USE=c.dataset.use; }; });
 })();
 function ckVal(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+// 증상 분류 칩 (필수, 다중선택) — 텍스트엔 반영 안 하고 별도 저장
+function ckSymCat(el){ el.classList.toggle('on'); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.remove('cat-err'); }
+function ckSymCats(){ return [].slice.call(document.querySelectorAll('#ck-symptom-cat .sc.on')).map(function(x){return x.textContent.trim();}); }
 function ckEsc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function ckGradeNum(sel){ var el=document.querySelector(sel); if(!el)return ''; var m=/(\d+)/.exec(el.dataset.overhaul||el.dataset.repair||el.textContent||''); return m?m[1]:''; }
 function ckRows3(g, on){
@@ -2646,11 +2673,19 @@ function openRbSheet(rec){
     var q=(document.getElementById('lk-q2').value||'').trim().toLowerCase();
     var box=document.getElementById('lk-results-manual');
     var terms=q?expandTerms(q):[];
-    var arr=(manualCache||[]).filter(function(r){ if(!q) return true; var txt=((r.symptom||'')+' '+(r.work||'')+' '+(r.model||'')+' '+(r.person||'')).toLowerCase(); return terms.some(function(t){ return t && txt.indexOf(t)>=0; }); });
-    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 처리내용이 없습니다')+'</div>'; return; }
+    var cats=[].slice.call(document.querySelectorAll('#lk-catfilter .lc.on')).map(function(x){return x.dataset.cat;});
+    var arr=(manualCache||[]).filter(function(r){
+      var txtOk=true;
+      if(q){ var txt=((r.symptom||'')+' '+(r.work||'')+' '+(r.model||'')+' '+(r.person||'')).toLowerCase(); txtOk=terms.some(function(t){ return t && txt.indexOf(t)>=0; }); }
+      var catOk=true;
+      if(cats.length){ var rc=Array.isArray(r.cat)?r.cat:[]; var hay=(r.symptom||'')+' '+(r.work||''); catOk=cats.some(function(c){ return rc.indexOf(c)>=0 || hay.indexOf(c)>=0; }); }
+      return txtOk && catOk;
+    });
+    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+((q||cats.length)?'검색 결과 없음':'저장된 처리내용이 없습니다')+'</div>'; return; }
     box.innerHTML=arr.slice(0,150).map(function(r){
       var tag=(r.src==='재수리')?'<span class="tag re">재수리</span>':'<span class="tag oh">오버홀</span>';
-      return '<div class="lk-kb"><div class="s">'+tag+'증상: '+esc(r.symptom||'-')+'</div><div class="a">처리: '+esc(r.work||'-')+'</div><div class="m">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.model?' · '+esc(r.model):'')+'</div></div>'; }).join('');
+      var ct=(Array.isArray(r.cat)&&r.cat.length)?' <span style="color:#2b6cb0;font-size:11px;font-weight:700">['+r.cat.map(esc).join('·')+']</span>':'';
+      return '<div class="lk-kb"><div class="s">'+tag+'증상: '+esc(r.symptom||'-')+ct+'</div><div class="a">처리: '+esc(r.work||'-')+'</div><div class="m">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.model?' · '+esc(r.model):'')+'</div></div>'; }).join('');
   }
   function showTab(which){
     document.getElementById('lk-tab-list').classList.toggle('on',which==='list');
@@ -2664,6 +2699,7 @@ function openRbSheet(rec){
   document.getElementById('lk-tab-manual').onclick=function(){ showTab('manual'); };
   document.getElementById('lk-q1').addEventListener('input', renderList);
   document.getElementById('lk-q2').addEventListener('input', renderManual);
+  document.querySelectorAll('#lk-catfilter .lc').forEach(function(c){ c.onclick=function(){ c.classList.toggle('on'); renderManual(); }; });
 })();
 // A4 시트 전체가 화면에 꽉 차게 자동 맞춤 (가로·세로 모두 들어오도록)
 function fitCk(){
@@ -2735,7 +2771,7 @@ async function saveChecklist(d, row){
     incoming: d.incoming, model: d.model, asset_no: (document.getElementById('f-asset')?document.getElementById('f-asset').value.trim():''), serial: d.serial, part: d.part,
     indate: ckVal('ck-indate'), reason: ckVal('ck-reason'),
     overhaul: d.overhaul, repair: d.repair, time: d.time,
-    symptom: ckVal('ck-symptom'), work: ckVal('ck-work'),
+    symptom: ckVal('ck-symptom'), work: ckVal('ck-work'), cat: ckSymCats(),
     pm: pm,
     counterIn: { bk:ckVal('ck-ci-bk'), c:ckVal('ck-ci-c'), bc:ckVal('ck-ci-bc'), sum:ckVal('ck-ci-sum') },
     counterOut: { bk:ckVal('ck-co-bk'), c:ckVal('ck-co-c'), bc:ckVal('ck-co-bc'), sum:ckVal('ck-co-sum') },
@@ -2748,11 +2784,11 @@ async function saveChecklist(d, row){
   await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'overhaul_checklist',value:list})});
   // 기술 매뉴얼: 담당자·증상·처리내용만 따로 저장(증상 조회용)
   try {
-    if (rec.symptom || rec.work) {
+    if (rec.cat.length || rec.symptom || rec.work) {
       var ml = [];
       var mr = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value', {headers:RB_SUPA_H});
       var mj = await mr.json(); ml = (mj&&mj[0]&&Array.isArray(mj[0].value))?mj[0].value:[];
-      ml.push({ id: rec.id, person: rec.person, symptom: rec.symptom, work: rec.work, model: rec.model, date: rec.date, src: '오버홀' });
+      ml.push({ id: rec.id, person: rec.person, symptom: rec.symptom, work: rec.work, cat: rec.cat, model: rec.model, date: rec.date, src: '오버홀' });
       await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'tech_manual',value:ml})});
     }
   } catch(e){}
