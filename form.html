@@ -318,7 +318,7 @@
   .cnt-tbl td.rh{background:#f8fafc;font-weight:700;width:54px;padding:6px 2px;}
   .cnt-tbl input{border:none;text-align:center;padding:9px 2px;width:100%;font-size:13px;}
   .pm-grade{font-weight:800;font-size:13px;color:#fff;padding:6px 10px;border-radius:6px;margin:8px 0 7px;}
-  .pm-grade.c{background:#0ea5e9;} .pm-grade.b{background:#8b5cf6;} .pm-grade.a{background:#f59e0b;}
+  .pm-grade.g1{background:#0ea5e9;} .pm-grade.g2{background:#6366f1;} .pm-grade.g3{background:#8b5cf6;} .pm-grade.g4{background:#0d9488;} .pm-grade.g5{background:#f59e0b;}
   .pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
   .pm-item{display:flex;align-items:center;gap:7px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12.5px;cursor:pointer;background:#fafbfc;}
   .pm-item input{width:16px;height:16px;flex-shrink:0;} .pm-item.on{background:#f0fdf4;border-color:#16a34a;color:#166534;font-weight:600;}
@@ -2462,9 +2462,11 @@ async function rbCancelSubmit(){
 <script>
 // ===== 오버홀 체크리스트 =====
 const CK_PM = {
-  'C급 오버홀': ['ADF 급지롤러 PM','급지롤러 PM','레지스트리 롤러 PM','광학부 PM','내부 PM','로스/LPH PM','팩스 테스트','ADF 복사 테스트(양면)','출력 테스트(양면) 모든 트레이','스캔 주소록 초기화(필수)','샘플/리포트 첨부','드럼수명 정지'],
-  'B급 오버홀': ['정착기 PM','전사벨트 분해 PM','전사벨트 브레이드 PM','현상기 PM','로스 분해 PM','디스펜서/리저브 PM'],
-  'A급 오버홀': ['올분해 오버홀','커버세척','카운터 초기화']
+  '오버홀1': ['ADF 급지롤러 PM','급지롤러 PM','레지스트리 롤러 PM','광학부 PM','내부 PM','로스 / LPH PM','ADF 복사 테스트(양면)','출력 테스트(양면) 모든 트레이','스캔 주소록 초기화(필수)','팩스 테스트','샘플 / 리포트 첨부','드럼 수명정지'],
+  '오버홀2': ['정착기 PM','전사벨트 분해 PM','전사벨트 브레이드 PM'],
+  '오버홀3': ['현상기 PM','로스 분해 PM','디스펜서 / 리저브 PM'],
+  '오버홀4': ['커버탈거 내부 에어PM'],
+  '오버홀5': ['올분해 오버홀','커버세척','카운터 초기화']
 };
 let CK_USE = '현장용';
 (function(){
@@ -2473,7 +2475,7 @@ let CK_USE = '현장용';
   if (box) {
     var h = '';
     Object.keys(CK_PM).forEach(function(g){
-      var cls = g[0]==='C'?'c':(g[0]==='B'?'b':'a');
+      var cls = 'g'+((g.replace(/[^0-9]/g,''))||'1');
       h += '<div class="pm-grade '+cls+'">'+g+'</div><div class="pm-grid">';
       CK_PM[g].forEach(function(it){
         h += '<label class="pm-item"><input type="checkbox" data-pm="'+it+'" onchange="this.closest(\'.pm-item\').classList.toggle(\'on\',this.checked)">'+it+'</label>';
@@ -2554,9 +2556,11 @@ function buildCkSheet(S){
    +'<tr><td class="l">소요시간</td><td>'+ckEsc(S.time)+'</td><td class="l">완료일</td><td>'+ckEsc(S.date)+'</td></tr>'
    +'<tr><td class="l">증상</td><td colspan="5" style="white-space:pre-wrap;height:80px;text-align:left;vertical-align:top">'+ckEsc(S.symptom)+'</td></tr>'
    +'<tr><td class="l">처리내용</td><td colspan="5" style="white-space:pre-wrap;height:105px;text-align:left;vertical-align:top">'+ckEsc(S.work)+'</td></tr></table>'
-   +'<div class="sectt">C급 오버홀</div><table class="cf">'+ckRows3('C급 오버홀',S.pm)+'</table>'
-   +'<div class="sectt">B급 오버홀</div><table class="cf">'+ckRows3('B급 오버홀',S.pm)+'</table>'
-   +'<div class="sectt">A급 오버홀</div><table class="cf">'+ckRows3('A급 오버홀',S.pm)+'</table>'
+   +'<div class="sectt">오버홀1</div><table class="cf">'+ckRows3('오버홀1',S.pm)+'</table>'
+   +'<div class="sectt">오버홀2</div><table class="cf">'+ckRows3('오버홀2',S.pm)+'</table>'
+   +'<div class="sectt">오버홀3</div><table class="cf">'+ckRows3('오버홀3',S.pm)+'</table>'
+   +'<div class="sectt">오버홀4</div><table class="cf">'+ckRows3('오버홀4',S.pm)+'</table>'
+   +'<div class="sectt">오버홀5</div><table class="cf">'+ckRows3('오버홀5',S.pm)+'</table>'
    +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(tn.bk)+'</td><td>C '+ckEsc(tn.c)+'</td><td>M '+ckEsc(tn.m)+'</td><td>Y '+ckEsc(tn.y)+'</td><td class="l">폐통 '+ckEsc(tn.w)+'</td></tr>'
    +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(S.etc)+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
