@@ -1976,11 +1976,7 @@ function validate(d) {
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
   if (!ckSymCats().length) { errors.push({ field: 'ck-symptom-cat', msg: '증상 분류를 1개 이상 선택하세요' }); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.add('cat-err'); }
-  // 사진: 새 저장 시 필수 / 수정 모드에서는 선택 (없으면 기존 사진 유지)
-  if (!editingRow) {
-    var anyPhoto = Object.keys(photoData).some(function(s){ return photoData[s]; });
-    if (!anyPhoto) errors.push({ field: 'slot-front-cover', msg: '사진을 1장 이상 첨부하세요' });
-  }
+  // 사진: 4컷 미만이어도 막지 않음 → showPreview에서 경고만(진행 가능). 이력엔 빨간 표시.
   return errors;
 }
 
@@ -2014,6 +2010,14 @@ function showPreview() {
     if (firstEl) firstEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     showToast(errors[0].msg, 'error');
     return;
+  }
+
+  // 증빙 사진 4컷 미만 경고 (막지 않음 — 진행 가능, 이력에 빨간 표시됨)
+  if (!editingRow) {
+    var _pc = Object.keys(photoData).filter(function(s){ return photoData[s]; }).length;
+    if (_pc < 4) {
+      if (!confirm('⚠️ 증빙 사진이 ' + _pc + '컷입니다 (권장 4컷).\n이대로 저장할까요?\n※ 완료 이력에 빨간색 경고로 표시됩니다.')) return;
+    }
   }
 
   const auto = computeAutoFields(d);
@@ -2639,9 +2643,13 @@ function openRbSheet(rec){
     box.innerHTML=arr.slice(0,100).map(function(r){
       var idx=(listCache||[]).indexOf(r);
       var sn=r.serial||'';
+      var pc=(typeof r.photoCount==='number')?r.photoCount:null;
+      var pcHtml = (pc===null)?'' : (pc>=4
+        ? '<span style="color:#16a34a;font-weight:700">📷 사진 '+pc+'컷</span>'
+        : '<span style="color:#e53e3e;font-weight:800">⚠️ 사진 '+pc+'컷 (4컷 미만!)</span>');
       return '<div class="lk-card"><div class="lk-top"><div style="min-width:0"><div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
         +'<div class="lk-sn">'+esc(r.serial||r.asset_no||'')+'</div>'
-        +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
+        +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+(pcHtml?'<br>'+pcHtml:'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
         +'<div style="display:flex;flex-direction:column;gap:6px">'
         +(sn?'<button type="button" class="lk-photo" data-sn="'+esc(sn)+'" style="border:none;border-radius:8px;background:#2b6cb0;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap">📷 사진</button>':'')
         +'<button type="button" class="lk-print" data-idx="'+idx+'">🖨 재출력</button>'
@@ -2776,7 +2784,7 @@ async function saveChecklist(d, row){
     counterIn: { bk:ckVal('ck-ci-bk'), c:ckVal('ck-ci-c'), bc:ckVal('ck-ci-bc'), sum:ckVal('ck-ci-sum') },
     counterOut: { bk:ckVal('ck-co-bk'), c:ckVal('ck-co-c'), bc:ckVal('ck-co-bc'), sum:ckVal('ck-co-sum') },
     toner: { bk:ckVal('ck-t-bk'), c:ckVal('ck-t-c'), m:ckVal('ck-t-m'), y:ckVal('ck-t-y'), waste:ckVal('ck-t-w') },
-    etc: ckVal('ck-etc'), createdAt: new Date().toISOString()
+    etc: ckVal('ck-etc'), photoCount: Object.keys(photoData).filter(function(s){ return photoData[s]; }).length, createdAt: new Date().toISOString()
   };
   var list = [];
   try { var r = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value', {headers:RB_SUPA_H}); var j = await r.json(); list = (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; } catch(e){}
