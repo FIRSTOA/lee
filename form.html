@@ -344,6 +344,17 @@
   #ck-overlay .ck-hint{text-align:center;font-size:12px;color:#64748b;padding:6px 8px;background:#fff;border-bottom:1px solid #eef1f5;}
   body.ck-open .footer-bar{display:none!important;}
   body.ck-open{overflow:hidden;}
+  /* 파트장 서명 패드 */
+  #sign-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;align-items:center;justify-content:center;padding:16px;}
+  #sign-modal.show{display:flex;}
+  #sign-modal .sign-box{background:#fff;border-radius:12px;padding:14px;width:100%;max-width:440px;}
+  #sign-modal .sign-title{font-weight:800;font-size:15px;margin-bottom:8px;}
+  #sign-modal #sign-canvas{width:100%;height:210px;border:2px dashed #cbd5e0;border-radius:8px;background:#fff;touch-action:none;display:block;}
+  #sign-modal .sign-btns{display:flex;gap:8px;margin-top:10px;}
+  #sign-modal .sign-btns button{flex:1;padding:12px;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;}
+  #sign-modal #sign-clear{background:#edf1f5;color:#475569;}
+  #sign-modal #sign-cancel{background:#64748b;color:#fff;}
+  #sign-modal #sign-ok{background:#2b6cb0;color:#fff;}
   /* 조회 / 재출력 모달 */
   #lookup-overlay{display:none;position:fixed;inset:0;background:#eef2f7;z-index:99000;overflow:hidden;flex-direction:column;}
   #lookup-overlay.show{display:flex;}
@@ -818,6 +829,17 @@
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
 </div>
 <img id="ck-print-img" alt="">
+<div id="sign-modal">
+  <div class="sign-box">
+    <div class="sign-title">✍ 파트장 서명</div>
+    <canvas id="sign-canvas"></canvas>
+    <div class="sign-btns">
+      <button type="button" id="sign-clear">지우기</button>
+      <button type="button" id="sign-cancel">취소</button>
+      <button type="button" id="sign-ok">서명 완료</button>
+    </div>
+  </div>
+</div>
 <div id="lookup-overlay">
   <div class="lk-bar">
     <div class="lk-tabs">
@@ -2528,8 +2550,10 @@ function ckRecData(rec){
     symptom:rec.symptom, work:rec.work, etc:rec.etc, pm:rec.pm||{}
   };
 }
+var ckSignPart='';
+function ckSignCell(h){ return '<td class="l" style="width:70px">파트장</td><td id="ck-sign-pl" style="'+h+';cursor:pointer">'+(ckSignPart?'<img src="'+ckSignPart+'" style="max-height:42px;max-width:130px">':'<span style="color:#bbb;font-size:11px">탭하여 서명</span>')+'</td>'; }
 function buildCkSheet(S){
-  if(!S) S=ckCurData();
+  if(!S) S=ckCurData(); ckSignPart='';
   function cc(lab,v){ return '<td><span class="cl">'+lab+'</span><span class="cv">'+ckEsc(v||'')+'</span></td>'; }
   var ci=S.ci||{}, co=S.co||{}, tn=S.toner||{};
   var ctr='<table class="ctr">'
@@ -2543,7 +2567,7 @@ function buildCkSheet(S){
    +'<table class="cf">'
    +'<tr>'
    +'<td class="l" style="width:70px">작성자</td><td style="height:48px;vertical-align:middle;width:135px">'+ckEsc(S.person)+'</td>'
-   +'<td class="l" style="width:70px">파트장</td><td style="height:48px;vertical-align:middle;width:135px"></td>'
+   +ckSignCell('height:48px;vertical-align:middle;width:135px')
    +'<td class="l" style="width:88px">오버홀 난이도</td><td style="width:60px">'+ckEsc(S.oh)+'</td>'
    +'<td class="l" style="width:80px">수리 난이도</td><td style="width:60px">'+ckEsc(S.rp)+'</td>'
    +'</tr><tr>'
@@ -2564,6 +2588,7 @@ function buildCkSheet(S){
    +'<table class="cf"><tr><td class="l">토너잔량</td><td>BK '+ckEsc(tn.bk)+'</td><td>C '+ckEsc(tn.c)+'</td><td>M '+ckEsc(tn.m)+'</td><td>Y '+ckEsc(tn.y)+'</td><td class="l">폐통 '+ckEsc(tn.w)+'</td></tr>'
    +'<tr><td class="l">기타사항</td><td colspan="5" style="white-space:pre-wrap;height:130px;text-align:left;vertical-align:top">'+ckEsc(S.etc)+'</td></tr></table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
+  var _pl=document.getElementById('ck-sign-pl'); if(_pl) _pl.onclick=function(){ if(window.openSignPad) openSignPad(); };
 }
 // 저장된 기록으로 리스트 보기 열기 (재출력)
 function openCkFromRec(rec){
@@ -2577,13 +2602,14 @@ function rbPartsFmt(rec){
 }
 function buildRbSheet(rec){
   function v(x){ return ckEsc(x==null?'':x); }
+  ckSignPart='';
   var cnt=0; try{ var key=(rec.serial||rec.asset_no||''); if(key) cnt=RB_LIST.filter(function(z){ return (z.serial||z.asset_no||'')===key; }).length; }catch(e){}
   var urg = rec.urgent==='긴급';
   var bad = rec.cause==='오버홀 불량';
   var html='<h2>오버홀 재수리 리스트</h2>'
    +'<table class="cf"><tr>'
    +'<td class="l" style="width:70px">처리자</td><td style="height:46px;width:135px">'+v(rec.completedBy||rec.handler)+'</td>'
-   +'<td class="l" style="width:70px">파트장</td><td style="height:46px;width:135px"></td>'
+   +ckSignCell('height:46px;vertical-align:middle;width:135px')
    +'<td class="l">긴급도</td><td'+(urg?' style="color:#c00;font-weight:800"':'')+'>'+v(rec.urgent)+'</td>'
    +'</tr></table>'
    +'<table class="cf">'
@@ -2600,12 +2626,41 @@ function buildRbSheet(rec){
    +'<tr><td class="l">기타사항</td><td colspan="5" style="text-align:left;white-space:pre-wrap;height:80px;vertical-align:top"></td></tr>'
    +'</table>';
   document.getElementById('ck-print-sheet').innerHTML=html;
+  var _pl=document.getElementById('ck-sign-pl'); if(_pl) _pl.onclick=function(){ if(window.openSignPad) openSignPad(); };
 }
 function openRbSheet(rec){
   buildRbSheet(rec);
   var ov=document.getElementById('ck-overlay');
   if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
 }
+// === 파트장 서명 패드 ===
+(function(){
+  var modal=document.getElementById('sign-modal'); if(!modal) return;
+  var c=document.getElementById('sign-canvas'); var ctx=null, drawing=false, last=null, signed=false;
+  function setup(){
+    var rect=c.getBoundingClientRect(); var dpr=window.devicePixelRatio||1;
+    c.width=Math.round(rect.width*dpr); c.height=Math.round(rect.height*dpr);
+    ctx=c.getContext('2d'); ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr);
+    ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#111';
+    ctx.clearRect(0,0,c.width,c.height); signed=false;
+  }
+  function pos(e){ var r=c.getBoundingClientRect(); var t=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
+  function start(e){ drawing=true; signed=true; last=pos(e); e.preventDefault(); }
+  function move(e){ if(!drawing||!ctx) return; var p=pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; e.preventDefault(); }
+  function end(){ drawing=false; }
+  c.addEventListener('mousedown',start); c.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false}); c.addEventListener('touchmove',move,{passive:false}); c.addEventListener('touchend',end);
+  window.openSignPad=function(){ modal.classList.add('show'); requestAnimationFrame(setup); };
+  document.getElementById('sign-clear').onclick=function(){ if(ctx) ctx.clearRect(0,0,c.width,c.height); signed=false; };
+  document.getElementById('sign-cancel').onclick=function(){ modal.classList.remove('show'); };
+  document.getElementById('sign-ok').onclick=function(){
+    if(!signed){ alert('서명을 입력하세요'); return; }
+    ckSignPart=c.toDataURL('image/png');
+    var cell=document.getElementById('ck-sign-pl');
+    if(cell) cell.innerHTML='<img src="'+ckSignPart+'" style="max-height:42px;max-width:130px">';
+    modal.classList.remove('show');
+  };
+})();
 // === 조회 / 재출력 모달 ===
 (function(){
   var ov=document.getElementById('lookup-overlay'); if(!ov) return;
