@@ -304,6 +304,7 @@
   .sym-cat .sc { border:1.5px solid #e2e8f0; border-radius:20px; padding:6px 13px; font-size:13px; cursor:pointer; background:#fff; color:#475569; user-select:none; }
   .sym-cat .sc.on { background:#2b6cb0; color:#fff; border-color:#2b6cb0; font-weight:700; }
   .sym-cat.cat-err { outline:2px solid #e53e3e; outline-offset:3px; border-radius:8px; }
+  .sym-cat .sc-none.on { background:#64748b; border-color:#64748b; }
   .warn-field { background: #fffafa !important; border-color: #f6c2c2 !important; }
   .warn-field:focus { border-color: #eda3a3 !important; box-shadow: 0 0 0 2px rgba(237,163,163,0.18) !important; }
   .warn-note { font-size: 11.5px; color: #d98a8a; margin-top: 4px; font-weight: 600; }
@@ -669,8 +670,14 @@
       <div class="warn-note">⚠️ 자동입력될 수 있어요 — 실제 입고처 꼭 확인!!</div>
     </div>
     <div class="field">
-      <label>입고 사유</label>
-      <input type="text" id="ck-reason" placeholder="예: 현상불량, 용지걸림 등">
+      <label>입고 사유 <span class="req">*</span></label>
+      <div class="sym-cat" id="ck-reason-chips">
+        <span class="sc" onclick="ckReasonPick(this)">계약종료</span>
+        <span class="sc" onclick="ckReasonPick(this)">기기교체</span>
+        <span class="sc" onclick="ckReasonPick(this)">기기고장</span>
+        <span class="sc" onclick="ckReasonPick(this)">기타</span>
+      </div>
+      <input type="hidden" id="ck-reason">
     </div>
     <div class="field">
       <label>모델명</label>
@@ -726,13 +733,16 @@
 
   <div class="form-card">
     <div class="section-title">증상 · 처리내용</div>
-    <div class="field"><label>증상 분류 <span class="req">*</span> <span style="font-weight:400;color:#718096">(다중 선택)</span></label>
-      <div class="sym-cat" id="ck-symptom-cat">
-        <span class="sc" onclick="ckSymCat(this)">화상불량</span>
-        <span class="sc" onclick="ckSymCat(this)">용지걸림</span>
-        <span class="sc" onclick="ckSymCat(this)">소음</span>
-        <span class="sc" onclick="ckSymCat(this)">에러</span>
-        <span class="sc" onclick="ckSymCat(this)">파손</span>
+    <div class="field">
+      <div id="ck-symptom-cat-wrap" style="display:none">
+        <label>증상 분류 <span class="req">*</span> <span style="font-weight:400;color:#718096">(기기고장 — 다중 선택)</span></label>
+        <div class="sym-cat" id="ck-symptom-cat">
+          <span class="sc" onclick="ckSymCat(this)">화상불량</span>
+          <span class="sc" onclick="ckSymCat(this)">용지걸림</span>
+          <span class="sc" onclick="ckSymCat(this)">소음</span>
+          <span class="sc" onclick="ckSymCat(this)">에러</span>
+          <span class="sc" onclick="ckSymCat(this)">파손</span>
+        </div>
       </div>
       <label style="margin-top:4px">증상 / 에러 상세</label>
       <textarea id="ck-symptom" placeholder="예: 컬러 현상 불량(흐림)"></textarea></div>
@@ -1997,7 +2007,8 @@ function validate(d) {
   if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요 (시리얼 없는 기기는 자산번호 필수)' });
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
-  if (!ckSymCats().length) { errors.push({ field: 'ck-symptom-cat', msg: '증상 분류를 1개 이상 선택하세요' }); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.add('cat-err'); }
+  if (!ckVal('ck-reason')) { errors.push({ field: 'ck-reason-chips', msg: '입고 사유를 선택하세요' }); var rw=document.getElementById('ck-reason-chips'); if(rw) rw.classList.add('cat-err'); }
+  if (ckVal('ck-reason')==='기기고장' && !ckSymCats().length) { errors.push({ field: 'ck-symptom-cat', msg: '증상 분류를 1개 이상 선택하세요' }); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.add('cat-err'); }
   // 사진: 4컷 미만이어도 막지 않음 → showPreview에서 경고만(진행 가능). 이력엔 빨간 표시.
   return errors;
 }
@@ -2511,6 +2522,19 @@ let CK_USE = '현장용';
   if (uc) uc.querySelectorAll('.uc').forEach(function(c){ c.onclick=function(){ uc.querySelectorAll('.uc').forEach(function(x){x.classList.remove('on');}); c.classList.add('on'); CK_USE=c.dataset.use; }; });
 })();
 function ckVal(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+// 입고사유 선택 (단일) — 기기고장이면 증상 분류 표시
+function ckReasonPick(el){
+  var g=document.getElementById('ck-reason-chips');
+  g.querySelectorAll('.sc').forEach(function(x){ x.classList.remove('on'); });
+  el.classList.add('on');
+  var val=el.textContent.trim();
+  document.getElementById('ck-reason').value=val;
+  g.classList.remove('cat-err');
+  var wrap=document.getElementById('ck-symptom-cat-wrap');
+  var isBreak = (val==='기기고장');
+  if(wrap) wrap.style.display = isBreak ? 'block' : 'none';
+  if(!isBreak){ document.querySelectorAll('#ck-symptom-cat .sc').forEach(function(x){ x.classList.remove('on'); }); }
+}
 // 증상 분류 칩 (필수, 다중선택) — 텍스트엔 반영 안 하고 별도 저장
 function ckSymCat(el){ el.classList.toggle('on'); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.remove('cat-err'); }
 function ckSymCats(){ return [].slice.call(document.querySelectorAll('#ck-symptom-cat .sc.on')).map(function(x){return x.textContent.trim();}); }
@@ -2742,6 +2766,7 @@ function openRbSheet(rec){
     var terms=q?expandTerms(q):[];
     var cats=[].slice.call(document.querySelectorAll('#lk-catfilter .lc.on')).map(function(x){return x.dataset.cat;});
     var arr=(manualCache||[]).filter(function(r){
+      if(Array.isArray(r.cat) && r.cat.indexOf('증상없음')>=0) return false;
       var txtOk=true;
       if(q){ var txt=((r.symptom||'')+' '+(r.work||'')+' '+(r.model||'')+' '+(r.person||'')).toLowerCase(); txtOk=terms.some(function(t){ return t && txt.indexOf(t)>=0; }); }
       var catOk=true;
@@ -2851,7 +2876,7 @@ async function saveChecklist(d, row){
   await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'overhaul_checklist',value:list})});
   // 기술 매뉴얼: 담당자·증상·처리내용만 따로 저장(증상 조회용)
   try {
-    if (rec.cat.length || rec.symptom || rec.work) {
+    if (rec.reason === '기기고장' && (rec.cat.length || rec.symptom || rec.work)) {
       var ml = [];
       var mr = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value', {headers:RB_SUPA_H});
       var mj = await mr.json(); ml = (mj&&mj[0]&&Array.isArray(mj[0].value))?mj[0].value:[];
