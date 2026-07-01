@@ -66,6 +66,9 @@ function daysSinceKst(rd){ const m=/(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(rd|
 function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=>d+=c); req.on('end',()=>resolve(d)); req.on('error',()=>resolve('')); }); }
 async function loadList(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_list&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveList(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:list})}); }
+async function loadLog(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_notify_log&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
+async function saveLog(log){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_notify_log',value:log})}); }
+function kstStamp(){ const k=new Date(Date.now()+9*3600*1000); return k.getUTCFullYear()+'-'+String(k.getUTCMonth()+1).padStart(2,'0')+'-'+String(k.getUTCDate()).padStart(2,'0')+' '+String(k.getUTCHours()).padStart(2,'0')+':'+String(k.getUTCMinutes()).padStart(2,'0'); }
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -76,15 +79,20 @@ module.exports = async (req, res) => {
       let body = {}; const raw = await readBody(req); try { body = JSON.parse(raw); } catch (e) {}
       const acks = (body && body.acks) || [];
       const list = await loadList();
-      let changed = 0;
+      let changed = 0; const logAdd = [];
       acks.forEach(a => {
         const rec = list.find(x => String(x.id) === String(a.id)); if (!rec) return;
-        if (a.type === 'req') { rec.notified = true; changed++; }
-        else if (a.type === 'done') { rec.notifiedDone = true; changed++; }
-        else if (a.type === 'cancel') { rec.notifiedCancel = true; changed++; }
-        else if (a.type === 'remind') { rec.lastReminded = kstToday(); changed++; }
+        let did = false;
+        if (a.type === 'req') { rec.notified = true; did = true; }
+        else if (a.type === 'done') { rec.notifiedDone = true; did = true; }
+        else if (a.type === 'cancel') { rec.notifiedCancel = true; did = true; }
+        else if (a.type === 'remind') { rec.lastReminded = kstToday(); did = true; }
+        if (did) { changed++; logAdd.push({ at: kstStamp(), type: a.type, model: rec.model||'', serial: rec.serial||rec.asset_no||'', handler: rec.handler||'', requester: rec.requester||'' }); }
       });
-      if (changed) await saveList(list);
+      if (changed) {
+        await saveList(list);
+        try { let log = await loadLog(); log = logAdd.concat(log); if (log.length > 300) log = log.slice(0, 300); await saveLog(log); } catch (e) {}
+      }
       res.status(200).json({ ok: true, acked: changed });
       return;
     }

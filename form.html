@@ -440,6 +440,7 @@
       <button type="button" id="rbsub-done" class="rb-subbtn" onclick="setRbSub('done')">⏳ 재수리 대기</button>
       <button type="button" id="rbsub-complete" class="rb-subbtn" onclick="setRbSub('complete')">✅ 완료 내역</button>
       <button type="button" id="rbsub-cancel" class="rb-subbtn" onclick="setRbSub('cancel')">🗑 취소</button>
+      <button type="button" id="rbsub-log" class="rb-subbtn" onclick="setRbSub('log')">🔔 알림로그</button>
     </div>
     <div id="rb-mode-new">
     <div class="form-card">
@@ -593,6 +594,14 @@
         <div class="section-title" style="color:#16a34a">✅ 재수리 완료 내역</div>
         <p style="font-size:12.5px;color:#64748b;margin:-4px 0 10px">완료 처리된 재수리 기록입니다 (보관용).</p>
         <div class="rbreclist" id="rbf-list"><div class="rbempty">불러오는 중…</div></div>
+      </div>
+    </div>
+
+    <div id="rb-mode-log" style="display:none">
+      <div class="form-card">
+        <div class="section-title" style="color:#2b6cb0">🔔 알림 발송 로그</div>
+        <p style="font-size:12.5px;color:#64748b;margin:-4px 0 10px">봇이 채팅방에 실제로 보낸 알림 기록입니다 (최신순).</p>
+        <div class="rbreclist" id="rblog-list" style="max-height:420px"><div class="rbempty">불러오는 중…</div></div>
       </div>
     </div>
 
@@ -2347,13 +2356,15 @@ function setRbSub(s){
   document.getElementById('rb-mode-done').style.display = s==='done'?'block':'none';
   document.getElementById('rb-mode-cancel').style.display = s==='cancel'?'block':'none';
   document.getElementById('rb-mode-complete').style.display = s==='complete'?'block':'none';
+  document.getElementById('rb-mode-log').style.display = s==='log'?'block':'none';
   document.getElementById('rbsub-new').classList.toggle('active', s==='new');
   document.getElementById('rbsub-done').classList.toggle('active', s==='done');
   document.getElementById('rbsub-complete').classList.toggle('active', s==='complete');
   document.getElementById('rbsub-cancel').classList.toggle('active', s==='cancel');
+  document.getElementById('rbsub-log').classList.toggle('active', s==='log');
   const btn=document.getElementById('btn-rb-submit');
   const foot=document.getElementById('rebuild-footer');
-  if(s==='complete'){ if(foot) foot.style.display='none'; }
+  if(s==='complete' || s==='log'){ if(foot) foot.style.display='none'; }
   else {
     if(foot) foot.style.display='flex';
     if(s==='cancel'){ btn.textContent='재수리 요청 취소'; btn.style.background='#e53e3e'; }
@@ -2363,6 +2374,25 @@ function setRbSub(s){
   if(s==='done') rbdInit();
   if(s==='cancel') rbcInit();
   if(s==='complete') rbfInit();
+  if(s==='log') rblogInit();
+}
+async function rblogInit(){
+  const box=document.getElementById('rblog-list');
+  box.innerHTML='<div class="rbempty">불러오는 중…</div>';
+  let log=[];
+  try{ const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.rebuild_notify_log&select=value',{headers:RB_SUPA_H}); const j=await r.json(); log=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }catch(e){}
+  if(!log.length){ box.innerHTML='<div class="rbempty">발송된 알림 기록이 없습니다</div>'; return; }
+  const TL={req:['요청','#c05621','#fff7ed'],done:['완료','#16a34a','#f0fdf4'],cancel:['취소','#e53e3e','#fef2f2'],remind:['독촉','#d97706','#fffbeb']};
+  box.innerHTML=log.slice(0,200).map(function(e){
+    var t=TL[e.type]||[e.type,'#64748b','#f1f5f9'];
+    return '<div class="rbit" style="cursor:default;display:block">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">'
+      +'<span style="font-weight:700;font-size:12.5px">'+rbEsc(e.model||'-')+'</span>'
+      +'<span style="background:'+t[2]+';color:'+t[1]+';font-size:11px;font-weight:800;border-radius:6px;padding:1px 8px">'+t[0]+' 발송</span></div>'
+      +'<div class="s" style="margin:2px 0">'+rbEsc(e.serial||'')+'</div>'
+      +'<div style="font-size:11.5px;color:#94a3b8">🕒 '+rbEsc(e.at||'')+(e.handler?' · 담당 '+rbEsc(e.handler):'')+(e.requester?' · 요청 '+rbEsc(e.requester):'')+'</div>'
+      +'</div>';
+  }).join('');
 }
 async function rbfInit(){
   const box=document.getElementById('rbf-list');
@@ -2397,10 +2427,14 @@ async function rbdInit(){
   const items=RB_LIST.filter(x=>(x.status||'요청')!=='완료' && x.status!=='취소').sort((a,b)=>(b.reqDate||'').localeCompare(a.reqDate||''));
   if(!items.length){ box.innerHTML='<div class="rbempty">처리할 재수리 요청이 없습니다</div>'; }
   else {
-    box.innerHTML=items.map((x,i)=>'<div class="rbit" data-i="'+i+'" style="align-items:center;gap:8px"><div style="flex:1;min-width:0">'
+    box.innerHTML=items.map((x,i)=>{
+      var sent = x.notified===true;
+      var alertHtml = '<span style="font-size:11.5px;font-weight:800;color:'+(sent?'#16a34a':'#e53e3e')+'">'+(sent?'🟢 알림 발송됨':'🔴 알림 미발송(대기)')+'</span>';
+      return '<div class="rbit" data-i="'+i+'" style="align-items:center;gap:8px"><div style="flex:1;min-width:0">'
       +'<div>'+rbEsc(rbShort(x.reqDate))+' · '+rbEsc(x.model||'')+' · '+rbEsc((x.parts||[]).map(q=>String(q).split(":")[0]).join("·"))+(x.urgent==='긴급'?' 🔴':'')+' · 담당 '+rbEsc(x.handler||'')+'</div>'
-      +'<div class="s">'+rbEsc(x.serial||x.asset_no||'')+'</div></div>'
-      +'<button type="button" class="rbr-btn" data-id="'+rbEsc(String(x.id))+'" style="background:#2b6cb0;color:#fff;padding:8px 11px;font-size:12px;border:none;border-radius:7px;font-weight:700;cursor:pointer;white-space:nowrap">🔔 재발송</button></div>').join('');
+      +'<div class="s">'+rbEsc(x.serial||x.asset_no||'')+'</div>'
+      +'<div style="margin-top:2px">'+alertHtml+(x.lastReminded?' <span style="font-size:11px;color:#94a3b8">· 독촉 '+rbEsc(x.lastReminded)+'</span>':'')+'</div></div>'
+      +'<button type="button" class="rbr-btn" data-id="'+rbEsc(String(x.id))+'" style="background:#2b6cb0;color:#fff;padding:8px 11px;font-size:12px;border:none;border-radius:7px;font-weight:700;cursor:pointer;white-space:nowrap">🔔 재발송</button></div>'; }).join('');
     box.querySelectorAll('.rbit').forEach(el=>{ el.onclick=()=>rbdPick(items[+el.dataset.i]); });
     box.querySelectorAll('.rbr-btn').forEach(b=>{ b.onclick=(e)=>{ e.stopPropagation(); rbrResend(b.dataset.id, b); }; });
   }
@@ -2536,8 +2570,9 @@ function ckReasonPick(el){
   if(!isBreak){ document.querySelectorAll('#ck-symptom-cat .sc').forEach(function(x){ x.classList.remove('on'); }); }
 }
 // 증상 분류 칩 (필수, 다중선택) — 텍스트엔 반영 안 하고 별도 저장
-function ckSymCat(el){ el.classList.toggle('on'); var w=document.getElementById('ck-symptom-cat'); if(w) w.classList.remove('cat-err'); }
-function ckSymCats(){ return [].slice.call(document.querySelectorAll('#ck-symptom-cat .sc.on')).map(function(x){return x.textContent.trim();}); }
+function ckSymCat(el){ el.classList.toggle('on'); var w=el.closest('.sym-cat'); if(w) w.classList.remove('cat-err'); }
+function symCatsOf(id){ return [].slice.call(document.querySelectorAll('#'+id+' .sc.on')).map(function(x){return x.textContent.trim();}); }
+function ckSymCats(){ return symCatsOf('ck-symptom-cat'); }
 function ckEsc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function ckGradeNum(sel){ var el=document.querySelector(sel); if(!el)return ''; var m=/(\d+)/.exec(el.dataset.overhaul||el.dataset.repair||el.textContent||''); return m?m[1]:''; }
 function ckRows3(g, on){
