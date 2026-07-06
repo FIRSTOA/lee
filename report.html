@@ -117,7 +117,10 @@ function build(data){
   const quotaOf = (p)=>{ const c=quotaConfig.persons[p]; if(c==null) return quotaConfig.default; if(typeof c==='number') return c; return (c.target!=null?c.target:quotaConfig.default); };
   const excluded = new Set(quotaConfig.excluded||[]);
   const now = new Date();
-  const curYear = now.getFullYear(), curMonth = now.getMonth()+1;
+  let curYear = now.getFullYear(), curMonth = now.getMonth()+1;
+  // ym=YYYY-MM 지정 시 그 달로 (과거 주간/월 보고)
+  const YM = new URLSearchParams(location.search).get('ym');
+  if(YM){ const mm=/^(\d{4})-(\d{1,2})$/.exec(YM); if(mm){ curYear=+mm[1]; curMonth=+mm[2]; } }
 
   let periodRows, colList, colOf, headLabel, periodSub, isQuarter=false, targetWeeksCount, monthsList;
   if(TYPE==='quarter'){
@@ -129,7 +132,7 @@ function build(data){
     colOf = (r)=> r._month+'월';
     targetWeeksCount = new Set(periodRows.map(r=>r.주차별)).size;
     headLabel = curYear+'년 '+(Math.floor((curMonth-1)/3)+1)+'분기 ('+qStart+'~'+(qStart+2)+'월) 누계';
-    periodSub = headLabel+' · '+(now.getMonth()+1)+'/'+now.getDate()+' 기준';
+    periodSub = headLabel+(YM?'':' · '+(now.getMonth()+1)+'/'+now.getDate()+' 기준');
   } else {
     periodRows = rows.filter(r=>r._isOverhaul && r._year===curYear && r._month===curMonth);
     const wks=[...new Set(periodRows.map(r=>r.주차별))].sort(sortByWeek);
@@ -137,7 +140,7 @@ function build(data){
     colOf = (r)=> r.주차별;
     targetWeeksCount = wks.length;
     const dow=['일','월','화','수','목','금','토'][now.getDay()];
-    periodSub = curYear+'년 '+curMonth+'월 · '+(now.getMonth()+1)+'/'+now.getDate()+'('+dow+') 기준';
+    periodSub = curYear+'년 '+curMonth+'월'+(YM ? ' 월누계' : ' · '+(now.getMonth()+1)+'/'+now.getDate()+'('+dow+') 기준');
   }
 
   // 단위 = (담당자 x 기록부서)
