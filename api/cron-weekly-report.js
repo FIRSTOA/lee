@@ -23,11 +23,13 @@ module.exports = async (req, res) => {
     const force = req.query && req.query.force === '1';
     if (!force && k.getUTCDay() !== 5) { res.status(200).json({ ok: true, skipped: 'not Friday(KST)' }); return; }
 
+    const ym = req.query && req.query.ym ? String(req.query.ym) : '';
+    const qs = 'type=week' + (ym ? '&ym=' + encodeURIComponent(ym) : '');
     let sum = '';
-    try { const r = await fetch(BASE + '/api/summary?type=week'); sum = await r.text(); } catch (e) {}
-    const text = brief(sum) + '\n📋 자세히: ' + BASE + '/report.html?type=week';
+    try { const r = await fetch(BASE + '/api/summary?' + qs); sum = await r.text(); } catch (e) {}
+    const text = brief(sum) + '\n📋 자세히: ' + BASE + '/report.html?' + qs;
 
-    const today = k.getUTCFullYear() + '-' + (k.getUTCMonth()+1) + '-' + k.getUTCDate();
+    const today = (ym ? ('ym-' + ym + '-') : '') + k.getUTCFullYear() + '-' + (k.getUTCMonth()+1) + '-' + k.getUTCDate();
     const list = await loadQ();
     if (!force && list.some(x => x.day === today)) { res.status(200).json({ ok: true, skipped: 'already queued today' }); return; }
     list.push({ id: Date.now(), text, sent: false, day: today, createdAt: new Date().toISOString() });
