@@ -59,15 +59,18 @@ module.exports = async (req, res) => {
     // KST 기준 현재 년/월
     const kst = new Date(Date.now() + 9*3600*1000);
     const curY = kst.getUTCFullYear(), curM = kst.getUTCMonth()+1, curD = kst.getUTCDate();
+    // ym=YYYY-MM 지정 시 그 달로 (과거 주간/월 보고 재발송용)
+    let tgtY = curY, tgtM = curM; const ym = req.query && req.query.ym;
+    if (ym) { const mm = /^(\d{4})-(\d{1,2})$/.exec(String(ym)); if (mm) { tgtY = +mm[1]; tgtM = +mm[2]; } }
 
     let periodRows, label;
     if(type==='quarter'){
-      const qs = Math.floor((curM-1)/3)*3+1; const months=[qs,qs+1,qs+2];
-      periodRows = rows.filter(r=>r._ov && r._y===curY && months.includes(r._m));
-      label = curY+'년 '+(Math.floor((curM-1)/3)+1)+'분기('+qs+'~'+(qs+2)+'월)';
+      const qs = Math.floor((tgtM-1)/3)*3+1; const months=[qs,qs+1,qs+2];
+      periodRows = rows.filter(r=>r._ov && r._y===tgtY && months.includes(r._m));
+      label = tgtY+'년 '+(Math.floor((tgtM-1)/3)+1)+'분기('+qs+'~'+(qs+2)+'월)';
     } else {
-      periodRows = rows.filter(r=>r._ov && r._y===curY && r._m===curM);
-      label = curM+'/'+curD+' 주간';
+      periodRows = rows.filter(r=>r._ov && r._y===tgtY && r._m===tgtM);
+      label = ym ? (tgtM+'월 주간(월누계)') : (curM+'/'+curD+' 주간');
     }
     const targetWeeks = new Set(periodRows.map(r=>r._wk)).size || 1;
 
