@@ -409,7 +409,7 @@
 <div id="quotaModal" class="modal-overlay hidden">
   <div class="modal">
     <h2>정량 목표 설정 (<span id="quotaTotalCount">0</span>명)</h2>
-    <div class="sub">담당자별 주간 오버홀 목표를 설정합니다. 변경 후 저장하면 정량 목표 달성 현황표에 즉시 반영됩니다. 브라우저에 자동 저장되며 다음에 접속 시 그대로 유지됩니다.</div>
+    <div class="sub">담당자별 주간 오버홀 목표를 설정합니다. <b style="color:#2b6cb0">목표를 바꾸면 이번 달부터 적용되고, 과거 달은 변경 전 목표로 그대로 유지됩니다.</b> (예: 7월에 2→3 변경 시 6월까지는 2, 7월부터 3) 전원 공유 저장됩니다.</div>
     <div class="field-row">
       <label>기본 주간 목표 (등록 안 된 사람):</label>
       <input type="number" id="quotaDefaultInput" min="0" value="3">
@@ -484,6 +484,20 @@ function loadQuotaConfig() {
 function saveQuotaConfig(c) { localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(c)); }
 let quotaConfig = loadQuotaConfig();
 function quotaOf(person) { const p = quotaConfig.persons[person]; if (p == null) return quotaConfig.default; if (typeof p === 'number') return p; return p.target ?? quotaConfig.default; }
+// 효력 시작월(hist) 기반 — 각 달은 그 시점 유효 목표로 고정. 변경은 변경 월부터만 적용.
+function effectiveQuotaCfg(cfg, person, ym) {
+  const p = cfg.persons[person];
+  if (p == null) return cfg.default;
+  if (typeof p === 'number') return p;
+  const base = (p.target != null ? p.target : cfg.default);
+  const hist = Array.isArray(p.hist) ? p.hist.filter(h => h && h.from && h.q != null).slice().sort((a, b) => String(a.from).localeCompare(String(b.from))) : [];
+  if (!hist.length || !ym) return base;
+  let val = null;
+  for (let i = 0; i < hist.length; i++) { if (String(hist[i].from) <= ym) val = hist[i].q; }
+  return (val != null) ? val : hist[0].q;
+}
+function effectiveQuota(person, ym) { return effectiveQuotaCfg(quotaConfig, person, ym); }
+function ymNowKST() { const k = new Date(Date.now() + 9 * 3600 * 1000); return k.getUTCFullYear() + '-' + String(k.getUTCMonth() + 1).padStart(2, '0'); }
 // 오버홀 실적 환산 가중치 — 등급 정가중: 오버홀1=1, 2=2, 3=3, 4=4, 5=5 (그 외 오버홀C 등은 0)
 const OVERHAUL_WEIGHT = { '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
 function overhaulWeight(r) {
@@ -1089,6 +1103,11 @@ function render() {
   const quotaBase = applyQuotaFilters(RAW_DATA);
   const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
+  // 효력 시작월 적용: 각 주차의 월에 맞는 유효 목표 사용
+  const QYEAR = overhaulOnly.length ? (parseInt(overhaulOnly[0].년) || new Date().getFullYear()) : new Date().getFullYear();
+  const weekYM = (w) => { const m = /(\d+)월/.exec(w); return m ? (QYEAR + '-' + String(m[1]).padStart(2, '0')) : null; };
+  const eqOf = (person, w) => effectiveQuota(person, weekYM(w));
+  const targetOf = (person) => quotaWeeks.reduce((s, w) => s + eqOf(person, w), 0);
   const quotaExcluded = new Set(quotaConfig.excluded || []);
   const deptSel = filterState['부서명'];
   const deptSelected = deptSel && deptSel.size > 0;
@@ -1156,7 +1175,7 @@ function render() {
   unitList.forEach(u => {
     qDeptCount[u.dept] = (qDeptCount[u.dept] || 0) + 1;
     if (!qDeptTotals[u.dept]) qDeptTotals[u.dept] = { target: 0, total: 0 };
-    qDeptTotals[u.dept].target += quotaOf(u.person) * quotaWeeks.length;
+    qDeptTotals[u.dept].target += targetOf(u.person);
     qDeptTotals[u.dept].total += quotaWeeks.reduce((s,w) => s + (u.weeks[w] || 0), 0);
   });
 
@@ -1179,7 +1198,7 @@ function render() {
       let mvp = null; unitList.forEach(u => { const tot = unitTotal(u); if (tot > 0 && (!mvp || tot > mvp.tot)) mvp = { person: u.person, tot }; });
       let achieved = 0, missed = 0; const zeroThis = [];
       unitList.forEach(u => {
-        const q = quotaOf(u.person), target = q * quotaWeeks.length, tot = unitTotal(u);
+        const q = quotaOf(u.person), target = targetOf(u.person), tot = unitTotal(u);
         if (target > 0) { if (tot >= target) achieved++; else missed++; }
         if (q > 0 && (u.weeks[wkThis] || 0) === 0) zeroThis.push(u.person);
       });
@@ -1263,12 +1282,13 @@ function render() {
     const k = UKEY(u.person, u.dept);
     const cells = quotaWeeks.map(w => {
       const v = u.weeks[w] || 0;
-      const cls = q === 0 ? (v > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="color:#a0aec0"') : (v >= q ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
+      const wq = eqOf(u.person, w);
+      const cls = wq === 0 ? (v > 0 ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : 'style="color:#a0aec0"') : (v >= wq ? 'style="background:#c6f6d5;color:#22543d;font-weight:600"' : (v === 0 ? 'style="background:#fed7d7;color:#a0aec0"' : 'style="background:#fed7d7;color:#742a2a"'));
       const clickable = v > 0 ? ' qcell" data-key="' + encodeURIComponent(k) + '" data-person="' + encodeURIComponent(u.person) + '" data-dept="' + encodeURIComponent(u.dept) + '" data-week="' + encodeURIComponent(w) + '" title="클릭하면 상세 내역' : '';
       return '<td class="num' + clickable + '" ' + cls + '>' + v + '</td>';
     }).join('');
     const total = quotaWeeks.reduce((s,w) => s + (u.weeks[w] || 0), 0);
-    const target = q * quotaWeeks.length;
+    const target = targetOf(u.person);
     let wowCell = '';
     if (quotaWeeks.length >= 2) { const dw = (u.weeks[wkThis] || 0) - (u.weeks[wkPrev] || 0); const cls = dw > 0 ? 'wow-up' : dw < 0 ? 'wow-down' : 'wow-flat'; const arr = dw > 0 ? '▲' + dw : dw < 0 ? '▼' + Math.abs(dw) : '–'; wowCell = '<td class="num ' + cls + '">' + arr + '</td>'; }
     tr.innerHTML = '<td style="text-align:left">' + u.person + '</td><td class="num">' + q + '</td>' + cells + wowCell + '<td class="num">' + target + '</td><td class="num"><b>' + total + '</b></td>' + pctCellHtml(target, total);
@@ -1411,7 +1431,10 @@ function renderQuotaConfigTable(tmp) {
       inp.onchange = () => {
         const t = Number(inp.value) || 0;
         const ex = tmp.persons[name];
-        tmp.persons[name] = (typeof ex === 'object') ? { dept: ex.dept || '', target: t } : { dept: '', target: t };
+        const dept = (typeof ex === 'object') ? (ex.dept || '') : '';
+        const obj = { dept: dept, target: t };
+        if (typeof ex === 'object' && Array.isArray(ex.hist)) obj.hist = ex.hist;
+        tmp.persons[name] = obj;
       };
       tdQuota.appendChild(inp); tr.appendChild(tdQuota);
       const tdDept = document.createElement('td');
@@ -1479,6 +1502,21 @@ document.getElementById('saveQuotaBtn').onclick = async () => {
   const btn = document.getElementById('saveQuotaBtn');
   const tmp = quotaModal._tmp;
   tmp.default = Number(quotaDefaultInput.value) || 0;
+  // 효력 시작월 기록: 이번 달 유효값과 달라진 사람만 '이번 달부터' 이력 추가 (과거는 유지)
+  const CM = ymNowKST();
+  Object.keys(tmp.persons).forEach(nm => {
+    const np = tmp.persons[nm]; if (!np || typeof np !== 'object') return;
+    const newQ = (np.target != null ? np.target : tmp.default);
+    const oldEff = effectiveQuotaCfg(quotaConfig, nm, CM); // 기존 저장본 기준 이번 달 유효값
+    let hist = Array.isArray(np.hist) ? np.hist.slice() : [];
+    if (newQ !== oldEff) {
+      if (!hist.length) hist.push({ from: '2000-01', q: oldEff }); // 첫 변경: 이전 값을 기준선으로 고정
+      hist = hist.filter(h => h.from !== CM);
+      hist.push({ from: CM, q: newQ });
+      hist.sort((a, b) => String(a.from).localeCompare(String(b.from)));
+    }
+    if (hist.length) np.hist = hist;
+  });
   quotaConfig = tmp;
   saveQuotaConfig(quotaConfig); // 로컬 캐시 (즉시)
   const orig = btn.textContent; btn.disabled = true; btn.textContent = '저장 중...';
