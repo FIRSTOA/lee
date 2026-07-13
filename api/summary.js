@@ -55,6 +55,7 @@ module.exports = async (req, res) => {
     const resigned = new Set((resignRows||[]).map(x=>x.name));
     const excluded = new Set(quotaConfig.excluded||[]);
     const quotaOf = (p)=>{ const c=quotaConfig.persons[p]; if(c==null) return quotaConfig.default; if(typeof c==='number') return c; return (c.target!=null?c.target:quotaConfig.default); };
+    const effQ = (person, ymv) => { const p=quotaConfig.persons[person]; if(p==null) return quotaConfig.default; if(typeof p==='number') return p; const base=(p.target!=null?p.target:quotaConfig.default); const hist=Array.isArray(p.hist)?p.hist.filter(h=>h&&h.from&&h.q!=null).slice().sort((a,b)=>String(a.from).localeCompare(String(b.from))):[]; if(!hist.length||!ymv) return base; let val=null; for(let i=0;i<hist.length;i++){ if(String(hist[i].from)<=ymv) val=hist[i].q; } return val!=null?val:hist[0].q; };
 
     // KST 기준 현재 년/월
     const kst = new Date(Date.now() + 9*3600*1000);
@@ -91,8 +92,12 @@ module.exports = async (req, res) => {
       if(!units[k]) units[k]={person:nm,dept,total:0};
     });
 
+    // 효력 시작월: 각 주차의 월에 맞는 유효 목표 합산
+    const wkMonths={}; periodRows.forEach(r=>{ if(r._wk && !wkMonths[r._wk]) wkMonths[r._wk]=tgtY+'-'+String(r._m).padStart(2,'0'); });
+    const allWeeks=Object.keys(wkMonths); const dfltYM=tgtY+'-'+String(tgtM).padStart(2,'0');
+    const targetOf=(person)=> allWeeks.length ? allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w]),0) : (effQ(person,dfltYM)*targetWeeks);
     const dTot={};
-    Object.values(units).forEach(u=>{ if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0}; dTot[u.dept].total+=u.total; dTot[u.dept].target+=quotaOf(u.person)*targetWeeks; });
+    Object.values(units).forEach(u=>{ if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0}; dTot[u.dept].total+=u.total; dTot[u.dept].target+=targetOf(u.person); });
     let tT=0,tA=0; Object.values(dTot).forEach(t=>{tT+=t.target;tA+=t.total;});
     const overall = tT>0 ? Math.round(tA/tT*100) : (tA>0?100+tA:0);
     let mvp=null; Object.values(units).forEach(u=>{ if(u.total>0&&(!mvp||u.total>mvp.total)) mvp={person:u.person,total:u.total}; });
