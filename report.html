@@ -115,6 +115,7 @@ async function fetchAll(){
 function build(data){
   const { rows, quotaConfig, hrRoster, resigned } = data;
   const quotaOf = (p)=>{ const c=quotaConfig.persons[p]; if(c==null) return quotaConfig.default; if(typeof c==='number') return c; return (c.target!=null?c.target:quotaConfig.default); };
+  const effQ = (person, ymv) => { const p=quotaConfig.persons[person]; if(p==null) return quotaConfig.default; if(typeof p==='number') return p; const base=(p.target!=null?p.target:quotaConfig.default); const hist=Array.isArray(p.hist)?p.hist.filter(h=>h&&h.from&&h.q!=null).slice().sort((a,b)=>String(a.from).localeCompare(String(b.from))):[]; if(!hist.length||!ymv) return base; let val=null; for(let i=0;i<hist.length;i++){ if(String(hist[i].from)<=ymv) val=hist[i].q; } return val!=null?val:hist[0].q; };
   const excluded = new Set(quotaConfig.excluded||[]);
   const now = new Date();
   let curYear = now.getFullYear(), curMonth = now.getMonth()+1;
@@ -143,6 +144,13 @@ function build(data){
     periodSub = curYear+'년 '+curMonth+'월'+(YM ? ' 월누계' : ' · '+(now.getMonth()+1)+'/'+now.getDate()+'('+dow+') 기준');
   }
 
+  // 효력 시작월: 각 주차의 월에 맞는 유효 목표
+  const _pad=(n)=>String(n).padStart(2,'0');
+  const dfltYM = curYear+'-'+_pad(curMonth);
+  const colYM = (c)=>{ const m=/(\d+)월/.exec(String(c)); return m ? curYear+'-'+_pad(m[1]) : dfltYM; };
+  const wkMonths={}; periodRows.forEach(r=>{ if(r.주차별 && !wkMonths[r.주차별]) wkMonths[r.주차별]=curYear+'-'+_pad(r._month); });
+  const allWeeks=Object.keys(wkMonths);
+  const targetOf=(person)=> allWeeks.length ? allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w]),0) : (effQ(person,dfltYM)*targetWeeksCount);
   // 단위 = (담당자 x 기록부서)
   const units={};
   periodRows.forEach(r=>{
@@ -170,7 +178,7 @@ function build(data){
 
   // 부서 합계
   const dCount={}, dTot={};
-  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0}; dTot[u.dept].target+=quotaOf(u.person)*targetWeeksCount; dTot[u.dept].total+=uTotal(u); });
+  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0}; dTot[u.dept].target+=targetOf(u.person); dTot[u.dept].total+=uTotal(u); });
   const orderedDepts=[]; unitList.forEach(u=>{ if(!orderedDepts.includes(u.dept))orderedDepts.push(u.dept); });
 
   // 전주 대비 (주간 보고만)
@@ -184,7 +192,7 @@ function build(data){
   const topPart=ranked[0]; const lowParts=ranked.filter(p=>p.pct<50).map(p=>p.d+'('+p.pct+'%)');
   let mvp=null; unitList.forEach(u=>{const t=uTotal(u); if(t>0&&(!mvp||t>mvp.t))mvp={p:u.person,t};});
   let achieved=0,missed=0; const zeroThis=[];
-  unitList.forEach(u=>{ const q=quotaOf(u.person),target=q*targetWeeksCount,t=uTotal(u); if(target>0){t>=target?achieved++:missed++;} if(!isQuarter&&q>0&&(u.cols[wkThis]||0)===0) zeroThis.push(u.person); });
+  unitList.forEach(u=>{ const q=quotaOf(u.person),target=targetOf(u.person),t=uTotal(u); if(target>0){t>=target?achieved++:missed++;} if(!isQuarter&&q>0&&(u.cols[wkThis]||0)===0) zeroThis.push(u.person); });
 
   // ===== HTML =====
   const headClass=isQuarter?'q':'week';
@@ -223,8 +231,8 @@ function build(data){
   let last=null;
   unitList.forEach(u=>{
     if(u.dept!==last){ h+='<tr class="deptrow'+(isQuarter?' q':'')+'"><td colspan="'+colspan+'">▸ '+u.dept+' ('+dCount[u.dept]+'명)</td></tr>'; last=u.dept; }
-    const q=quotaOf(u.person), target=q*targetWeeksCount, tot=uTotal(u);
-    const cells=colList.map(c=>{ const v=u.cols[c]||0; const cls=q===0?(v>0?'ok2':'z'):(v>=q?'ok2':(v===0?'missz':'miss')); return '<td class="'+cls+'">'+v+'</td>'; }).join('');
+    const q=quotaOf(u.person), target=targetOf(u.person), tot=uTotal(u);
+    const cells=colList.map(c=>{ const v=u.cols[c]||0; const cq=effQ(u.person,colYM(c)); const cls=cq===0?(v>0?'ok2':'z'):(v>=cq?'ok2':(v===0?'missz':'miss')); return '<td class="'+cls+'">'+v+'</td>'; }).join('');
     let wowCell=''; if(wkPrev){const dw=(u.cols[wkThis]||0)-(u.cols[wkPrev]||0);const cls=dw>0?'wu':dw<0?'wd':'wf';const a=dw>0?'▲'+dw:dw<0?'▼'+Math.abs(dw):'–';wowCell='<td class="'+cls+'">'+a+'</td>';}
     let rate; if(target>0){const pct=Math.round(tot/target*100);rate='<td class="'+pctClass(pct)+'">'+pct+'%</td>';}else if(tot>0){rate='<td class="rgr">'+(100+tot)+'%</td>';}else{rate='<td class="dash">—</td>';}
     h+='<tr><td class="name">'+u.person+'</td><td>'+q+'</td>'+cells+wowCell+'<td>'+target+'</td><td><b>'+tot+'</b></td>'+rate+'</tr>';
