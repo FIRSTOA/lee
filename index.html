@@ -1396,6 +1396,18 @@ function openQuotaModal() {
 }
 function closeQuotaModal() { quotaModal.classList.add('hidden'); }
 
+// 목표 변경 이력 텍스트 (예: "이전 2 · 7월~ 3")
+function quotaHistText(p) {
+  if (!p || typeof p !== 'object' || !Array.isArray(p.hist) || !p.hist.length) return '';
+  const h = p.hist.filter(e => e && e.from && e.q != null).slice().sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  if (!h.length) return '';
+  return h.map((e, i) => {
+    const isBase = String(e.from) < '2020-01';
+    if (isBase) return '이전 ' + e.q;
+    const parts = String(e.from).split('-');
+    return parts[0].slice(2) + '.' + parseInt(parts[1]) + '월~ ' + e.q;
+  }).join(' · ');
+}
 function renderQuotaConfigTable(tmp) {
   quotaConfigBody.innerHTML = '';
   const names = Object.keys(tmp.persons);
@@ -1425,7 +1437,11 @@ function renderQuotaConfigTable(tmp) {
       const target = (typeof p === 'object') ? p.target : p;
       const currentDept = effDeptOf(name) === '미지정' ? '' : effDeptOf(name); // 설정 부서 우선, 없으면 조직도
       const tr = document.createElement('tr');
-      const tdName = document.createElement('td'); tdName.textContent = name; tr.appendChild(tdName);
+      const tdName = document.createElement('td');
+      const nmDiv = document.createElement('div'); nmDiv.textContent = name; tdName.appendChild(nmDiv);
+      const ht = quotaHistText(tmp.persons[name]);
+      if (ht) { const hd = document.createElement('div'); hd.style.cssText = 'font-size:10.5px;color:#94a3b8;margin-top:2px;line-height:1.3'; hd.textContent = '📜 ' + ht; tdName.appendChild(hd); }
+      tr.appendChild(tdName);
       const tdQuota = document.createElement('td'); tdQuota.style.textAlign = 'right';
       const inp = document.createElement('input'); inp.type = 'number'; inp.min = '0'; inp.value = target;
       inp.onchange = () => {
