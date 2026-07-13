@@ -2589,6 +2589,7 @@ function ckCurData(){
   return {
     person:d.person, oh:ckGradeNum('.chip[data-overhaul].selected'), rp:ckGradeNum('.chip[data-repair].selected'),
     use:CK_USE, incoming:d.incoming, indate:ckVal('ck-indate'), reason:ckVal('ck-reason'),
+    asset_no:ckVal('f-asset'),
     model:d.model, serial:d.serial, time:(d.time||ckVal('f-time')), date:d.date,
     ci:{bk:ckVal('ck-ci-bk'),c:ckVal('ck-ci-c'),bc:ckVal('ck-ci-bc'),sum:ckVal('ck-ci-sum')},
     co:{bk:ckVal('ck-co-bk'),c:ckVal('ck-co-c'),bc:ckVal('ck-co-bc'),sum:ckVal('ck-co-sum')},
@@ -2603,6 +2604,7 @@ function ckRecData(rec){
   return {
     person:rec.person, oh:ckGnum(rec.overhaul), rp:ckGnum(rec.repair),
     use:rec.use||'', incoming:rec.incoming, indate:rec.indate, reason:rec.reason,
+    asset_no:rec.asset_no||'',
     model:rec.model, serial:rec.serial, time:rec.time, date:rec.date,
     ci:rec.counterIn||{}, co:rec.counterOut||{},
     toner:{bk:t.bk,c:t.c,m:t.m,y:t.y,w:t.waste},
@@ -2631,7 +2633,8 @@ function buildCkSheet(S){
    +'<td class="l" style="width:80px">수리 난이도</td><td style="width:60px">'+ckEsc(S.rp)+'</td>'
    +'</tr><tr>'
    +'<td class="l">구분</td><td style="font-weight:800;color:#c00">'+ckEsc(u)+(u.indexOf('현장')>=0||u.indexOf('사무')>=0?' 완료 ✔':'')+'</td>'
-   +'<td class="l">비고</td><td colspan="5"></td>'
+   +'<td class="l">자산번호</td><td>'+ckEsc(S.asset_no)+'</td>'
+   +'<td class="l">비고</td><td colspan="3"></td>'
    +'</tr></table>'
    +'<table class="cf">'
    +'<tr><td class="l">입고처</td><td>'+ckEsc(S.incoming)+'</td><td class="l">입고일</td><td>'+ckEsc(S.indate)+'</td><td class="l">입고사유</td><td>'+ckEsc(S.reason)+'</td></tr>'
