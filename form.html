@@ -2013,7 +2013,8 @@ function validate(d) {
   if (!d.person) errors.push({ field: 'f-person', msg: '담당자를 입력하세요' });
   if (!d.dept) errors.push({ field: 'dept-grid', msg: '부서를 선택하세요' });
   if (!d.model) errors.push({ field: 'f-model', msg: '모델명을 입력하세요' });
-  if (!isPartsTask && !d.serial) errors.push({ field: 'f-serial', msg: '시리얼 번호를 입력하세요 (시리얼 없는 기기는 자산번호 필수)' });
+  var _assetNo = document.getElementById('f-asset') ? document.getElementById('f-asset').value.trim() : '';
+  if (!isPartsTask && !d.serial && !_assetNo) errors.push({ field: 'f-serial', msg: '시리얼 번호 또는 자산번호 중 하나는 반드시 입력하세요' });
   if (!d.overhaul && !d.repair) errors.push({ field: 'overhaul-chips', msg: '오버홀 또는 수리 항목을 반드시 1개 이상 선택하세요' });
   if (!d.time || d.time <= 0) errors.push({ field: 'f-time', msg: '소요시간을 입력하세요' });
   if (!ckVal('ck-reason')) { errors.push({ field: 'ck-reason-chips', msg: '입고 사유를 선택하세요' }); var rw=document.getElementById('ck-reason-chips'); if(rw) rw.classList.add('cat-err'); }
@@ -2769,7 +2770,7 @@ function openRbSheet(rec){
         ? '<span style="color:#16a34a;font-weight:700">📷 사진 '+pc+'컷</span>'
         : '<span style="color:#e53e3e;font-weight:800">⚠️ 사진 '+pc+'컷 (4컷 미만!)</span>');
       return '<div class="lk-card"><div class="lk-top"><div style="min-width:0"><div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
-        +'<div class="lk-sn">'+esc(r.serial||r.asset_no||'')+'</div>'
+        +'<div class="lk-sn">'+[(r.asset_no?'자산번호: '+esc(r.asset_no):''),(r.serial?'S/N: '+esc(r.serial):'')].filter(Boolean).join('&nbsp;&nbsp; ')+'</div>'
         +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+(pcHtml?'<br>'+pcHtml:'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
         +'<div style="display:flex;flex-direction:column;gap:6px">'
         +(sn?'<button type="button" class="lk-photo" data-sn="'+esc(sn)+'" style="border:none;border-radius:8px;background:#2b6cb0;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap">📷 사진</button>':'')
