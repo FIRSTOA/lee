@@ -69,6 +69,9 @@
   .card.hidden { display: none; }
   .btn.layout { background: #2c5282; color: #fff; }
   .btn.layout:hover { background: #2a4365; }
+  .btn.report { background: #2f855a; color: #fff; font-weight: 600; }
+  .btn.report:hover { background: #276749; }
+  .btn.report:disabled { background: #9ae6b4; color: #22543d; cursor: not-allowed; }
   .chart-wrap { position: relative; height: 320px; }
   .chart-wrap.tall { height: 380px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -301,6 +304,7 @@
       <button class="btn refresh" id="refreshBtn">새로고침</button>
       <button class="btn settings" id="quotaSettingsBtn">⚙ 정량 목표 설정</button>
       <button class="btn layout" id="layoutBtn">🎨 차트 표시 설정</button>
+      <button class="btn report" id="weekReportBtn">📤 주간보고</button>
     </div>
 
     <div class="kpis">
@@ -1481,6 +1485,30 @@ function renderQuotaConfigTable(tmp) {
 
 document.getElementById('quotaSettingsBtn').onclick = openQuotaModal;
 document.getElementById('layoutBtn').onclick = openLayoutModal;
+
+// 주간보고 버튼 — 톡방에 "주간보고" 쳤을 때 나가는 정보(요약 전문)를 큐에 넣어 봇이 톡방으로 발송
+document.getElementById('weekReportBtn').onclick = async function () {
+  const btn = this;
+  if (!confirm('이번 주 주간보고를 카톡방(통계 영업보고 분석 예측)으로 보낼까요?')) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '전송 중…';
+  try {
+    const r = await fetch('/api/cron-weekly-report?force=1&full=1', { cache: 'no-store' });
+    const j = await r.json();
+    if (j && j.queued) {
+      btn.textContent = '✅ 전송 요청됨';
+      alert('주간보고를 카톡방으로 보냈습니다.\n봇이 폴링해 최대 1분 내 전송됩니다.\n\n' + (j.text || ''));
+    } else {
+      btn.textContent = orig;
+      alert('전송 요청 실패: ' + (j && (j.error || j.skipped) || '알 수 없음'));
+    }
+  } catch (e) {
+    btn.textContent = orig;
+    alert('전송 요청 실패: ' + (e && e.message || e));
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 4000);
+  }
+};
 document.getElementById('closeLayoutBtn').onclick = () => document.getElementById('layoutModal').classList.add('hidden');
 document.getElementById('layoutModal').onclick = (e) => { if (e.target.id === 'layoutModal') document.getElementById('layoutModal').classList.add('hidden'); };
 document.getElementById('showAllBtn').onclick = () => {
