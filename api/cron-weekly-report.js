@@ -21,13 +21,14 @@ module.exports = async (req, res) => {
   try {
     const k = kst();
     const force = req.query && req.query.force === '1';
+    const full = req.query && req.query.full === '1';   // 대시보드 버튼: 요약 전문 발송("주간보고" 텍스트와 동일)
     if (!force && k.getUTCDay() !== 5) { res.status(200).json({ ok: true, skipped: 'not Friday(KST)' }); return; }
 
     const ym = req.query && req.query.ym ? String(req.query.ym) : '';
     const qs = 'type=week' + (ym ? '&ym=' + encodeURIComponent(ym) : '');
     let sum = '';
     try { const r = await fetch(BASE + '/api/summary?' + qs); sum = await r.text(); } catch (e) {}
-    const text = brief(sum) + '\n📋 자세히: ' + BASE + '/report.html?' + qs;
+    const text = (full ? String(sum || '').trim() : brief(sum)) + '\n📋 자세히: ' + BASE + '/report.html?' + qs;
 
     const today = (ym ? ('ym-' + ym + '-') : '') + k.getUTCFullYear() + '-' + (k.getUTCMonth()+1) + '-' + k.getUTCDate();
     const list = await loadQ();
