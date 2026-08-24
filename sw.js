@@ -1,6 +1,6 @@
 // 오버홀 입력 PWA 서비스워커
-const CACHE = 'overhaul-app-v1';
-const SHELL = ['/form.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'overhaul-app-v2';
+const SHELL = ['/splash.html', '/splash.jpg', '/form.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
