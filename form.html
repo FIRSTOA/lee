@@ -427,6 +427,7 @@
     <a href="/" target="_blank" rel="noopener" id="stats-link" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;display:inline-block">📊 통계</a>
   </div>
 </header>
+<div id="ck-pending-bar" style="display:none;background:#fef3c7;color:#92400e;border-bottom:1px solid #fde68a;padding:10px 14px;font-size:12px;font-weight:700;text-align:center;cursor:pointer"></div>
 <div class="container">
 
   <div class="mode-toggle">
@@ -802,6 +803,11 @@
 
   <div class="form-card">
     <div class="section-title">증빙 사진</div>
+    <div id="edit-photos" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#0c4a6e;margin-bottom:8px" id="edit-photos-title">기존 저장된 사진</div>
+      <div id="edit-photos-strip" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <div style="font-size:11px;color:#0369a1;margin-top:8px">새로 촬영하지 않으면 위 사진이 그대로 유지됩니다.</div>
+    </div>
     <div class="photo-grid4">
       <div>
         <div class="photo-label"><span>전면 앞커버</span><span class="photo-tag">사진 1</span></div>
@@ -841,8 +847,9 @@
 </div>
 <div id="ck-overlay">
   <div class="ck-bar">
+    <button id="btn-ck-datasave" style="background:#dc2626;display:none">💾 저장하기</button>
     <button id="btn-ck-out" style="background:#2b6cb0">🖨 출력</button>
-    <button id="btn-ck-save" style="background:#16a34a">💾 저장</button>
+    <button id="btn-ck-save" style="background:#16a34a">🖼 이미지</button>
     <button id="btn-ck-close" style="background:#64748b">✕ 닫기</button>
   </div>
   <div id="ck-scaler"><div id="ck-print-sheet" class="ck-sheet"></div></div>
@@ -1050,15 +1057,111 @@ function enterEditMode(row, formData) {
   // 배너 표시
   const bar = document.getElementById('edit-mode-bar');
   const txt = document.getElementById('edit-mode-text');
-  txt.textContent = '✏️ 수정 모드 — 행 ' + row + ' (사진은 새로 첨부 시에만 교체)';
+  txt.textContent = '✏️ 수정 모드 — 행 ' + row + ' (저장된 내용 불러오는 중...)';
   bar.style.display = 'flex';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 확인서에만 있는 정보(자산번호·업체·증상·카운터·PM·사진)까지 이어서 복원
+  restoreChecklistIntoForm(row, txt);
+}
+
+// === 수정 모드: 확인서에 저장된 내용까지 폼에 되살리기 ===
+function setValIf(id, v){ var el = document.getElementById(id); if (el && v != null && v !== '') el.value = v; }
+async function restoreChecklistIntoForm(row, txtEl){
+  var rec = null;
+  try {
+    var r = await fetch(RB_SUPA_URL + '/rest/v1/app_config?key=eq.overhaul_checklist&select=value', { headers: RB_SUPA_H });
+    var j = await r.json();
+    var list = (j && j[0] && Array.isArray(j[0].value)) ? j[0].value : [];
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (list[i] && String(list[i].savedRow) === String(row)) { rec = list[i]; break; }
+    }
+  } catch (e) { rec = null; }
+
+  if (!rec) {
+    if (txtEl) txtEl.textContent = '✏️ 수정 모드 — 행 ' + row + ' (확인서 기록 없음 · 사진은 새로 첨부 시에만 교체)';
+    return;
+  }
+
+  // 기본 칸
+  setValIf('f-asset', rec.asset_no);
+  setValIf('f-incoming', rec.incoming);
+  setValIf('f-serial', rec.serial);
+  setValIf('f-part', rec.part);
+  // 확인서 칸
+  setValIf('ck-indate', rec.indate);
+  setValIf('ck-symptom', rec.symptom);
+  setValIf('ck-work', rec.work);
+  setValIf('ck-etc', rec.etc);
+  if (rec.counterIn)  { setValIf('ck-ci-bk', rec.counterIn.bk);  setValIf('ck-ci-c', rec.counterIn.c);  setValIf('ck-ci-bc', rec.counterIn.bc);  setValIf('ck-ci-sum', rec.counterIn.sum); }
+  if (rec.counterOut) { setValIf('ck-co-bk', rec.counterOut.bk); setValIf('ck-co-c', rec.counterOut.c); setValIf('ck-co-bc', rec.counterOut.bc); setValIf('ck-co-sum', rec.counterOut.sum); }
+  if (rec.toner) { setValIf('ck-t-bk', rec.toner.bk); setValIf('ck-t-c', rec.toner.c); setValIf('ck-t-m', rec.toner.m); setValIf('ck-t-y', rec.toner.y); setValIf('ck-t-w', rec.toner.waste); }
+  // 구분(현장용/사무용)
+  if (rec.use) {
+    var uc = document.getElementById('ck-use');
+    if (uc) uc.querySelectorAll('.uc').forEach(function(c){
+      var on = (c.dataset.use === rec.use);
+      c.classList.toggle('on', on);
+      if (on) CK_USE = rec.use;
+    });
+  }
+  // 입고사유 (칩 클릭과 동일 처리 → 증상분류 표시까지 같이 반영)
+  if (rec.reason) {
+    var g = document.getElementById('ck-reason-chips');
+    if (g) g.querySelectorAll('.sc').forEach(function(x){
+      if (x.textContent.trim() === rec.reason) ckReasonPick(x);
+    });
+  }
+  // 증상 분류(다중)
+  if (Array.isArray(rec.cat) && rec.cat.length) {
+    document.querySelectorAll('#ck-symptom-cat .sc').forEach(function(x){
+      x.classList.toggle('on', rec.cat.indexOf(x.textContent.trim()) >= 0);
+    });
+  }
+  // PM 체크
+  if (rec.pm) {
+    document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){
+      cb.checked = !!rec.pm[cb.dataset.pm];
+      var it = cb.closest('.pm-item'); if (it) it.classList.toggle('on', cb.checked);
+    });
+  }
+  if (txtEl) txtEl.textContent = '✏️ 수정 모드 — 행 ' + row + ' (저장된 내용 불러옴 · 사진은 새로 첨부 시에만 교체)';
+
+  // 기존 사진 보여주기 (시리얼로 조회)
+  var sn = rec.serial || '';
+  var box = document.getElementById('edit-photos');
+  var strip = document.getElementById('edit-photos-strip');
+  var title = document.getElementById('edit-photos-title');
+  if (!box || !strip) return;
+  if (!sn) {
+    box.style.display = 'block';
+    title.textContent = '기존 저장된 사진 ' + (rec.photoCount || 0) + '장';
+    strip.innerHTML = '<div style="font-size:12px;color:#64748b">시리얼이 없는 기록이라 사진을 불러올 수 없습니다. (저장된 사진은 그대로 유지됩니다)</div>';
+    return;
+  }
+  box.style.display = 'block';
+  title.textContent = '기존 저장된 사진';
+  strip.innerHTML = '<div style="font-size:12px;color:#64748b">사진 불러오는 중…</div>';
+  try {
+    var pr = await fetch(RB_APPS_URL, { method: 'POST', body: JSON.stringify({ action: 'serialPhotos', serial: sn }), redirect: 'follow' });
+    var pj = await pr.json();
+    var urls = (pj && pj.ok && Array.isArray(pj.photos)) ? pj.photos : [];
+    if (!urls.length) { strip.innerHTML = '<div style="font-size:12px;color:#64748b">저장된 사진이 없습니다</div>'; return; }
+    title.textContent = '기존 저장된 사진 ' + urls.length + '장';
+    strip.innerHTML = urls.map(function(u){
+      var m = /[-\w]{25,}/.exec(u); var id = m ? m[0] : '';
+      var thumb = id ? ('https://drive.google.com/thumbnail?id=' + id + '&sz=w220') : u;
+      return '<a href="' + u + '" target="_blank" rel="noopener"><img src="' + thumb + '" style="width:88px;height:70px;object-fit:cover;border-radius:8px;border:1px solid #bae6fd;background:#000"></a>';
+    }).join('');
+  } catch (e) {
+    strip.innerHTML = '<div style="font-size:12px;color:#c53030">사진 불러오기 실패 (저장된 사진은 그대로 유지됩니다)</div>';
+  }
 }
 function exitEditMode() {
   editingRow = null;
   editingPhotosKept = true;
   editingOriginal = null;
   document.getElementById('edit-mode-bar').style.display = 'none';
+  var ep = document.getElementById('edit-photos'); if (ep) ep.style.display = 'none';
 }
 // 수정 모드 취소 버튼
 document.addEventListener('DOMContentLoaded', () => {
@@ -2100,7 +2203,7 @@ function showPreview() {
 }
 
 document.getElementById('btn-submit').onclick = showPreview;
-document.getElementById('btn-cancel-preview').onclick = () => document.getElementById('preview-modal').classList.add('hidden');
+document.getElementById('btn-cancel-preview').onclick = () => { window.ckReturnAfterSave = false; document.getElementById('preview-modal').classList.add('hidden'); };
 document.getElementById('preview-modal').onclick = (e) => { if (e.target.id === 'preview-modal') document.getElementById('preview-modal').classList.add('hidden'); };
 document.getElementById('btn-confirm-preview').onclick = async () => {
   const confirmBtn = document.getElementById('btn-confirm-preview');
@@ -2146,7 +2249,11 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
     });
     const result = await resp.json();
     if (result.ok) {
-      try { await saveChecklist(collectInputs(), result.row); } catch (e) { console.warn('체크리스트 저장 실패', e); }
+      // 확인서(리스트) 저장 — 실패해도 조용히 넘기지 않고 재시도·보관·경고
+      const ckRow = result.row || editingRow;
+      const ckRes = await saveChecklistSafe(collectInputs(), ckRow);
+      const ckOk = !ckRes.failed;
+      if (!ckOk && ckRes.rec) ckPendingAdd(ckRes.rec);
       // 로그 기록 (수정이면 기존 로그 항목 갱신, 새 저장이면 추가)
       const d2 = collectInputs();
       const wasEditing = !!editingRow;
@@ -2197,15 +2304,27 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
         const d = result.debug;
         msg += ' [DEBUG: lastRow=' + d.lastRow + ', maxNum=' + d.maxNum + ', firstEmpty=' + d.firstEmptyRow + ', hasDate=' + d.hasDateCount + ', gid=' + d.sheetGid + ']';
       }
-      const allOk = !result.mainError && result.stockSaved === true;
+      // 확인서 저장 상태
+      if (ckOk) { msg += ' | 확인서 ✓'; }
+      else { msg += ' | 확인서 ✗ (폰에 보관 — 인터넷 연결 후 자동 재전송)'; }
+      const allOk = !result.mainError && result.stockSaved === true && ckOk;
       showToast((allOk ? '✅ ' : '⚠️ ') + msg, allOk ? 'success' : 'error');
+      if (!ckOk) alert('⚠️ 확인서 저장에 실패했습니다.\n\n작업 기록(시트)은 저장되었습니다.\n확인서는 폰에 보관해두었다가 인터넷이 연결되면 자동으로 다시 보냅니다.\n\n화면 위쪽 노란 띠를 눌러 지금 바로 재전송할 수도 있습니다.');
       console.log('Save response:', result);
+      // 리스트 화면에서 [저장하기]로 들어온 경우 — 폼을 비우기 전에 내용을 떠둔다
+      let ckSnap = null;
+      if (window.ckReturnAfterSave) { try { ckSnap = ckCurData(); } catch (e) { ckSnap = null; } }
       // 폼 초기화
       document.getElementById('f-date').valueAsDate = new Date();
       ['f-person', 'f-incoming', 'f-model', 'f-serial', 'f-part', 'f-time'].forEach(id => document.getElementById(id).value = '');
       updateTimeDisplay();
       document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
       Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
+      // 저장 완료 → 리스트 화면으로 되돌아가서 출력 버튼 열어주기
+      if (window.ckReturnAfterSave) {
+        window.ckReturnAfterSave = false;
+        if (ckSnap && window.__ckShowSaved) window.__ckShowSaved(ckSnap);
+      }
     } else {
       showToast('❌ 저장 실패: ' + result.error, 'error');
     }
@@ -2235,6 +2354,7 @@ document.getElementById('btn-reset').onclick = () => {
   document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.error, .error-border').forEach(el => el.classList.remove('error', 'error-border'));
   Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
+  var ep = document.getElementById('edit-photos'); if (ep) ep.style.display = 'none';
 };
 </script>
 <script>
@@ -2656,6 +2776,8 @@ function buildCkSheet(S){
 // 저장된 기록으로 리스트 보기 열기 (재출력)
 function openCkFromRec(rec){
   buildCkSheet(ckRecData(rec));
+  // 이미 저장된 기록의 재출력 — 출력 버튼 그대로 노출
+  window.ckNeedSave=false; if(typeof ckSyncBar==='function') ckSyncBar();
   var ov=document.getElementById('ck-overlay');
   if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
 }
@@ -2693,6 +2815,8 @@ function buildRbSheet(rec){
 }
 function openRbSheet(rec){
   buildRbSheet(rec);
+  // 재수리 리스트는 저장 절차가 별도 — 출력 버튼 그대로 노출
+  window.ckNeedSave=false; if(typeof ckSyncBar==='function') ckSyncBar();
   var ov=document.getElementById('ck-overlay');
   if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); }
 }
@@ -2849,14 +2973,33 @@ function fitCk(){
   sc.style.height=Math.round(sh*scale)+'px';
 }
 function resetCkScale(){ var sheet=document.getElementById('ck-print-sheet'); if(sheet) sheet.style.transform='none'; }
+// 리스트 화면 버튼 전환: 저장 전에는 [저장하기]만, 저장 후에는 [출력][이미지]
+// ckNeedSave=true  → 아직 저장 안 된 입력 내용을 보고 있는 상태
+window.ckNeedSave = false;
+function ckSyncBar(){
+  var bd=document.getElementById('btn-ck-datasave');
+  var bo=document.getElementById('btn-ck-out');
+  var bi=document.getElementById('btn-ck-save');
+  var need=!!window.ckNeedSave;
+  if(bd) bd.style.display = need ? '' : 'none';
+  if(bo) bo.style.display = need ? 'none' : '';
+  if(bi) bi.style.display = need ? 'none' : '';
+}
 (function(){
   var ov=document.getElementById('ck-overlay');
-  function openOv(){ buildCkSheet(); if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); } }
+  function showOv(){ if(ov){ ov.classList.add('show'); document.body.classList.add('ck-open'); try{ history.pushState({_ck:1},''); }catch(e){} requestAnimationFrame(function(){ fitCk(); }); } }
+  // 입력폼에서 [📋 리스트 보기] → 아직 저장 전이므로 저장 버튼만 보여줌
+  function openOv(){ buildCkSheet(); window.ckNeedSave = true; ckSyncBar(); showOv(); }
   function closeOv(){ if(ov){ ov.classList.remove('show'); document.body.classList.remove('ck-open'); } }
+  // 저장 완료 후 되돌아올 때 — 저장 직전 데이터로 다시 그리고 출력 버튼 노출
+  window.__ckShowSaved=function(data){ buildCkSheet(data); window.ckNeedSave = false; ckSyncBar(); showOv(); };
   var b=document.getElementById('btn-ck-print'); if(b) b.onclick=openOv;
   var bc=document.getElementById('btn-ck-close'); if(bc) bc.onclick=closeOv;
   var bo=document.getElementById('btn-ck-out'); if(bo) bo.onclick=function(){ printCk(); };
   var bs=document.getElementById('btn-ck-save'); if(bs) bs.onclick=function(){ saveCkImage(); };
+  // 저장하기 — 리스트를 닫고 기존 저장 절차(미리보기 → 저장)로 넘김
+  var bd=document.getElementById('btn-ck-datasave');
+  if(bd) bd.onclick=function(){ window.ckReturnAfterSave = true; closeOv(); showPreview(); };
   // 리스트가 열린 상태에서 뒤로가기 → 페이지 종료 대신 리스트만 닫기
   window.addEventListener('popstate', function(){ if(ov && ov.classList.contains('show')) closeOv(); });
   window.addEventListener('resize', function(){ if(ov&&ov.classList.contains('show')) fitCk(); });
@@ -2893,10 +3036,11 @@ function saveCkImage(){
 ['ck-ci-bk','ck-ci-c','ck-ci-bc','ck-ci-sum','ck-co-bk','ck-co-c','ck-co-bc','ck-co-sum','ck-t-bk','ck-t-c','ck-t-m','ck-t-y','ck-t-w'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('inputmode','numeric'); e.setAttribute('pattern','[0-9]*'); } });
 // 날짜 칸: 어디를 눌러도 달력 열기 (입고일·날짜)
 ['ck-indate','f-date'].forEach(function(id){ var e=document.getElementById(id); if(e){ e.addEventListener('click', function(){ try{ this.showPicker(); }catch(err){} }); e.addEventListener('focus', function(){ try{ this.showPicker(); }catch(err){} }); } });
-async function saveChecklist(d, row){
+// 화면 내용 → 확인서 1건 (전송 전에 미리 떠둠 — 실패 시 이 덩어리를 보관했다가 재전송)
+function buildChecklistRec(d, row){
   var pm = {};
   document.querySelectorAll('#ck-pm input[data-pm]').forEach(function(cb){ if(cb.checked) pm[cb.dataset.pm]=true; });
-  var rec = {
+  return {
     id: Date.now(), savedRow: row||'',
     use: CK_USE, date: d.date, person: d.person, dept: d.dept,
     incoming: d.incoming, model: d.model, asset_no: (document.getElementById('f-asset')?document.getElementById('f-asset').value.trim():''), serial: d.serial, part: d.part,
@@ -2909,10 +3053,21 @@ async function saveChecklist(d, row){
     toner: { bk:ckVal('ck-t-bk'), c:ckVal('ck-t-c'), m:ckVal('ck-t-m'), y:ckVal('ck-t-y'), waste:ckVal('ck-t-w') },
     etc: ckVal('ck-etc'), photoCount: Object.keys(photoData).filter(function(s){ return photoData[s]; }).length, createdAt: new Date().toISOString()
   };
+}
+// 확인서 1건 전송
+async function pushChecklistRec(rec){
   var list = [];
-  try { var r = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value', {headers:RB_SUPA_H}); var j = await r.json(); list = (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; } catch(e){}
-  list.push(rec);
-  await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'overhaul_checklist',value:list})});
+  var gr = await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value', {headers:RB_SUPA_H});
+  if (!gr.ok) throw new Error('기존 목록 읽기 실패 (HTTP ' + gr.status + ')');
+  var j = await gr.json();
+  list = (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[];
+  if (!list.length) throw new Error('기존 목록이 비어 있음 — 덮어쓰기 방지');
+  // 같은 행이 이미 저장돼 있으면 교체(중복 방지), 없으면 추가
+  var dup = -1;
+  for (var di = 0; di < list.length; di++) { if (list[di] && String(list[di].savedRow) === String(rec.savedRow) && rec.savedRow) { dup = di; break; } }
+  if (dup >= 0) list[dup] = rec; else list.push(rec);
+  var pr = await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key', {method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'overhaul_checklist',value:list})});
+  if (!pr.ok) throw new Error('확인서 저장 실패 (HTTP ' + pr.status + ')');
   // 기술 매뉴얼: 담당자·증상·처리내용만 따로 저장(증상 조회용)
   try {
     if (rec.reason === '기기고장' && (rec.cat.length || rec.symptom || rec.work)) {
@@ -2924,6 +3079,64 @@ async function saveChecklist(d, row){
     }
   } catch(e){}
 }
+
+// === 확인서 저장: 재시도 + 실패 시 폰에 보관했다가 자동 재전송 ===
+const CK_PENDING_KEY = 'overhaul_ck_pending_v1';
+function ckPendingLoad(){ try { var s = localStorage.getItem(CK_PENDING_KEY); var a = s ? JSON.parse(s) : []; return Array.isArray(a) ? a : []; } catch(e){ return []; } }
+function ckPendingSave(a){ try { localStorage.setItem(CK_PENDING_KEY, JSON.stringify(a)); } catch(e){} }
+function ckPendingAdd(rec){
+  if (!rec) return;
+  var a = ckPendingLoad();
+  a = a.filter(function(x){ return !(x && x.rec && String(x.rec.savedRow) === String(rec.savedRow)); });
+  a.push({ rec: rec, at: new Date().toISOString() });
+  ckPendingSave(a);
+  ckPendingBadge();
+}
+function ckPendingBadge(){
+  var n = ckPendingLoad().length;
+  var el = document.getElementById('ck-pending-bar');
+  if (!el) return;
+  if (!n) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = '⚠️ 확인서 ' + n + '건이 아직 전송되지 않았습니다 — 인터넷 연결 후 눌러서 재전송';
+}
+// 저장 시도(최대 3회). 성공하면 null, 실패하면 보관용 확인서 덩어리를 돌려줌
+async function saveChecklistSafe(d, row){
+  var rec;
+  try { rec = buildChecklistRec(d, row); }
+  catch (e) { console.warn('확인서 작성 실패', e); return { failed: true, rec: null }; }
+  for (var i = 1; i <= 3; i++) {
+    try { await pushChecklistRec(rec); return { failed: false, rec: rec }; }
+    catch (e) {
+      console.warn('확인서 저장 실패 ' + i + '/3', e);
+      if (i < 3) await new Promise(function(r){ setTimeout(r, i * 1200); });
+    }
+  }
+  return { failed: true, rec: rec };
+}
+// 보관해둔 실패건 재전송
+async function ckPendingFlush(silent){
+  var a = ckPendingLoad();
+  if (!a.length) { if (!silent) showToast('재전송할 확인서가 없습니다', 'success'); return; }
+  var left = [];
+  for (var i = 0; i < a.length; i++) {
+    var ok = false;
+    try { await pushChecklistRec(a[i].rec); ok = true; } catch (e) { ok = false; }
+    if (!ok) left.push(a[i]);
+  }
+  ckPendingSave(left);
+  ckPendingBadge();
+  if (!silent) {
+    if (!left.length) showToast('✓ 확인서 재전송 완료', 'success');
+    else showToast('일부 재전송 실패 (' + left.length + '건 남음)', 'error');
+  }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  ckPendingBadge();
+  var bar = document.getElementById('ck-pending-bar');
+  if (bar) bar.onclick = function(){ ckPendingFlush(false); };
+  if (ckPendingLoad().length) setTimeout(function(){ ckPendingFlush(true); }, 3000);
+});
 </script>
 <script>
 // PWA 서비스워커 등록 (앱 설치 지원)
@@ -2933,3 +3146,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
