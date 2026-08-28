@@ -407,6 +407,15 @@
     body > *{ display:none !important; }
     #ck-print-img{ display:block !important; position:static; margin:0; width:210mm; height:297mm; object-fit:fill; page-break-after:avoid; page-break-inside:avoid; }
   }
+  /* 저장 중 표시 — 저장이 끝날 때까지 화면을 덮고 진행 상태를 보여줌 */
+  #saving-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:200000;align-items:center;justify-content:center;padding:24px;}
+  #saving-overlay.show{display:flex;}
+  #saving-overlay .sv-box{background:#fff;border-radius:16px;padding:26px 28px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);}
+  #saving-overlay .sv-spin{width:46px;height:46px;margin:0 auto 16px;border:5px solid #e2e8f0;border-top-color:#2b6cb0;border-radius:50%;animation:svspin .8s linear infinite;}
+  @keyframes svspin{to{transform:rotate(360deg);}}
+  #saving-overlay .sv-title{font-size:17px;font-weight:800;color:#1a202c;margin-bottom:6px;}
+  #saving-overlay .sv-step{font-size:13px;color:#4a5568;line-height:1.5;min-height:20px;}
+  #saving-overlay .sv-warn{font-size:12px;color:#a0aec0;margin-top:12px;}
 </style>
 </head>
 <body>
@@ -428,6 +437,14 @@
   </div>
 </header>
 <div id="ck-pending-bar" style="display:none;background:#fef3c7;color:#92400e;border-bottom:1px solid #fde68a;padding:10px 14px;font-size:12px;font-weight:700;text-align:center;cursor:pointer"></div>
+<div id="saving-overlay">
+  <div class="sv-box">
+    <div class="sv-spin"></div>
+    <div class="sv-title">저장 중입니다</div>
+    <div class="sv-step" id="saving-step">잠시만 기다려 주세요…</div>
+    <div class="sv-warn">저장이 끝날 때까지 앱을 닫지 마세요</div>
+  </div>
+</div>
 <div class="container">
 
   <div class="mode-toggle">
@@ -2205,6 +2222,21 @@ function showPreview() {
 document.getElementById('btn-submit').onclick = showPreview;
 document.getElementById('btn-cancel-preview').onclick = () => { window.ckReturnAfterSave = false; document.getElementById('preview-modal').classList.add('hidden'); };
 document.getElementById('preview-modal').onclick = (e) => { if (e.target.id === 'preview-modal') document.getElementById('preview-modal').classList.add('hidden'); };
+// === 저장 중 표시 ===
+function savingShow(step){
+  var ov = document.getElementById('saving-overlay');
+  if (ov) ov.classList.add('show');
+  savingStep(step || '잠시만 기다려 주세요…');
+}
+function savingStep(text){
+  var el = document.getElementById('saving-step');
+  if (el) el.textContent = text;
+}
+function savingHide(){
+  var ov = document.getElementById('saving-overlay');
+  if (ov) ov.classList.remove('show');
+}
+
 document.getElementById('btn-confirm-preview').onclick = async () => {
   const confirmBtn = document.getElementById('btn-confirm-preview');
   const cancelBtn = document.getElementById('btn-cancel-preview');
@@ -2212,6 +2244,8 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
   confirmBtn.textContent = '저장 중...';
   confirmBtn.disabled = true;
   cancelBtn.disabled = true;
+  const _photoN = Object.keys(photoData).filter(function(s){ return photoData[s]; }).length;
+  savingShow(_photoN ? ('작업 기록과 사진 ' + _photoN + '장을 저장하는 중…') : '작업 기록을 저장하는 중…');
   try {
     const d = collectInputs();
     const payload = {
@@ -2250,6 +2284,7 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
     const result = await resp.json();
     if (result.ok) {
       // 확인서(리스트) 저장 — 실패해도 조용히 넘기지 않고 재시도·보관·경고
+      savingStep('확인서를 저장하는 중…');
       const ckRow = result.row || editingRow;
       const ckRes = await saveChecklistSafe(collectInputs(), ckRow);
       const ckOk = !ckRes.failed;
@@ -2340,6 +2375,7 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
     showToast('❌ 네트워크 오류: ' + e.message, 'error');
     console.error(e);
   } finally {
+    savingHide();
     confirmBtn.textContent = original;
     confirmBtn.disabled = false;
     cancelBtn.disabled = false;
@@ -3109,7 +3145,10 @@ async function saveChecklistSafe(d, row){
     try { await pushChecklistRec(rec); return { failed: false, rec: rec }; }
     catch (e) {
       console.warn('확인서 저장 실패 ' + i + '/3', e);
-      if (i < 3) await new Promise(function(r){ setTimeout(r, i * 1200); });
+      if (i < 3) {
+        if (typeof savingStep === 'function') savingStep('확인서 저장 실패 — 다시 시도하는 중 (' + (i + 1) + '/3)…');
+        await new Promise(function(r){ setTimeout(r, i * 1200); });
+      }
     }
   }
   return { failed: true, rec: rec };
@@ -3118,8 +3157,10 @@ async function saveChecklistSafe(d, row){
 async function ckPendingFlush(silent){
   var a = ckPendingLoad();
   if (!a.length) { if (!silent) showToast('재전송할 확인서가 없습니다', 'success'); return; }
+  if (!silent && typeof savingShow === 'function') savingShow('보관된 확인서 ' + a.length + '건을 다시 보내는 중…');
   var left = [];
   for (var i = 0; i < a.length; i++) {
+    if (!silent && typeof savingStep === 'function') savingStep('다시 보내는 중… (' + (i + 1) + '/' + a.length + ')');
     var ok = false;
     try { await pushChecklistRec(a[i].rec); ok = true; } catch (e) { ok = false; }
     if (!ok) left.push(a[i]);
@@ -3127,6 +3168,7 @@ async function ckPendingFlush(silent){
   ckPendingSave(left);
   ckPendingBadge();
   if (!silent) {
+    if (typeof savingHide === 'function') savingHide();
     if (!left.length) showToast('✓ 확인서 재전송 완료', 'success');
     else showToast('일부 재전송 실패 (' + left.length + '건 남음)', 'error');
   }
