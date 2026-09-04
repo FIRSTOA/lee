@@ -44,13 +44,33 @@ module.exports = async (req, res) => {
   const type = (req.query && req.query.type) === 'quarter' ? 'quarter' : 'week';
   try {
     const hh = { apikey: HR_KEY, Authorization: 'Bearer '+HR_KEY };
+    // 시트 조회는 간헐적으로 실패한다(구글이 오류 페이지를 돌려줌).
+    // 실패한 걸 빈 데이터로 넘기면 '전체 0%' 짜리 가짜 보고서가 만들어지므로 3회까지 재시도한다.
+    const fetchDash = async () => {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const r = await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'dashboardData'})});
+          const j = await r.json();
+          if (j && Array.isArray(j.rows) && j.rows.length) return j;
+        } catch (e) { /* 다음 시도 */ }
+        if (i < 2) await new Promise(rs => setTimeout(rs, 900 * (i + 1)));
+      }
+      return null;
+    };
     const [dash, qcRows, hrRows, resignRows] = await Promise.all([
-      fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'dashboardData'})}).then(r=>r.json()).catch(()=>({rows:[]})),
+      fetchDash(),
       jget(SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_quota&select=value',{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}).catch(()=>null),
       jget(HR_URL+'/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)',hh).catch(()=>[]),
       jget(HR_URL+'/rest/v1/employees?select=name&status=eq.퇴사',hh).catch(()=>[])
     ]);
     const rows = processRows((dash&&dash.rows)||[]);
+    // 데이터를 못 받았으면 보고서를 만들지 않는다 (잘못된 0% 보고 방지)
+    if (!rows.length) {
+      res.setHeader('Cache-Control','no-store');   // 실패 응답이 캐시에 박히지 않게
+      res.setHeader('Content-Type','text/plain; charset=utf-8');
+      res.status(200).send('⚠️ 작업 데이터를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
     const quotaConfig = (qcRows&&qcRows[0]&&qcRows[0].value) ? qcRows[0].value : {default:3,persons:{},excluded:[]};
     if(!quotaConfig.persons) quotaConfig.persons={}; if(!quotaConfig.excluded) quotaConfig.excluded=[];
     const hrRoster = (hrRows||[]).map(r=>({name:r.name, dept:(HR_DEPT_TO_PART[r.department]!==undefined?HR_DEPT_TO_PART[r.department]:'')}));
