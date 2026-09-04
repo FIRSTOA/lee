@@ -17,6 +17,8 @@ async function maybeQueueWeekly(list){
     if (list.some(x => x.day === today)) return list;                 // 오늘 이미 적재됐으면 skip
     let sum = '';
     try { const r = await fetch(BASE + '/api/summary?type=week'); sum = await r.text(); } catch (e) {}
+    // 요약을 못 받았으면 이번 폴링에서는 적재하지 않는다 (잘못된 0% 보고 방지) — 다음 폴링에서 재시도
+    if (!/^(📊|📈)/.test(String(sum || '').trim())) return list;
     const lines = String(sum||'').split('\n').map(s=>s.trim()).filter(Boolean);
     const head = lines[0] || '📊 주간 정량목표 보고';
     const mvp = lines.find(l => l.indexOf('MVP') >= 0) || '';
