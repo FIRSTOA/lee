@@ -27,7 +27,9 @@ function processRows(allRows){
     if(!dm) continue;
     let y=parseInt(dm[1]); if(y<100) y+=2000;
     r._y=y; r._m=parseInt(dm[2]);
-    r._wk=parseInt(dm[2])+'월'+Math.ceil(parseInt(dm[3])/7)+'주차';
+    // 주차 = 달력 기준(일요일 시작, 1일이 속한 주가 1주차) — 스프레드시트 '주차별' 열과 동일 규칙
+    const _fd=new Date(y, parseInt(dm[2])-1, 1).getDay();
+    r._wk=parseInt(dm[2])+'월'+Math.ceil((parseInt(dm[3])+_fd)/7)+'주차';
     r._ov=/^오버홀/.test((r.오버홀품목||'').replace(/\s+/g,''));
     r.오버홀품목=(r.오버홀품목||'').replace(/\s+/g,'');
     out.push(r);
@@ -108,7 +110,32 @@ module.exports = async (req, res) => {
 
     const head = (type==='quarter'?'📈':'📊')+' '+label+' 정량목표 달성  전체 '+overall+'% ('+tA+'/'+tT+')';
     const mvpLine = mvp ? '🏅 '+(type==='quarter'?'분기':'이주의')+' MVP: '+mvp.person+' ('+mvp.total+')' : '';
-    const text = [head, '────────────', ...lines, mvpLine].filter(Boolean).join('\n');
+    let text = [head, '────────────', ...lines, mvpLine].filter(Boolean).join('\n');
+
+    // === 미달성 인원 안내 (주간만) ===
+    // 목표가 1 이상인데 실적이 목표에 못 미친 사람만. 원인은 쓰지 않는다(추측 금지).
+    // 해당자가 없으면 이 블록 전체를 표시하지 않는다.
+    if (type !== 'quarter') {
+      const byPerson = {};
+      Object.values(units).forEach(u=>{
+        if (!byPerson[u.person]) byPerson[u.person] = 0;
+        byPerson[u.person] += u.total;
+      });
+      const under = [];
+      Object.keys(byPerson).forEach(nm=>{
+        const tot = byPerson[nm];
+        const goal = targetOf(nm);
+        if (!(goal > 0) || tot >= goal) return;
+        under.push({ name: nm, total: tot, goal: goal, pct: Math.round(tot / goal * 100) });
+      });
+      under.sort((a,b)=> (a.pct - b.pct) || String(a.name).localeCompare(String(b.name), 'ko'));
+      if (under.length) {
+        text += '\n\n⚠️ 미달성 인원';
+        under.forEach(u=>{ text += '\n' + u.name + ' ' + u.total + '/' + u.goal + ' ' + u.pct + '%'; });
+        text += '\n\n📋 AAR 보고 요청';
+        text += '\n\n위 미달성 인원에 대해서는 해당 팀장 또는 파트장이 미달성 원인을 파악한 후 AAR 방식으로 간단히 보고해 주세요.';
+      }
+    }
 
     res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=900');
     res.setHeader('Content-Type','text/plain; charset=utf-8');
