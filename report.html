@@ -114,6 +114,15 @@ async function fetchAll(){
 
 function build(data){
   const { rows, quotaConfig, hrRoster, resigned } = data;
+  // 시트 조회가 실패하면 '전부 0'인 보고서가 그려진다 → 아예 만들지 않고 이유를 표시
+  if (!rows || !rows.length) {
+    document.getElementById('report').innerHTML =
+      '<div class="loading" style="color:#c53030;line-height:1.7">'
+      + '⚠️ 작업 데이터를 가져오지 못했습니다.<br>'
+      + '<span style="font-size:13px;color:#718096">구글 시트 조회가 일시적으로 실패했습니다. 잠시 후 새로고침해 주세요.</span>'
+      + '</div>';
+    return;
+  }
   const quotaOf = (p)=>{ const c=quotaConfig.persons[p]; if(c==null) return quotaConfig.default; if(typeof c==='number') return c; return (c.target!=null?c.target:quotaConfig.default); };
   const effQ = (person, ymv) => { const p=quotaConfig.persons[person]; if(p==null) return quotaConfig.default; if(typeof p==='number') return p; const base=(p.target!=null?p.target:quotaConfig.default); const hist=Array.isArray(p.hist)?p.hist.filter(h=>h&&h.from&&h.q!=null).slice().sort((a,b)=>String(a.from).localeCompare(String(b.from))):[]; if(!hist.length||!ymv) return base; let val=null; for(let i=0;i<hist.length;i++){ if(String(hist[i].from)<=ymv) val=hist[i].q; } return val!=null?val:hist[0].q; };
   const excluded = new Set(quotaConfig.excluded||[]);
