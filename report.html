@@ -114,6 +114,7 @@ async function fetchAll(){
 
 function build(data){
   const { rows, quotaConfig, hrRoster, resigned } = data;
+  // build v2 — 데이터 없음 방어
   // 시트 조회가 실패하면 '전부 0'인 보고서가 그려진다 → 아예 만들지 않고 이유를 표시
   if (!rows || !rows.length) {
     document.getElementById('report').innerHTML =
