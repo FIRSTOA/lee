@@ -28,6 +28,11 @@ module.exports = async (req, res) => {
     const qs = 'type=week' + (ym ? '&ym=' + encodeURIComponent(ym) : '');
     let sum = '';
     try { const r = await fetch(BASE + '/api/summary?' + qs); sum = await r.text(); } catch (e) {}
+    // 요약을 못 받았으면 큐에 넣지 않는다 (예전에 '전체 0%' 잘못된 보고가 방으로 나간 적 있음)
+    if (!/^(📊|📈)/.test(String(sum || '').trim())) {
+      res.status(200).json({ ok: false, skipped: 'summary unavailable', got: String(sum || '').slice(0, 120) });
+      return;
+    }
     const text = (full ? String(sum || '').trim() : brief(sum)) + '\n📋 자세히: ' + BASE + '/report.html?' + qs;
 
     const today = (ym ? ('ym-' + ym + '-') : '') + k.getUTCFullYear() + '-' + (k.getUTCMonth()+1) + '-' + k.getUTCDate();
