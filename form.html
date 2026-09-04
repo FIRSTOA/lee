@@ -1348,12 +1348,25 @@ const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
 const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', '운영지원': 'CSS', 'CS': '' };
 
 const EXTERNAL_STORAGE_KEY = 'overhaul_external_v1';
-const DEFAULT_EXTERNAL = [{ name: '엄재현', dept: '외부인력' }];
+// 엄재현: 주간=직원(CSS) / 야간=아르바이트(외부인력) 으로 분리 — 담당자를 고르면 부서가 자동 선택됨
+const DEFAULT_EXTERNAL = [
+  { name: '엄재현', dept: 'CSS' },
+  { name: '엄재현(야간)', dept: '외부인력' }
+];
 function loadExternal() {
-  try { const s = localStorage.getItem(EXTERNAL_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) return a; } } catch (e) {}
+  let arr = null;
+  try { const s = localStorage.getItem(EXTERNAL_STORAGE_KEY); if (s) { const a = JSON.parse(s); if (Array.isArray(a)) arr = a; } } catch (e) {}
   // 구버전 명단(overhaul_persons_v1)에서 외부인력만 승계
-  try { const old = JSON.parse(localStorage.getItem('overhaul_persons_v1') || '[]'); const ext = old.filter(p => p && p.dept === '외부인력'); if (ext.length) return ext; } catch (e) {}
-  return JSON.parse(JSON.stringify(DEFAULT_EXTERNAL));
+  if (!arr) { try { const old = JSON.parse(localStorage.getItem('overhaul_persons_v1') || '[]'); const ext = old.filter(p => p && p.dept === '외부인력'); if (ext.length) arr = ext; } catch (e) {} }
+  if (!arr) arr = JSON.parse(JSON.stringify(DEFAULT_EXTERNAL));
+  // 주간/야간 분리 자동 반영 (폰마다 저장돼 있어서 기존 기기도 한 번에 맞춰준다)
+  try {
+    let changed = false;
+    arr.forEach(p => { if (p && p.name === '엄재현' && p.dept !== 'CSS') { p.dept = 'CSS'; changed = true; } });
+    if (!arr.some(p => p && p.name === '엄재현(야간)')) { arr.push({ name: '엄재현(야간)', dept: '외부인력' }); changed = true; }
+    if (changed) localStorage.setItem(EXTERNAL_STORAGE_KEY, JSON.stringify(arr));
+  } catch (e) {}
+  return arr;
 }
 function saveExternal(arr) { localStorage.setItem(EXTERNAL_STORAGE_KEY, JSON.stringify(arr)); }
 
