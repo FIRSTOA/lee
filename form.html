@@ -1342,8 +1342,22 @@ const PARTS = ['정착기','드럼','현상기','급지부','공청기','문서�
 // === 담당자 명단 ===
 // 원천: 퍼스트전산 공유 인사DB(조직도, 읽기전용) — CS 전체 + CSS(CS_S). 조직도가 바뀌면 자동 반영.
 // 외부인력은 인사DB에 없으므로 수동 명단으로 유지하여 합쳐서 표시.
-const HR_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
-const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
+// 인사DB — 2026-10 그룹웨어 통합본 (구 DB는 2026-07-30 갱신 중단)
+const HR_URL = 'https://okwhgofnketyqfoaylkx.supabase.co';
+const HR_KEY = 'sb_publishable_UkhjLRJ7bLBemr2wHjZTzw_iQVJrc5z';
+const HR_TABLE = 'directory_employees';
+// 파트 구분이 department 단일값 → department + region 으로 바뀜. 부서명(강북A 등)은 그대로 둔다.
+function hrPartOf(dept, region) {
+  const r = String(region || '');
+  if (/수도권A$/.test(r)) return '강북A';
+  if (/수도권B$/.test(r)) return '강서B';
+  if (/수도권C$/.test(r)) return '강남C';
+  if (/수도권D$/.test(r)) return '경기D';
+  if (/수도권E$/.test(r)) return 'CSS';
+  if (dept === 'CSS') return 'CSS';
+  if (dept === '운영지원') return 'CSS';
+  return '';   // 수도권BCD(여러 파트 총괄) 등 → 명단 제외
+}
 // 인사DB 부서코드 → 오버홀 대시보드 부서명 매핑 (CS 상위부서는 세부팀 없음 → 수동 선택)
 const HR_DEPT_TO_PART = { 'CS_A': '강북A', 'CS_B': '강서B', 'CS_C': '강남C', 'CS_D': '경기D', 'CS_S': 'CSS', '운영지원': 'CSS', 'CS': '' };
 
@@ -1381,11 +1395,11 @@ function rebuildPersonsData() {
 }
 async function fetchHrRoster() {
   try {
-    const url = HR_URL + '/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)';
+    const url = HR_URL + '/rest/v1/' + HR_TABLE + '?select=name,department,region&status=eq.재직&department=in.(CS,CSS,운영지원)';
     const resp = await fetch(url, { headers: { apikey: HR_KEY, Authorization: 'Bearer ' + HR_KEY } });
     if (!resp.ok) return [];
     const rows = await resp.json();
-    return rows.map(r => ({ name: r.name, dept: HR_DEPT_TO_PART[r.department] ?? '' }));
+    return rows.map(r => ({ name: r.name, dept: hrPartOf(r.department, r.region) })).filter(p => p.dept);
   } catch (e) { console.warn('인사DB(조직도) 조회 실패 — 외부인력 명단만 사용', e); return []; }
 }
 async function loadHrRoster() { hrRoster = await fetchHrRoster(); rebuildPersonsData(); }
