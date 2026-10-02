@@ -2,9 +2,22 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
 const SUPA_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
 const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
-const HR_URL = 'https://wleudrdfyprxwbpjidke.supabase.co';
-const HR_KEY = 'sb_publishable_woLsDr8yxttr_6ToYdq24g_52CRi5fV';
-const HR_DEPT_TO_PART = { 'CS_A':'강북A','CS_B':'강서B','CS_C':'강남C','CS_D':'경기D','CS_S':'CSS','운영지원':'CSS','CS':'' };
+// 인사DB — 2026-10 그룹웨어 통합본. 구 'HR information'(wleudrdfy…)은 2026-07-30 갱신 중단
+const HR_URL = 'https://okwhgofnketyqfoaylkx.supabase.co';
+const HR_KEY = 'sb_publishable_UkhjLRJ7bLBemr2wHjZTzw_iQVJrc5z';
+const HR_TABLE = 'directory_employees';
+// 파트 구분이 department 단일값 → department + region 으로 바뀜. 부서명(강북A 등)은 그대로 둔다.
+function hrPartOf(dept, region) {
+  const r = String(region || '');
+  if (/수도권A$/.test(r)) return '강북A';
+  if (/수도권B$/.test(r)) return '강서B';
+  if (/수도권C$/.test(r)) return '강남C';
+  if (/수도권D$/.test(r)) return '경기D';
+  if (/수도권E$/.test(r)) return 'CSS';
+  if (dept === 'CSS') return 'CSS';
+  if (dept === '운영지원') return 'CSS';
+  return '';   // 수도권BCD(여러 파트 총괄) 등 → 통계 대상 제외
+}
 const DEPT_ORDER = ['강북A','강서B','강남C','경기D','CSS','외부인력'];
 const OVERHAUL_WEIGHT = { '1':1,'2':2,'3':3,'4':4,'5':5 };
 
@@ -60,8 +73,8 @@ module.exports = async (req, res) => {
     const [dash, qcRows, hrRows, resignRows] = await Promise.all([
       fetchDash(),
       jget(SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_quota&select=value',{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}).catch(()=>null),
-      jget(HR_URL+'/rest/v1/active_employees?select=name,department&department=in.(CS,CS_A,CS_B,CS_C,CS_D,CS_S,운영지원)',hh).catch(()=>[]),
-      jget(HR_URL+'/rest/v1/employees?select=name&status=eq.퇴사',hh).catch(()=>[])
+      jget(HR_URL+'/rest/v1/'+HR_TABLE+'?select=name,department,region&status=eq.재직&department=in.(CS,CSS,운영지원)',hh).catch(()=>[]),
+      jget(HR_URL+'/rest/v1/'+HR_TABLE+'?select=name&status=neq.재직',hh).catch(()=>[])
     ]);
     const rows = processRows((dash&&dash.rows)||[]);
     // 데이터를 못 받았으면 보고서를 만들지 않는다 (잘못된 0% 보고 방지)
@@ -73,7 +86,8 @@ module.exports = async (req, res) => {
     }
     const quotaConfig = (qcRows&&qcRows[0]&&qcRows[0].value) ? qcRows[0].value : {default:3,persons:{},excluded:[]};
     if(!quotaConfig.persons) quotaConfig.persons={}; if(!quotaConfig.excluded) quotaConfig.excluded=[];
-    const hrRoster = (hrRows||[]).map(r=>({name:r.name, dept:(HR_DEPT_TO_PART[r.department]!==undefined?HR_DEPT_TO_PART[r.department]:'')}));
+    // 파트가 안 잡히는 인원(수도권BCD 총괄 등)은 통계 대상에서 제외
+    const hrRoster = (hrRows||[]).map(r=>({name:r.name, dept:hrPartOf(r.department, r.region)})).filter(p=>p.dept);
     const resigned = new Set((resignRows||[]).map(x=>x.name));
     const excluded = new Set(quotaConfig.excluded||[]);
     const quotaOf = (p)=>{ const c=quotaConfig.persons[p]; if(c==null) return quotaConfig.default; if(typeof c==='number') return c; return (c.target!=null?c.target:quotaConfig.default); };
