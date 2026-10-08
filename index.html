@@ -540,11 +540,31 @@ function effectiveQuotaCfg(cfg, person, ym) {
 }
 function effectiveQuota(person, ym) { return effectiveQuotaCfg(quotaConfig, person, ym); }
 function ymNowKST() { const k = new Date(Date.now() + 9 * 3600 * 1000); return k.getUTCFullYear() + '-' + String(k.getUTCMonth() + 1).padStart(2, '0'); }
-// 오버홀 실적 환산 가중치 — 등급 정가중: 오버홀1=1, 2=2, 3=3, 4=4, 5=5 (그 외 오버홀C 등은 0)
+// 실적 환산 가중치 (2026-10-08 확정) — 오버홀 포인트 + 수리 포인트 합산
+//   오버홀1~5 = 1~5 · 오버홀C = 1 · 기기폐기 = 1 · 부품정리 = 0
+//   수리1 = 0 · 수리2 = 1 · 수리3 = 2 · 수리4 = 4 · 수리5 = 5 · 수리B = 3 · 부품제조 = 1 · 재수리 = 1
+//   예) 오버홀2+수리1 = 2 / 오버홀1+수리2 = 2 / 오버홀1+수리3 = 3
 const OVERHAUL_WEIGHT = { '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
+const REPAIR_WEIGHT   = { '1': 0, '2': 1, '3': 2, '4': 4, '5': 5 };
+function ohPart(s) {
+  const t = String(s || '').replace(/\s+/g, '');
+  const m = /^오버홀([1-5])/.exec(t);
+  if (m) return OVERHAUL_WEIGHT[m[1]];
+  if (/^오버홀C/.test(t)) return 1;
+  if (/^기기폐기/.test(t)) return 1;
+  return 0;   // 부품정리 포함
+}
+function rpPart(s) {
+  const t = String(s || '').replace(/\s+/g, '');
+  const m = /^수리([1-5])/.exec(t);
+  if (m) return REPAIR_WEIGHT[m[1]];
+  if (/^수리B/.test(t)) return 3;
+  if (/^부품제조/.test(t)) return 1;
+  if (/^재수리/.test(t)) return 1;
+  return 0;
+}
 function overhaulWeight(r) {
-  const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || '');
-  return m ? OVERHAUL_WEIGHT[m[1]] : 0;
+  return ohPart(r.오버홀품목) + rpPart(r.수리품목);
 }
 
 // --- Supabase 공유 저장 (정량 목표를 모든 기기/사용자가 동일하게 보도록) ---
@@ -1163,7 +1183,8 @@ function render() {
   // === 정량 목표 달성 현황 (오버홀만 카운트, 주차별) ===
   // 메인 필터가 아닌 quota 카드의 로컬 필터를 사용
   const quotaBase = applyQuotaFilters(RAW_DATA);
-  const overhaulOnly = quotaBase.filter(r => r.카테고리목록.includes('오버홀'));
+  // 포인트가 붙는 작업은 모두 집계 대상 (부품제조·수리 등급도 포인트가 있으므로 오버홀만 거르면 안 됨)
+  const overhaulOnly = quotaBase.filter(r => overhaulWeight(r) > 0);
   const quotaWeeks = [...new Set(overhaulOnly.map(r => r.주차별).filter(v => v))].sort(sortByWeek);
   // 효력 시작월 적용: 각 주차의 월에 맞는 유효 목표 사용
   const QYEAR = overhaulOnly.length ? (parseInt(overhaulOnly[0].년) || new Date().getFullYear()) : new Date().getFullYear();
@@ -1843,11 +1864,17 @@ function openQuotaDetail(key, person, dept, week) {
   const total = recs.reduce((s, r) => s + (r.weight || 0), 0);
   document.getElementById('qd-title').textContent = person + (dept ? ' (' + dept + ')' : '') + ' — ' + week + ' 상세';
   document.getElementById('qd-sub').textContent = '환산 실적 합계 ' + total + ' · 작업 ' + recs.length + '건';
-  const byGrade = {};
-  recs.forEach(r => { const m = /오버홀\s*([1-5])/.exec(r.오버홀품목 || ''); const g = m ? m[1] : '기타'; byGrade[g] = (byGrade[g] || 0) + 1; });
-  document.getElementById('qd-sum').innerHTML = Object.keys(byGrade).sort().map(g => {
-    const wt = OVERHAUL_WEIGHT[g] || 0;
-    return '<span class="pill">오버홀' + g + ' ' + byGrade[g] + '건' + (wt ? ' = ' + (byGrade[g] * wt) : '') + '</span>';
+  // 품목별 요약 — 오버홀/수리 양쪽 모두 포인트가 있으므로 각각 집계
+  const byItem = {};
+  recs.forEach(r => {
+    const oh = String(r.오버홀품목 || '').trim();
+    const rp = String(r.수리품목 || '').trim();
+    if (oh) { byItem[oh] = byItem[oh] || { n: 0, w: ohPart(oh) }; byItem[oh].n++; }
+    if (rp) { byItem[rp] = byItem[rp] || { n: 0, w: rpPart(rp) }; byItem[rp].n++; }
+  });
+  document.getElementById('qd-sum').innerHTML = Object.keys(byItem).sort().map(name => {
+    const it = byItem[name];
+    return '<span class="pill">' + name + ' ' + it.n + '건' + (it.w ? ' = ' + (it.n * it.w) : ' = 0') + '</span>';
   }).join('') || '<span class="pill">내역 없음</span>';
   const sorted = [...recs].sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
   document.getElementById('qd-rows').innerHTML = sorted.map(r => {
