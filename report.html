@@ -100,6 +100,12 @@ function rpPart(s){
   return 0;
 }
 function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
+// 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
+// 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로, 집계할 때만 야간으로 읽는다.
+function normPerson(name, dept){
+  if(String(name||'').trim()==='엄재현' && String(dept||'').trim()==='외부인력') return '엄재현(야간)';
+  return name;
+}
 function sortByWeek(a,b){ const pa=a.match(/(\d+)월(\d+)주차/),pb=b.match(/(\d+)월(\d+)주차/); if(!pa||!pb)return a.localeCompare(b); return (parseInt(pa[1])*10+parseInt(pa[2]))-(parseInt(pb[1])*10+parseInt(pb[2])); }
 function pctClass(pct){ return pct>=100?'rgr':pct>=70?'ry':'rg'; }
 function barColor(pct){ return pct>=100?'#38a169':pct>=70?'#d69e2e':'#e53e3e'; }
@@ -197,10 +203,12 @@ function build(data){
   // 단위 = (담당자 x 기록부서)
   const units={};
   periodRows.forEach(r=>{
-    if(!r.담당자) return; if(excluded.has(r.담당자)||resigned.has(r.담당자)) return;
+    if(!r.담당자) return;
+    const person=normPerson(r.담당자,r.부서명);
+    if(excluded.has(person)||resigned.has(person)) return;
     const dept=r.부서명||'(미지정)'; const col=colOf(r); if(!col) return;
-    const k=r.담당자+''+dept;
-    if(!units[k]) units[k]={person:r.담당자,dept,cols:{}};
+    const k=person+''+dept;
+    if(!units[k]) units[k]={person:person,dept,cols:{}};
     units[k].cols[col]=(units[k].cols[col]||0)+overhaulWeight(r);
   });
   // 0건 로스터 인원
