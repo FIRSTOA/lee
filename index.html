@@ -567,6 +567,13 @@ function overhaulWeight(r) {
   return ohPart(r.오버홀품목) + rpPart(r.수리품목);
 }
 
+// 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
+// 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로 두고 집계할 때만 야간으로 읽는다.
+function normPerson(name, dept) {
+  if (String(name || '').trim() === '엄재현' && String(dept || '').trim() === '외부인력') return '엄재현(야간)';
+  return name;
+}
+
 // --- Supabase 공유 저장 (정량 목표를 모든 기기/사용자가 동일하게 보도록) ---
 const SUPA_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
 const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
@@ -1201,11 +1208,12 @@ function render() {
   quotaDetail = {};
   overhaulOnly.forEach(r => {
     if (!r.담당자 || !r.주차별) return;
-    if (quotaExcluded.has(r.담당자)) return;
+    const person = normPerson(r.담당자, r.부서명);
+    if (quotaExcluded.has(person)) return;
     const dept = r.부서명 || '(미지정)';
     if (deptSelected && !deptSel.has(dept)) return;
-    const k = UKEY(r.담당자, dept);
-    if (!units[k]) { units[k] = { person: r.담당자, dept: dept, weeks: {} }; quotaWeeks.forEach(w => units[k].weeks[w] = 0); }
+    const k = UKEY(person, dept);
+    if (!units[k]) { units[k] = { person: person, dept: dept, weeks: {} }; quotaWeeks.forEach(w => units[k].weeks[w] = 0); }
     const w = overhaulWeight(r);
     units[k].weeks[r.주차별] = (units[k].weeks[r.주차별] || 0) + w;
     (quotaDetail[k] = quotaDetail[k] || {});
