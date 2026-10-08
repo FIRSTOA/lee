@@ -43,6 +43,12 @@ function rpPart(s){
 }
 
 function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
+// 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
+// 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로, 집계할 때만 야간으로 읽는다.
+function normPerson(name, dept){
+  if(String(name||'').trim()==='엄재현' && String(dept||'').trim()==='외부인력') return '엄재현(야간)';
+  return name;
+}
 
 function processRows(allRows){
   let hi=-1;
@@ -135,9 +141,11 @@ module.exports = async (req, res) => {
     // (담당자 x 기록부서) 집계
     const units = {};
     periodRows.forEach(r=>{
-      if(!r.담당자 || excluded.has(r.담당자) || resigned.has(r.담당자)) return;
-      const dept=r.부서명||'(미지정)'; const k=r.담당자+'|'+dept;
-      if(!units[k]) units[k]={person:r.담당자,dept,total:0};
+      if(!r.담당자) return;
+      const person=normPerson(r.담당자,r.부서명);
+      if(excluded.has(person) || resigned.has(person)) return;
+      const dept=r.부서명||'(미지정)'; const k=person+'|'+dept;
+      if(!units[k]) units[k]={person:person,dept,total:0};
       units[k].total += overhaulWeight(r);
     });
     const settingsDept={}; hrRoster.forEach(p=>{ if(p.dept) settingsDept[p.name]=p.dept; });
