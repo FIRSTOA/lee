@@ -19,9 +19,30 @@ function hrPartOf(dept, region) {
   return '';   // 수도권BCD(여러 파트 총괄) 등 → 통계 대상 제외
 }
 const DEPT_ORDER = ['강북A','강서B','강남C','경기D','CSS','외부인력'];
+// 실적 환산 가중치 (2026-10-08 확정) — 오버홀 포인트 + 수리 포인트 합산
+//   오버홀1~5=1~5 · 오버홀C=1 · 기기폐기=1 · 부품정리=0
+//   수리1=0 · 수리2=1 · 수리3=2 · 수리4=4 · 수리5=5 · 수리B=3 · 부품제조=1 · 재수리=1
 const OVERHAUL_WEIGHT = { '1':1,'2':2,'3':3,'4':4,'5':5 };
+const REPAIR_WEIGHT   = { '1':0,'2':1,'3':2,'4':4,'5':5 };
+function ohPart(s){
+  const t=String(s||'').replace(/\s+/g,'');
+  const m=/^오버홀([1-5])/.exec(t);
+  if(m) return OVERHAUL_WEIGHT[m[1]];
+  if(/^오버홀C/.test(t)) return 1;
+  if(/^기기폐기/.test(t)) return 1;
+  return 0;
+}
+function rpPart(s){
+  const t=String(s||'').replace(/\s+/g,'');
+  const m=/^수리([1-5])/.exec(t);
+  if(m) return REPAIR_WEIGHT[m[1]];
+  if(/^수리B/.test(t)) return 3;
+  if(/^부품제조/.test(t)) return 1;
+  if(/^재수리/.test(t)) return 1;
+  return 0;
+}
 
-function overhaulWeight(품목){ const m=/오버홀\s*([1-5])/.exec(품목||''); return m?OVERHAUL_WEIGHT[m[1]]:0; }
+function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
 
 function processRows(allRows){
   let hi=-1;
@@ -43,7 +64,7 @@ function processRows(allRows){
     // 주차 = 달력 기준(일요일 시작, 1일이 속한 주가 1주차) — 스프레드시트 '주차별' 열과 동일 규칙
     const _fd=new Date(y, parseInt(dm[2])-1, 1).getDay();
     r._wk=parseInt(dm[2])+'월'+Math.ceil((parseInt(dm[3])+_fd)/7)+'주차';
-    r._ov=/^오버홀/.test((r.오버홀품목||'').replace(/\s+/g,''));
+    r._ov=overhaulWeight(r)>0;   // 포인트가 붙는 작업은 모두 집계 (부품제조·수리 등급 포함)
     r.오버홀품목=(r.오버홀품목||'').replace(/\s+/g,'');
     out.push(r);
   }
@@ -117,7 +138,7 @@ module.exports = async (req, res) => {
       if(!r.담당자 || excluded.has(r.담당자) || resigned.has(r.담당자)) return;
       const dept=r.부서명||'(미지정)'; const k=r.담당자+'|'+dept;
       if(!units[k]) units[k]={person:r.담당자,dept,total:0};
-      units[k].total += overhaulWeight(r.오버홀품목);
+      units[k].total += overhaulWeight(r);
     });
     const settingsDept={}; hrRoster.forEach(p=>{ if(p.dept) settingsDept[p.name]=p.dept; });
     Object.keys(quotaConfig.persons).forEach(nm=>{ const c=quotaConfig.persons[nm]; if(c&&typeof c==='object'&&c.dept) settingsDept[nm]=c.dept; });
