@@ -60,6 +60,42 @@ async function maybeQueueWeekly(list){
   return list;
 }
 
+// 주 중간 점검 — 수요일 18:00 ~ 목요일 23:59 KST 사이에 그 주 수요일분이 없으면 만든다.
+// 공지방 room='notice' 로 보낸다. 금요일 주간보고와는 별개 항목이다.
+async function maybeQueueMidweek(list){
+  try {
+    const k = new Date(Date.now() + 9*3600*1000);
+    const dow = k.getUTCDay(), hh = k.getUTCHours();   // 수=3, 목=4
+    let back = -1;
+    if (dow === 3 && hh >= 18) back = 0;
+    else if (dow === 4) back = 1;
+    if (back < 0) return list;
+
+    const wed = new Date(k.getTime()); wed.setUTCDate(wed.getUTCDate() - back);
+    const day = wed.getUTCFullYear() + '-' + (wed.getUTCMonth()+1) + '-' + wed.getUTCDate() + '-mid';
+    if (list.some(x => x.day === day)) return list;
+
+    let sum = '';
+    try { const r = await fetch(BASE + '/api/summary?type=midweek'); sum = await r.text(); } catch (e) {}
+    const t = String(sum || '').trim();
+
+    // ✅ = 전원 페이스 유지 → 보낼 내용이 없다. 빈 항목을 sent 처리해 두어 재시도를 멈춘다.
+    if (t.indexOf('✅') === 0) {
+      list.push({ id: Date.now(), text: '', sent: true, day: day, createdAt: new Date().toISOString(), src: 'mid-none' });
+      while (list.length > KEEP) list.shift();
+      await saveQ(list);
+      return list;
+    }
+    // ⏰ 가 아니면 조회 실패 — 적재하지 않고 다음 폴링(30초 뒤)에서 재시도
+    if (t.indexOf('⏰') !== 0) return list;
+
+    list.push({ id: Date.now(), text: t, sent: false, day: day, room: 'notice', createdAt: new Date().toISOString(), src: back ? 'mid-late' : 'mid' });
+    while (list.length > KEEP) list.shift();
+    await saveQ(list);
+  } catch (e) {}
+  return list;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
@@ -76,7 +112,9 @@ module.exports = async (req, res) => {
     }
     let list = await loadQ();
     list = await maybeQueueWeekly(list);
-    const items = list.filter(x => !x.sent).map(x => ({ id: x.id, text: x.text }));
+    list = await maybeQueueMidweek(list);
+    // room: 'notice' = 공지방, 없으면 통계방(기본). 구버전 봇은 room 을 무시하고 통계방으로 보낸다.
+    const items = list.filter(x => !x.sent).map(x => ({ id: x.id, text: x.text, room: x.room || 'main' }));
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.status(200).json({ ok: true, count: items.length, items });
   } catch (e) {
