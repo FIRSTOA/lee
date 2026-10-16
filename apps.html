@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f5fa8">
 <meta name="robots" content="noindex">
-<!-- 업무앱 런처 (테스트) r2 -->
+<!-- 업무앱 런처 (테스트) r3 — 메뉴 4개, 차량은 login.html 경유로 로딩 화면 항상 노출 -->
 
 <title>퍼스트전산 업무앱</title>
 <!-- 홈 화면에 추가해도 '독립 앱'이 아니라 브라우저로 열리게 한다.
@@ -18,7 +18,7 @@
     color-scheme: light;
     --ground:#eef1f5; --surface:#fff; --line:#dde3ea;
     --ink:#16202c; --ink-soft:#5a6878; --ink-faint:#8d99a8;
-    --accent:#1f5fa8; --oh:#2f7d5a; --car:#1f5fa8; --cafe:#a3562a;
+    --accent:#1f5fa8; --oh:#2f7d5a; --car:#0f766e; --dash:#1f5fa8; --cafe:#a3562a;
     --warn-bg:#fdeeee; --warn-fg:#a32b2b;
     --note-bg:#fdf6e8; --note-fg:#8a6318;
     --shadow:0 1px 2px rgba(22,32,44,.06), 0 6px 20px rgba(22,32,44,.07);
@@ -28,7 +28,7 @@
       color-scheme: dark;
       --ground:#11161d; --surface:#1a212b; --line:#2b3542;
       --ink:#e8edf3; --ink-soft:#a3b0bf; --ink-faint:#71808f;
-      --accent:#6ba6e8; --oh:#5cb98c; --car:#6ba6e8; --cafe:#d08a56;
+      --accent:#6ba6e8; --oh:#5cb98c; --car:#45b3a5; --dash:#6ba6e8; --cafe:#d08a56;
       --warn-bg:#3a2222; --warn-fg:#f0a0a0;
       --note-bg:#352c17; --note-fg:#e3c178;
       --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
@@ -70,7 +70,7 @@
   .app:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   .tile { width:48px; height:48px; border-radius:13px; display:grid; place-items:center; color:#fff; }
   .tile svg { width:25px; height:25px; display:block; }
-  .t-oh{background:var(--oh)} .t-car{background:var(--car)} .t-cafe{background:var(--cafe)}
+  .t-oh{background:var(--oh)} .t-car{background:var(--car)} .t-dash{background:var(--dash)} .t-cafe{background:var(--cafe)}
   .nm { font-family:'Gothic A1','Noto Sans KR',sans-serif; font-weight:700; font-size:16px; letter-spacing:-.01em; margin:0; }
   .sub { font-size:12px; color:var(--ink-faint); margin:3px 0 0; line-height:1.4; }
   .badge { display:inline-flex; align-items:center; gap:5px; margin-top:7px; padding:3px 9px;
@@ -128,7 +128,7 @@
       <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
     </a>
 
-    <a class="app" href="https://firstoa-car.vercel.app/form.html">
+    <a class="app" href="https://firstoa-car.vercel.app/login.html">
       <span class="tile t-car" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 16v2.5M20 16v2.5"></path>
@@ -139,8 +139,24 @@
         </svg>
       </span>
       <span>
-        <p class="nm">법인차량 관리</p>
+        <p class="nm">법인차량 신청·보고</p>
         <p class="sub">개인사용 · 정비 · 과태료 · 월간점검</p>
+        <span class="badge b-note stat"><span class="dot"></span>완료보고 대기 2건</span>
+      </span>
+      <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+    </a>
+
+    <a class="app" href="https://firstoa-car.vercel.app/login.html?next=%2Fdashboard.html">
+      <span class="tile t-dash" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 20V4"></path>
+          <path d="M4 20h16"></path>
+          <path d="M8 20v-6M12.6 20V8M17.2 20v-9"></path>
+        </svg>
+      </span>
+      <span>
+        <p class="nm">법인차량 대시보드</p>
+        <p class="sub">검증 · 운영 분석 · 차량 상세</p>
         <span class="badge b-warn stat"><span class="dot"></span>검증 대기 3건</span>
       </span>
       <svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
@@ -166,8 +182,9 @@
   <section class="howto">
     <h2>연결 주소 — 홈 화면 아이콘과 동일</h2>
     <ul class="urls">
-      <li><b>오버홀 입력폼</b><code>lee-zeta-one.vercel.app/splash.html</code><em>LOADING 화면 2.6초 → 입력폼</em></li>
-      <li><b>법인차량 관리</b><code>firstoa-car.vercel.app/form.html</code><em>기존 시작 화면 그대로</em></li>
+      <li><b>오버홀 입력폼</b><code>lee-zeta-one.vercel.app/splash.html</code><em>로딩 2.6초 → 입력폼</em></li>
+      <li><b>법인차량 신청·보고</b><code>firstoa-car.vercel.app/login.html</code><em>로딩 1.5초 → 신청 화면</em></li>
+      <li><b>법인차량 대시보드</b><code>firstoa-car.vercel.app/login.html?next=/dashboard.html</code><em>로딩 1.5초 → 대시보드</em></li>
       <li><b>한신다방</b><code>cafe-ops-psi.vercel.app/</code><em>기존 시작 화면 그대로</em></li>
     </ul>
   </section>
