@@ -126,6 +126,9 @@ module.exports = async (req, res) => {
     // ym=YYYY-MM 지정 시 그 달로 (과거 주간/월 보고 재발송용)
     let tgtY = curY, tgtM = curM; const ym = req.query && req.query.ym;
     if (ym) { const mm = /^(\d{4})-(\d{1,2})$/.exec(String(ym)); if (mm) { tgtY = +mm[1]; tgtM = +mm[2]; } }
+    // asof=M/D — 제목에 찍히는 날짜만 바꾼다(집계 범위는 그대로).
+    // 금요일 보고를 토·일에 뒤늦게 만들 때 '10/17 주간'이 아니라 '10/16 주간'으로 나가게 하려는 용도.
+    const asof = (req.query && req.query.asof && /^\d{1,2}\/\d{1,2}$/.test(String(req.query.asof))) ? String(req.query.asof) : '';
 
     let periodRows, label;
     if(type==='quarter'){
@@ -134,7 +137,7 @@ module.exports = async (req, res) => {
       label = tgtY+'년 '+(Math.floor((tgtM-1)/3)+1)+'분기('+qs+'~'+(qs+2)+'월)';
     } else {
       periodRows = rows.filter(r=>r._ov && r._y===tgtY && r._m===tgtM);
-      label = ym ? (tgtM+'월 주간(월누계)') : (curM+'/'+curD+' 주간');
+      label = ym ? (tgtM+'월 주간(월누계)') : ((asof || (curM+'/'+curD))+' 주간');
     }
     const targetWeeks = new Set(periodRows.map(r=>r._wk)).size || 1;
 
