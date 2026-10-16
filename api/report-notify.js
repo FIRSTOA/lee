@@ -8,23 +8,53 @@ function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveQ(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'report_queue',value:list})}); }
 
-// 봇 폴링 시점에 주간보고 자동 생성 (금요일 18시 이후, 주 1회) — Vercel cron 불필요
+const KEEP = 40;   // 큐 보관 건수 (미발송 추적에 쓰므로 넉넉히)
+
+// 봇 폴링 시점에 주간보고 자동 생성 — 봇은 30초마다 이 API를 치므로 사실상 무제한 재시도다.
+//  · 금요일 18:00 ~ 일요일 23:59 KST 사이에 '그 주 금요일분'이 없으면 만든다.
+//    (금요일 저녁에 봇이 꺼져 있었어도 주말에 켜지면 복구된다)
+//  · 토요일 정오를 넘겨도 못 만들었으면 '보고가 안 나갔다'는 경고를 큐에 넣는다.
+//    경고도 큐를 타므로, 봇이 나중에 켜져도 반드시 전달된다.
 async function maybeQueueWeekly(list){
   try {
     const k = new Date(Date.now() + 9*3600*1000);
-    if (k.getUTCDay() !== 5 || k.getUTCHours() < 18) return list;     // 금요일 18:00 KST 이후만
-    const today = k.getUTCFullYear() + '-' + (k.getUTCMonth()+1) + '-' + k.getUTCDate();
-    if (list.some(x => x.day === today)) return list;                 // 오늘 이미 적재됐으면 skip
+    const dow = k.getUTCDay(), hh = k.getUTCHours();   // KST 요일/시 (금=5, 토=6, 일=0)
+    let back = -1;                                     // 대상 금요일까지 거슬러 올라갈 일수
+    if (dow === 5 && hh >= 18) back = 0;
+    else if (dow === 6) back = 1;
+    else if (dow === 0) back = 2;
+    if (back < 0) return list;
+
+    const fri = new Date(k.getTime()); fri.setUTCDate(fri.getUTCDate() - back);
+    const day = fri.getUTCFullYear() + '-' + (fri.getUTCMonth()+1) + '-' + fri.getUTCDate();
+    const md  = (fri.getUTCMonth()+1) + '/' + fri.getUTCDate();
+    if (list.some(x => x.day === day)) return list;    // 이미 적재됐으면 skip
+
     let sum = '';
-    try { const r = await fetch(BASE + '/api/summary?type=week'); sum = await r.text(); } catch (e) {}
-    // 요약을 못 받았으면 이번 폴링에서는 적재하지 않는다 (잘못된 0% 보고 방지) — 다음 폴링에서 재시도
-    if (!/^(📊|📈)/.test(String(sum || '').trim())) return list;
+    // 뒤늦게 만드는 분은 제목 날짜를 금요일로 고정 (집계 범위는 동일)
+    const sumQs = 'type=week' + (back ? '&asof=' + encodeURIComponent(md) : '');
+    try { const r = await fetch(BASE + '/api/summary?' + sumQs); sum = await r.text(); } catch (e) {}
+
+    // 요약을 못 받았으면 적재하지 않는다 (잘못된 0% 보고 방지) — 30초 뒤 폴링에서 재시도
+    if (!/^(📊|📈)/.test(String(sum || '').trim())) {
+      const late = (dow === 6 && hh >= 12) || dow === 0;   // 토요일 정오 이후
+      if (late && !list.some(x => x.day === day + '-warn')) {
+        const warn = '⚠️ ' + md + '(금) 주간보고가 발송되지 않았습니다.\n'
+                   + '요약 자동 생성이 계속 실패하고 있습니다. 확인이 필요합니다.\n'
+                   + '📋 대시보드: ' + BASE + '/report.html?type=week';
+        list.push({ id: Date.now(), text: warn, sent: false, day: day + '-warn', createdAt: new Date().toISOString(), src: 'poll-warn' });
+        while (list.length > KEEP) list.shift();
+        await saveQ(list);
+      }
+      return list;
+    }
+
     const lines = String(sum||'').split('\n').map(s=>s.trim()).filter(Boolean);
     const head = lines[0] || '📊 주간 정량목표 보고';
     const mvp = lines.find(l => l.indexOf('MVP') >= 0) || '';
     const text = head + (mvp ? '\n'+mvp : '') + '\n📋 자세히: ' + BASE + '/report.html?type=week';
-    list.push({ id: Date.now(), text, sent: false, day: today });
-    while (list.length > 20) list.shift();
+    list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: back ? 'poll-late' : 'poll' });
+    while (list.length > KEEP) list.shift();
     await saveQ(list);
   } catch (e) {}
   return list;
