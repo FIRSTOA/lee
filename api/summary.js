@@ -19,6 +19,7 @@ function hrPartOf(dept, region) {
   return '';   // 수도권BCD(여러 파트 총괄) 등 → 통계 대상 제외
 }
 const DEPT_ORDER = ['강북A','강서B','강남C','경기D','CSS','외부인력'];
+const REPORT_BASE = 'https://lee-zeta-one.vercel.app';
 // 실적 환산 가중치 (2026-10-08 확정) — 오버홀 포인트 + 수리 포인트 합산
 //   오버홀1~5=1~5 · 오버홀C=1 · 기기폐기=1 · 부품정리=0
 //   수리1=0 · 수리2=1 · 수리3=2 · 수리4=4 · 수리5=5 · 수리B=3 · 부품제조=1 · 재수리=1
@@ -67,6 +68,7 @@ function processRows(allRows){
     if(!dm) continue;
     let y=parseInt(dm[1]); if(y<100) y+=2000;
     r._y=y; r._m=parseInt(dm[2]);
+    r._d=y+'-'+String(parseInt(dm[2])).padStart(2,'0')+'-'+String(parseInt(dm[3])).padStart(2,'0');   // 중간 점검용 일자
     // 주차 = 달력 기준(일요일 시작, 1일이 속한 주가 1주차) — 스프레드시트 '주차별' 열과 동일 규칙
     const _fd=new Date(y, parseInt(dm[2])-1, 1).getDay();
     r._wk=parseInt(dm[2])+'월'+Math.ceil((parseInt(dm[3])+_fd)/7)+'주차';
@@ -81,7 +83,8 @@ async function jget(url, headers){ const r=await fetch(url,{headers}); return r.
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin','*');
-  const type = (req.query && req.query.type) === 'quarter' ? 'quarter' : 'week';
+  const _tq = (req.query && req.query.type) || 'week';
+  const type = (_tq === 'quarter' || _tq === 'midweek') ? _tq : 'week';
   try {
     const hh = { apikey: HR_KEY, Authorization: 'Bearer '+HR_KEY };
     // 시트 조회는 간헐적으로 실패한다(구글이 오류 페이지를 돌려줌).
@@ -129,6 +132,64 @@ module.exports = async (req, res) => {
     // asof=M/D — 제목에 찍히는 날짜만 바꾼다(집계 범위는 그대로).
     // 금요일 보고를 토·일에 뒤늦게 만들 때 '10/17 주간'이 아니라 '10/16 주간'으로 나가게 하려는 용도.
     const asof = (req.query && req.query.asof && /^\d{1,2}\/\d{1,2}$/.test(String(req.query.asof))) ? String(req.query.asof) : '';
+
+    // === 중간 점검 (주 중간) ===
+    // 금요일 주간보고와 별개. '이번 주 월요일 ~ 오늘' 실적만 보고,
+    // 경과 근무일 비례 목표(월1/5 … 금5/5)에 못 미치는 인원만 추린다.
+    if (type === 'midweek') {
+      const dowK = kst.getUTCDay();                       // 0=일 … 6=토
+      const backToMon = (dowK === 0) ? 6 : (dowK - 1);
+      const mon = new Date(kst.getTime()); mon.setUTCDate(mon.getUTCDate() - backToMon);
+      const ds = (d) => d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+      const from = ds(mon), to = ds(kst);
+      const elapsed = Math.min(5, backToMon + 1);         // 경과 근무일 (월=1 … 금=5)
+      const ratio = elapsed / 5;
+
+      const got = {};
+      rows.forEach(r=>{
+        if(!r._ov || !r._d || r._d < from || r._d > to) return;
+        const p = normPerson(r.담당자, r.부서명); if(!p) return;
+        got[p] = (got[p]||0) + overhaulWeight(r);
+      });
+
+      const ymv = tgtY + '-' + String(tgtM).padStart(2,'0');
+      const sDept = {}; hrRoster.forEach(p=>{ if(p.dept) sDept[p.name]=p.dept; });
+      Object.keys(quotaConfig.persons).forEach(nm=>{ const c=quotaConfig.persons[nm]; if(c&&typeof c==='object'&&c.dept) sDept[nm]=c.dept; });
+
+      const behind = [];
+      Object.keys(quotaConfig.persons).forEach(nm=>{
+        if (excluded.has(nm) || resigned.has(nm)) return;
+        const goal = effQ(nm, ymv);
+        if (!(goal > 0)) return;                          // 목표 없는 인원은 대상 아님
+        const cur = got[nm] || 0;
+        if (cur >= goal * ratio) return;                  // 페이스 유지 중
+        behind.push({ name: nm, dept: sDept[nm] || '(미지정)', cur: cur, goal: goal, left: Math.max(0, goal - cur) });
+      });
+
+      const mdL = (kst.getUTCMonth()+1)+'/'+kst.getUTCDate();
+      const dnm = ['일','월','화','수','목','금','토'][dowK];
+      res.setHeader('Cache-Control','no-store');          // 중간 점검은 캐시하지 않는다
+      res.setHeader('Content-Type','text/plain; charset=utf-8');
+      if (!behind.length) {
+        res.status(200).send('✅ '+mdL+'('+dnm+') 중간 점검 — 전원 주간목표 페이스를 유지하고 있습니다.');
+        return;
+      }
+      const byDept = {};
+      behind.forEach(b=>{ (byDept[b.dept] = byDept[b.dept] || []).push(b); });
+      const ord = [...DEPT_ORDER, ...Object.keys(byDept).filter(d=>!DEPT_ORDER.includes(d))];
+      let mt = '⏰ '+mdL+'('+dnm+') 중간 점검 — 금요일까지 '+Math.max(0, 5-elapsed)+'일\n\n이대로면 금요일 목표 미달이 예상됩니다.';
+      ord.forEach(d=>{
+        const arr = byDept[d]; if(!arr || !arr.length) return;
+        let sum = 0; arr.forEach(b=>{ sum += b.left; });
+        arr.sort((a,b)=> (b.left-a.left) || String(a.name).localeCompare(String(b.name),'ko'));
+        mt += '\n\n['+d+'] '+sum+'개 더 필요';
+        arr.forEach(b=>{ mt += '\n· '+b.name+'  '+b.cur+'/'+b.goal+(b.cur===0 ? '   ← 이번 주 0건' : ''); });
+      });
+      mt += '\n\n나머지 인원은 주간목표 페이스를 지키고 있습니다.';
+      mt += '\n📋 상세: '+REPORT_BASE+'/report.html?type=week';
+      res.status(200).send(mt);
+      return;
+    }
 
     let periodRows, label;
     if(type==='quarter'){
