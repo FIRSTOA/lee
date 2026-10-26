@@ -49,10 +49,8 @@ async function maybeQueueWeekly(list){
       return list;
     }
 
-    const lines = String(sum||'').split('\n').map(s=>s.trim()).filter(Boolean);
-    const head = lines[0] || '📊 주간 정량목표 보고';
-    const mvp = lines.find(l => l.indexOf('MVP') >= 0) || '';
-    const text = head + (mvp ? '\n'+mvp : '') + '\n📋 자세히: ' + BASE + '/report.html?type=week';
+    // 전문으로 보낸다 (2026-10-26) — 미달성 인원·AAR 요청이 빠지면 보고가 할 일을 못 한다
+    const text = String(sum||'').trim() + '\n📋 자세히: ' + BASE + '/report.html?type=week';
     list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: back ? 'poll-late' : 'poll' });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
