@@ -13,19 +13,10 @@ function kst(){ return new Date(Date.now() + 9*3600*1000); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveQ(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'report_queue',value:list})}); }
 
-// 요약 텍스트에서 헤드라인 + MVP 줄만 뽑아 짧게
-function brief(summary){
-  const lines = String(summary||'').split('\n').map(s=>s.trim()).filter(Boolean);
-  const head = lines[0] || '📊 주간 정량목표 보고';
-  const mvp = lines.find(l => l.indexOf('MVP') >= 0) || '';
-  return head + (mvp ? '\n' + mvp : '');
-}
-
 module.exports = async (req, res) => {
   try {
     const k = kst();
     const force = req.query && req.query.force === '1';
-    const full = req.query && req.query.full === '1';   // 대시보드 버튼: 요약 전문 발송("주간보고" 텍스트와 동일)
     const dow = k.getUTCDay();                          // KST 요일 (금=5, 토=6)
     if (!force && dow !== 5 && dow !== 6) { res.status(200).json({ ok: true, skipped: 'not Fri/Sat(KST)' }); return; }
     const catchup = !force && dow === 6;                // 토요일 = 어제(금)분 재시도
@@ -54,7 +45,9 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const text = (full ? String(sum || '').trim() : brief(sum)) + '\n📋 자세히: ' + BASE + '/report.html?' + linkQs;
+    // 자동 발송도 전문으로 보낸다 (2026-10-26). 예전엔 헤드라인+MVP 3줄만 보냈는데,
+    // 조치가 필요한 '미달성 인원·AAR 요청'이 거기서 잘려 나가 보고가 할 일을 못 했다.
+    const text = String(sum || '').trim() + '\n📋 자세히: ' + BASE + '/report.html?' + linkQs;
     list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: force ? 'manual' : (catchup ? 'cron-sat' : 'cron-fri') });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
