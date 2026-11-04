@@ -236,7 +236,7 @@ function build(data){
 
   // 부서 합계
   const dCount={}, dTot={};
-  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0,rp:0,pt:0}; dTot[u.dept].target+=targetOf(u.person); dTot[u.dept].total+=uTotal(u); dTot[u.dept].rp+=u.rp; dTot[u.dept].pt+=u.pt; });
+  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0,rp:0,ohpt:0}; dTot[u.dept].target+=targetOf(u.person); dTot[u.dept].total+=uTotal(u); dTot[u.dept].rp+=u.rp; dTot[u.dept].ohpt+=u.ohpt; });
   const orderedDepts=[]; unitList.forEach(u=>{ if(!orderedDepts.includes(u.dept))orderedDepts.push(u.dept); });
 
   // 전주 대비 (주간 보고만)
@@ -279,15 +279,17 @@ function build(data){
     else if(t.total>0){pct=100;bc='#38a169';pcol='#38a169';ptxt=(100+t.total)+'%';}
     else {pct=0;bc='#cbd5e0';pcol='#a0aec0';ptxt='—';}
     let wow=''; if(wkPrev){const dw=deptWow[d]||0;const cls=dw>0?'up':dw<0?'down':'flat';const a=dw>0?'▲'+dw:dw<0?'▼'+Math.abs(dw):'–';wow='<div class="wow '+cls+'" style="font-size:11px;font-weight:700;margin-top:2px">전주 대비 '+a+'</div>';}
-    // 수리는 달성률에 안 들어간다. 한 일이 없어 보이지 않게 카드 아래에 따로 적는다.
-    const sideTxt=(t.rp||t.pt)?'<div style="font-size:11px;color:#718096;margin-top:4px">수리 '+t.rp+'대 · '+t.pt+'pt</div>':'';
+    // 포인트를 '수리 N대' 옆에 붙였더니 수리 포인트로 읽혔다(수리 0대인데 5pt).
+    // 포인트는 오버홀분까지 합친 값이라 그 자리에 둘 수 없다 → 오버홀 평균 등급으로 바꾼다.
+    const sideTxt='<div style="font-size:11px;color:#718096;margin-top:4px">오버홀 평균 '
+      +(t.total>0?(t.ohpt/t.total).toFixed(1)+'등급':'—')+' · 수리만 '+t.rp+'대</div>';
     return '<div class="pc"><div class="pt">'+d+' <small>'+dCount[d]+'명</small></div><div style="font-size:11px;color:#a0aec0;margin-top:6px">오버홀 실적 / 목표 (대)</div><div class="big"><b>'+t.total+'</b><small> / '+t.target+'</small></div><div class="bar"><i style="width:'+Math.min(100,pct)+'%;background:'+bc+'"></i></div><div class="pct"><span style="color:'+pcol+'">달성률 '+ptxt+'</span></div>'+sideTxt+wow+'</div>';
   }).join('')+'</div>';
 
   // 표
   const wowHdr=wkPrev?'<th>전주대비</th>':'';
   const colspan = 2 + colList.length + (wkPrev?1:0) + 5;
-  h+='<table><thead><tr><th class="name">담당자</th><th>'+(isQuarter?'분기목표':'주간목표')+'</th>'+colList.map(c=>'<th>'+c+'</th>').join('')+wowHdr+'<th>총목표</th><th>총실적</th><th title="오버홀 평균 등급 — 낮으면 쉬운 등급으로만 대수를 채운 것">평균</th><th title="오버홀 없이 수리만 한 대수. 달성률에는 들어가지 않습니다">수리</th><th>달성률</th></tr></thead><tbody>';
+  h+='<table><thead><tr><th class="name">담당자</th><th>'+(isQuarter?'분기목표':'주간목표')+'</th>'+colList.map(c=>'<th>'+c+'</th>').join('')+wowHdr+'<th>총목표</th><th>총실적</th><th title="오버홀 평균 등급 — 낮으면 쉬운 등급으로만 대수를 채운 것">평균</th><th title="오버홀 없이 수리만 한 대수. 달성률에는 들어가지 않습니다">수리만</th><th>달성률</th></tr></thead><tbody>';
   let last=null;
   unitList.forEach(u=>{
     if(u.dept!==last){ h+='<tr class="deptrow'+(isQuarter?' q':'')+'"><td colspan="'+colspan+'">▸ '+u.dept+' ('+dCount[u.dept]+'명)</td></tr>'; last=u.dept; }
