@@ -194,7 +194,7 @@ module.exports = async (req, res) => {
         arr.forEach(b=>{
           mt += '\n· '+b.name+'  '+b.cur+'/'+b.goal+'대'
              + (b.cur===0 ? '   ← 이번 주 0대' : '')
-             + (b.rp ? '   (수리 '+b.rp+'대)' : '');
+             + (b.rp ? '   (수리만 '+b.rp+'대)' : '');
         });
       });
       mt += '\n\n나머지 인원은 주간 오버홀 목표 페이스를 지키고 있습니다.';
@@ -243,9 +243,9 @@ module.exports = async (req, res) => {
     const targetOf=(person)=> allWeeks.length ? allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w]),0) : (effQ(person,dfltYM)*targetWeeks);
     const dTot={};
     Object.values(units).forEach(u=>{
-      if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,rp:0,pt:0};
+      if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,rp:0,ohpt:0};
       dTot[u.dept].total+=u.total; dTot[u.dept].target+=targetOf(u.person);
-      dTot[u.dept].rp+=u.rp; dTot[u.dept].pt+=u.pt;
+      dTot[u.dept].rp+=u.rp; dTot[u.dept].ohpt+=u.ohpt;
     });
     let tT=0,tA=0; Object.values(dTot).forEach(t=>{tT+=t.target;tA+=t.total;});
     const overall = tT>0 ? Math.round(tA/tT*100) : (tA>0?100+tA:0);
@@ -257,8 +257,9 @@ module.exports = async (req, res) => {
     order.forEach(d=>{
       if(!dTot[d]) return; const t=dTot[d];
       const pct=t.target>0?Math.round(t.total/t.target*100):(t.total>0?100+t.total:0);
-      // 수리는 달성률에 안 들어가므로, 한 일이 없어 보이지 않게 옆에 적는다
-      const side = (t.rp||t.pt) ? '   (수리 '+t.rp+'대 · '+t.pt+'pt)' : '';
+      // 포인트를 '수리 N대' 옆에 붙였더니 수리 포인트로 읽혔다(수리 0대인데 5pt).
+      // 포인트는 오버홀분까지 합친 값이라 그 자리에 둘 수 없다 → 오버홀 평균 등급으로 바꾼다.
+      const side = t.target>0 ? '   (오버홀 평균 '+(t.total>0?(t.ohpt/t.total).toFixed(1)+'등급':'—')+' · 수리만 '+t.rp+'대)' : '';
       lines.push('• '+d+'  '+t.total+'/'+t.target+'대  '+pct+'%'+side);
     });
 
@@ -290,7 +291,7 @@ module.exports = async (req, res) => {
         under.forEach(u=>{
           // 평균 난이도 = 오버홀 포인트 ÷ 오버홀 대수. 대수만 채우려고 오버홀1만 고르는 쏠림이 보인다.
           const avg = u.total > 0 ? (u.ohpt / u.total).toFixed(1) : null;
-          const side = [avg ? '평균 '+avg : null, u.rp ? '수리 '+u.rp+'대' : null].filter(Boolean).join(' · ');
+          const side = [avg ? '평균 '+avg+'등급' : null, u.rp ? '수리만 '+u.rp+'대' : null].filter(Boolean).join(' · ');
           text += '\n' + u.name + ' ' + u.total + '/' + u.goal + '대 ' + u.pct + '%' + (side ? '  ('+side+')' : '');
         });
         text += '\n\n📋 AAR 보고 요청';
@@ -300,7 +301,8 @@ module.exports = async (req, res) => {
 
     // 기준이 바뀐 주에 '저번 주엔 170%였는데' 가 반드시 나온다. 한 줄로 못박아 둔다.
     text += '\n\n※ 2026-11-04부터 달성률은 오버홀 대수 기준입니다.'
-          + '\n수리·부품제조는 달성률에 들어가지 않고 괄호 안에 따로 표시합니다. pt는 난이도 참고치입니다.';
+          + '\n수리·부품제조는 달성률에 들어가지 않고 \'수리만\'으로 따로 표시합니다.'
+          + '\n평균 등급은 오버홀 난이도(1~5)입니다. 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.';
 
     res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=900');
     res.setHeader('Content-Type','text/plain; charset=utf-8');
