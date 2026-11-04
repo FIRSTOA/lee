@@ -100,6 +100,10 @@ function rpPart(s){
   return 0;
 }
 function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
+// 2026-11-04 기준 변경 — 달성률은 '오버홀 대수'로 센다. 목표가 '주 N대'인데 실적을
+// 포인트로 재면 1대가 최대 5대로 부풀어(10월 실측 176%) 목표를 안 넘길 수가 없었다.
+function ohUnit(r){ return ohPart(r && r.오버홀품목) > 0 ? 1 : 0; }   // 오버홀 대수 = 달성률 분자
+function rpUnit(r){ return (ohPart(r && r.오버홀품목) === 0 && rpPart(r && r.수리품목) > 0) ? 1 : 0; }
 // 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
 // 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로, 집계할 때만 야간으로 읽는다.
 function normPerson(name, dept){
@@ -208,8 +212,11 @@ function build(data){
     if(excluded.has(person)||resigned.has(person)) return;
     const dept=r.부서명||'(미지정)'; const col=colOf(r); if(!col) return;
     const k=person+''+dept;
-    if(!units[k]) units[k]={person:person,dept,cols:{}};
-    units[k].cols[col]=(units[k].cols[col]||0)+overhaulWeight(r);
+    if(!units[k]) units[k]={person:person,dept,cols:{},rp:0,ohpt:0,pt:0};
+    units[k].cols[col]=(units[k].cols[col]||0)+ohUnit(r);   // 셀 값 = 오버홀 대수
+    units[k].rp   += rpUnit(r);            // 수리만 한 대수 (달성률 제외, 표시만)
+    units[k].ohpt += ohPart(r.오버홀품목);  // 오버홀 난이도 합 (평균 레벨용)
+    units[k].pt   += overhaulWeight(r);    // 종전 포인트 (참고치)
   });
   // 0건 로스터 인원
   const settingsDept={}; hrRoster.forEach(p=>{ if(p.dept) settingsDept[p.name]=p.dept; });
@@ -218,7 +225,7 @@ function build(data){
   [...new Set([...Object.keys(quotaConfig.persons),...hrRoster.map(p=>p.name)])].forEach(nm=>{
     if(excluded.has(nm)||resigned.has(nm)||hasRec.has(nm)) return;
     const dept=settingsDept[nm]||'(미지정)'; const k=nm+''+dept;
-    if(!units[k]) units[k]={person:nm,dept,cols:{}};
+    if(!units[k]) units[k]={person:nm,dept,cols:{},rp:0,ohpt:0,pt:0};
   });
 
   const unitList = Object.values(units).sort((a,b)=>{
@@ -229,7 +236,7 @@ function build(data){
 
   // 부서 합계
   const dCount={}, dTot={};
-  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0}; dTot[u.dept].target+=targetOf(u.person); dTot[u.dept].total+=uTotal(u); });
+  unitList.forEach(u=>{ dCount[u.dept]=(dCount[u.dept]||0)+1; if(!dTot[u.dept])dTot[u.dept]={target:0,total:0,rp:0,pt:0}; dTot[u.dept].target+=targetOf(u.person); dTot[u.dept].total+=uTotal(u); dTot[u.dept].rp+=u.rp; dTot[u.dept].pt+=u.pt; });
   const orderedDepts=[]; unitList.forEach(u=>{ if(!orderedDepts.includes(u.dept))orderedDepts.push(u.dept); });
 
   // 전주 대비 (주간 보고만)
@@ -247,22 +254,22 @@ function build(data){
 
   // ===== HTML =====
   const headClass=isQuarter?'q':'week';
-  const titleTxt=isQuarter?'📈 정량목표 달성 현황 — 분기 보고':'📊 정량목표 달성 현황 — 주간 보고';
-  let h='<div class="rhead '+headClass+'"><div class="t">'+titleTxt+'</div><div class="p">'+periodSub+' · 실적=오버홀 등급 환산(1~5점), 목표는 건수</div></div><div class="rbody">';
+  const titleTxt=isQuarter?'📈 오버홀 목표 달성 현황 — 분기 보고':'📊 오버홀 목표 달성 현황 — 주간 보고';
+  let h='<div class="rhead '+headClass+'"><div class="t">'+titleTxt+'</div><div class="p">'+periodSub+' · 실적·목표 모두 <b>오버홀 대수</b> 기준 (2026-11-04 변경)</div></div><div class="rbody">';
 
   // 요약
-  h+='<div class="q-summary">'+(isQuarter?'📈':'📊')+' 전체 <span class="em">'+overallPct+'%</span> ('+tA+'/'+tT+')'
+  h+='<div class="q-summary">'+(isQuarter?'📈':'📊')+' 전체 <span class="em">'+overallPct+'%</span> ('+tA+'/'+tT+'대)'
     +(topPart?' · 달성률 1위 <span class="em">'+topPart.d+' '+topPart.pct+'%</span>':'')
-    +(mvp?' · '+(isQuarter?'분기':'이주의')+' MVP <span class="em">'+mvp.p+'('+mvp.t+')</span>':'')
+    +(mvp?' · '+(isQuarter?'분기':'이주의')+' MVP <span class="em">'+mvp.p+'('+mvp.t+'대)</span>':'')
     +(lowParts.length?' · <span class="warn">⚠️ '+lowParts.join('·')+' 분발 필요</span>':'')+'</div>';
   // 상태
   h+='<div class="q-status"><span class="chip ok">목표달성 '+achieved+'명</span><span class="chip no">미달 '+missed+'명</span>'
-    +(!isQuarter?'<span class="zero">이번 주('+(wkThis||'-')+') 무실적 <b>'+zeroThis.length+'명</b>'+(zeroThis.length?': '+zeroThis.slice(0,12).join('·')+(zeroThis.length>12?' 외':''):'')+'</span>':'<span class="zero">분기 누계 기준</span>')+'</div>';
+    +(!isQuarter?'<span class="zero">이번 주('+(wkThis||'-')+') 오버홀 0대 <b>'+zeroThis.length+'명</b>'+(zeroThis.length?': '+zeroThis.slice(0,12).join('·')+(zeroThis.length>12?' 외':''):'')+'</span>':'<span class="zero">분기 누계 기준</span>')+'</div>';
   // 페이스 (주간, 단일월)
   if(!isQuarter && targetWeeksCount>0){
     const daysInMonth=new Date(curYear,curMonth,0).getDate(); const monthWeeks=Math.ceil(daysInMonth/7); const elapsed=targetWeeksCount;
     if(monthWeeks>=elapsed){ const remaining=monthWeeks-elapsed; const monthTarget=Math.round(tT/elapsed*monthWeeks); const projActual=Math.round(tA/elapsed*monthWeeks); const projPct=monthTarget>0?Math.round(projActual/monthTarget*100):0; const need=Math.max(0,monthTarget-tA); const needWk=remaining>0?Math.ceil(need/remaining):0; const curWk=Math.round(tA/elapsed);
-      h+='<div class="q-pace">⏳ '+curMonth+'월 <b>남은 '+remaining+'주</b> · 현재 페이스면 <b>월말 예상 '+projPct+'%</b>'+(remaining>0?' · 목표 달성하려면 팀 <b>주 '+needWk+'건</b> 필요(현재 주 '+curWk+'건)':'')+'</div>';
+      h+='<div class="q-pace">⏳ '+curMonth+'월 <b>남은 '+remaining+'주</b> · 현재 페이스면 <b>월말 예상 '+projPct+'%</b>'+(remaining>0?' · 목표 달성하려면 팀 <b>주 '+needWk+'대</b> 필요(현재 주 '+curWk+'대)':'')+'</div>';
     }
   }
   // 파트 카드
@@ -272,13 +279,15 @@ function build(data){
     else if(t.total>0){pct=100;bc='#38a169';pcol='#38a169';ptxt=(100+t.total)+'%';}
     else {pct=0;bc='#cbd5e0';pcol='#a0aec0';ptxt='—';}
     let wow=''; if(wkPrev){const dw=deptWow[d]||0;const cls=dw>0?'up':dw<0?'down':'flat';const a=dw>0?'▲'+dw:dw<0?'▼'+Math.abs(dw):'–';wow='<div class="wow '+cls+'" style="font-size:11px;font-weight:700;margin-top:2px">전주 대비 '+a+'</div>';}
-    return '<div class="pc"><div class="pt">'+d+' <small>'+dCount[d]+'명</small></div><div style="font-size:11px;color:#a0aec0;margin-top:6px">실적 / 목표 (건)</div><div class="big"><b>'+t.total+'</b><small> / '+t.target+'</small></div><div class="bar"><i style="width:'+Math.min(100,pct)+'%;background:'+bc+'"></i></div><div class="pct"><span style="color:'+pcol+'">달성률 '+ptxt+'</span></div>'+wow+'</div>';
+    // 수리는 달성률에 안 들어간다. 한 일이 없어 보이지 않게 카드 아래에 따로 적는다.
+    const sideTxt=(t.rp||t.pt)?'<div style="font-size:11px;color:#718096;margin-top:4px">수리 '+t.rp+'대 · '+t.pt+'pt</div>':'';
+    return '<div class="pc"><div class="pt">'+d+' <small>'+dCount[d]+'명</small></div><div style="font-size:11px;color:#a0aec0;margin-top:6px">오버홀 실적 / 목표 (대)</div><div class="big"><b>'+t.total+'</b><small> / '+t.target+'</small></div><div class="bar"><i style="width:'+Math.min(100,pct)+'%;background:'+bc+'"></i></div><div class="pct"><span style="color:'+pcol+'">달성률 '+ptxt+'</span></div>'+sideTxt+wow+'</div>';
   }).join('')+'</div>';
 
   // 표
   const wowHdr=wkPrev?'<th>전주대비</th>':'';
-  const colspan = 2 + colList.length + (wkPrev?1:0) + 3;
-  h+='<table><thead><tr><th class="name">담당자</th><th>'+(isQuarter?'분기목표':'주간목표')+'</th>'+colList.map(c=>'<th>'+c+'</th>').join('')+wowHdr+'<th>총목표</th><th>총실적</th><th>달성률</th></tr></thead><tbody>';
+  const colspan = 2 + colList.length + (wkPrev?1:0) + 5;
+  h+='<table><thead><tr><th class="name">담당자</th><th>'+(isQuarter?'분기목표':'주간목표')+'</th>'+colList.map(c=>'<th>'+c+'</th>').join('')+wowHdr+'<th>총목표</th><th>총실적</th><th title="오버홀 평균 등급 — 낮으면 쉬운 등급으로만 대수를 채운 것">평균</th><th title="오버홀 없이 수리만 한 대수. 달성률에는 들어가지 않습니다">수리</th><th>달성률</th></tr></thead><tbody>';
   let last=null;
   unitList.forEach(u=>{
     if(u.dept!==last){ h+='<tr class="deptrow'+(isQuarter?' q':'')+'"><td colspan="'+colspan+'">▸ '+u.dept+' ('+dCount[u.dept]+'명)</td></tr>'; last=u.dept; }
@@ -286,10 +295,12 @@ function build(data){
     const cells=colList.map(c=>{ const v=u.cols[c]||0; const cq=effQ(u.person,colYM(c)); const cls=cq===0?(v>0?'ok2':'z'):(v>=cq?'ok2':(v===0?'missz':'miss')); return '<td class="'+cls+'">'+v+'</td>'; }).join('');
     let wowCell=''; if(wkPrev){const dw=(u.cols[wkThis]||0)-(u.cols[wkPrev]||0);const cls=dw>0?'wu':dw<0?'wd':'wf';const a=dw>0?'▲'+dw:dw<0?'▼'+Math.abs(dw):'–';wowCell='<td class="'+cls+'">'+a+'</td>';}
     let rate; if(target>0){const pct=Math.round(tot/target*100);rate='<td class="'+pctClass(pct)+'">'+pct+'%</td>';}else if(tot>0){rate='<td class="rgr">'+(100+tot)+'%</td>';}else{rate='<td class="dash">—</td>';}
-    h+='<tr><td class="name">'+u.person+'</td><td>'+q+'</td>'+cells+wowCell+'<td>'+target+'</td><td><b>'+tot+'</b></td>'+rate+'</tr>';
+    const avgCell='<td class="dash">'+(tot>0?(u.ohpt/tot).toFixed(1):'—')+'</td>';
+    const rpCell='<td class="dash">'+(u.rp||'—')+'</td>';
+    h+='<tr><td class="name">'+u.person+'</td><td>'+q+'</td>'+cells+wowCell+'<td>'+target+'</td><td><b>'+tot+'</b></td>'+avgCell+rpCell+rate+'</tr>';
   });
   h+='</tbody></table>';
-  h+='</div><div class="foot">오버홀 통계 대시보드 · 자동 생성</div>';
+  h+='</div><div class="foot">2026-11-04부터 달성률은 <b>오버홀 대수</b> 기준입니다. 수리·부품제조는 달성률에 들어가지 않고 \'수리\' 칸에 따로 표시합니다.<br>\'평균\'은 오버홀 평균 등급(1~5)입니다. 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.<br>오버홀 통계 대시보드 · 자동 생성</div>';
   document.getElementById('report').innerHTML=h;
   document.title = (isQuarter?'분기보고 ':'주간보고 ')+periodSub;
   window._reportReady = true; // 메신저봇R 캡처 타이밍용
