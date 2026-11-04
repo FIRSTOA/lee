@@ -1,12 +1,16 @@
 // 관리자 인증 — 회사 인증서버(firstoa-works)에 위임. 별도 환경변수 불필요.
 // POST { username, password }
 //  → { ok, role: 'master'|'admin'|'none', user: {username,name,department,position}, admins: [...] }
-// 마스터: lee.us / lee.es (고정). 관리자: app_config key=overhaul_admins 목록에 등록된 아이디.
+// 마스터: lee.us / lee.es / 190201 (고정). 관리자: app_config key=overhaul_admins 목록에 등록된 아이디.
 const WORKS_AUTH_URL = 'https://firstoa-works.vercel.app/api/auth/login';
 const SUPA_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
 const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const SUPA_H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
-const MASTERS = ['lee.us', 'lee.es'];
+// 2026-11-01 그룹웨어가 '사번으로만 로그인'으로 바뀌었다(login-cutoff.ts SABUN_ONLY_FROM).
+// 전환 중이라 인증서버가 돌려주는 아이디가 옛 아이디일 수도, 사번일 수도 있다.
+// 한쪽만 적어 두면 그룹웨어가 login_id 를 사번으로 정리하는 날 권한이 통째로 끊긴다.
+// → 옛 아이디와 사번을 **둘 다** 적고, 판정도 아이디·사번·사원코드 셋을 모두 본다.
+const MASTERS = ['lee.us', 'lee.es', '190201'];
 const ADMIN_KEY = 'overhaul_admins';
 
 function readBody(req) {
@@ -52,9 +56,13 @@ async function verifyUser(username, password) {
 
   const uname = String(data.username).trim().toLowerCase();
   const admins = await loadAdmins();
+  // 아이디·사원코드·사번 중 하나라도 맞으면 그 사람으로 본다 (사번 전환 대응)
+  const ids = [data.username, data.empNo, data.sabun]
+    .map(x => String(x == null ? '' : x).trim().toLowerCase())
+    .filter(Boolean);
   let role = 'none';
-  if (MASTERS.indexOf(uname) >= 0) role = 'master';
-  else if (admins.indexOf(uname) >= 0) role = 'admin';
+  if (ids.some(x => MASTERS.indexOf(x) >= 0)) role = 'master';
+  else if (ids.some(x => admins.indexOf(x) >= 0)) role = 'admin';
 
   return {
     ok: true,
