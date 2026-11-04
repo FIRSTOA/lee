@@ -44,6 +44,13 @@ function rpPart(s){
 }
 
 function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
+// 2026-11-04 기준 변경 — 달성률은 '오버홀 대수'로 센다.
+// 목표는 '주 N대'인데 실적을 포인트로 재면 1대가 최대 5대로 부풀어(10월 실측 176%)
+// 아무도 목표를 안 넘길 수가 없었다. 포인트는 난이도 참고치로만 옆에 붙인다.
+//   · 오버홀 대수 = 오버홀품목이 적힌 건(기기폐기 포함, 부품정리·없음 제외) 1건 = 1대
+//   · 수리 대수   = 오버홀 없이 수리만 한 건. 달성률에는 안 들어가고 옆에 표시만 한다
+function ohUnit(r){ return ohPart(r && r.오버홀품목) > 0 ? 1 : 0; }
+function rpUnit(r){ return (ohPart(r && r.오버홀품목) === 0 && rpPart(r && r.수리품목) > 0) ? 1 : 0; }
 // 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
 // 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로, 집계할 때만 야간으로 읽는다.
 function normPerson(name, dept){
@@ -145,11 +152,12 @@ module.exports = async (req, res) => {
       const elapsed = Math.min(5, backToMon + 1);         // 경과 근무일 (월=1 … 금=5)
       const ratio = elapsed / 5;
 
-      const got = {};
+      const got = {}, gotRp = {};
       rows.forEach(r=>{
         if(!r._ov || !r._d || r._d < from || r._d > to) return;
         const p = normPerson(r.담당자, r.부서명); if(!p) return;
-        got[p] = (got[p]||0) + overhaulWeight(r);
+        got[p]   = (got[p]||0)   + ohUnit(r);     // 달성률 분자는 오버홀 대수
+        gotRp[p] = (gotRp[p]||0) + rpUnit(r);
       });
 
       const ymv = tgtY + '-' + String(tgtM).padStart(2,'0');
@@ -163,7 +171,7 @@ module.exports = async (req, res) => {
         if (!(goal > 0)) return;                          // 목표 없는 인원은 대상 아님
         const cur = got[nm] || 0;
         if (cur >= goal * ratio) return;                  // 페이스 유지 중
-        behind.push({ name: nm, dept: sDept[nm] || '(미지정)', cur: cur, goal: goal, left: Math.max(0, goal - cur) });
+        behind.push({ name: nm, dept: sDept[nm] || '(미지정)', cur: cur, goal: goal, rp: gotRp[nm] || 0, left: Math.max(0, goal - cur) });
       });
 
       const mdL = (kst.getUTCMonth()+1)+'/'+kst.getUTCDate();
@@ -171,21 +179,26 @@ module.exports = async (req, res) => {
       res.setHeader('Cache-Control','no-store');          // 중간 점검은 캐시하지 않는다
       res.setHeader('Content-Type','text/plain; charset=utf-8');
       if (!behind.length) {
-        res.status(200).send('✅ '+mdL+'('+dnm+') 중간 점검 — 전원 주간목표 페이스를 유지하고 있습니다.');
+        res.status(200).send('✅ '+mdL+'('+dnm+') 중간 점검 — 전원 주간 오버홀 목표 페이스를 유지하고 있습니다.');
         return;
       }
       const byDept = {};
       behind.forEach(b=>{ (byDept[b.dept] = byDept[b.dept] || []).push(b); });
       const ord = [...DEPT_ORDER, ...Object.keys(byDept).filter(d=>!DEPT_ORDER.includes(d))];
-      let mt = '⏰ '+mdL+'('+dnm+') 중간 점검 — 금요일까지 '+Math.max(0, 5-elapsed)+'일\n\n이대로면 금요일 목표 미달이 예상됩니다.';
+      let mt = '⏰ '+mdL+'('+dnm+') 중간 점검 — 금요일까지 '+Math.max(0, 5-elapsed)+'일\n\n이대로면 금요일 오버홀 목표 미달이 예상됩니다.';
       ord.forEach(d=>{
         const arr = byDept[d]; if(!arr || !arr.length) return;
         let sum = 0; arr.forEach(b=>{ sum += b.left; });
         arr.sort((a,b)=> (b.left-a.left) || String(a.name).localeCompare(String(b.name),'ko'));
-        mt += '\n\n['+d+'] '+sum+'개 더 필요';
-        arr.forEach(b=>{ mt += '\n· '+b.name+'  '+b.cur+'/'+b.goal+(b.cur===0 ? '   ← 이번 주 0건' : ''); });
+        mt += '\n\n['+d+'] 오버홀 '+sum+'대 더 필요';
+        arr.forEach(b=>{
+          mt += '\n· '+b.name+'  '+b.cur+'/'+b.goal+'대'
+             + (b.cur===0 ? '   ← 이번 주 0대' : '')
+             + (b.rp ? '   (수리 '+b.rp+'대)' : '');
+        });
       });
-      mt += '\n\n나머지 인원은 주간목표 페이스를 지키고 있습니다.';
+      mt += '\n\n나머지 인원은 주간 오버홀 목표 페이스를 지키고 있습니다.';
+      mt += '\n※ 수리·부품제조는 달성률에 들어가지 않습니다. 목표는 오버홀 대수입니다.';
       mt += '\n📋 상세: '+REPORT_BASE+'/report.html?type=week';
       res.status(200).send(mt);
       return;
@@ -209,8 +222,11 @@ module.exports = async (req, res) => {
       const person=normPerson(r.담당자,r.부서명);
       if(excluded.has(person) || resigned.has(person)) return;
       const dept=r.부서명||'(미지정)'; const k=person+'|'+dept;
-      if(!units[k]) units[k]={person:person,dept,total:0};
-      units[k].total += overhaulWeight(r);
+      if(!units[k]) units[k]={person:person,dept,total:0,rp:0,ohpt:0,pt:0};
+      units[k].total += ohUnit(r);              // 달성률 분자 = 오버홀 대수
+      units[k].rp    += rpUnit(r);              // 수리만 한 대수 (참고 표시)
+      units[k].ohpt  += ohPart(r.오버홀품목);    // 오버홀 난이도 합 (평균 레벨 계산용)
+      units[k].pt    += overhaulWeight(r);      // 종전 포인트 (참고 표시)
     });
     const settingsDept={}; hrRoster.forEach(p=>{ if(p.dept) settingsDept[p.name]=p.dept; });
     Object.keys(quotaConfig.persons).forEach(nm=>{ const c=quotaConfig.persons[nm]; if(c&&typeof c==='object'&&c.dept) settingsDept[nm]=c.dept; });
@@ -218,7 +234,7 @@ module.exports = async (req, res) => {
     [...new Set([...Object.keys(quotaConfig.persons),...hrRoster.map(p=>p.name)])].forEach(nm=>{
       if(excluded.has(nm)||resigned.has(nm)||hasRec.has(nm)) return;
       const dept=settingsDept[nm]||'(미지정)'; const k=nm+'|'+dept;
-      if(!units[k]) units[k]={person:nm,dept,total:0};
+      if(!units[k]) units[k]={person:nm,dept,total:0,rp:0,ohpt:0,pt:0};
     });
 
     // 효력 시작월: 각 주차의 월에 맞는 유효 목표 합산
@@ -226,17 +242,28 @@ module.exports = async (req, res) => {
     const allWeeks=Object.keys(wkMonths); const dfltYM=tgtY+'-'+String(tgtM).padStart(2,'0');
     const targetOf=(person)=> allWeeks.length ? allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w]),0) : (effQ(person,dfltYM)*targetWeeks);
     const dTot={};
-    Object.values(units).forEach(u=>{ if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0}; dTot[u.dept].total+=u.total; dTot[u.dept].target+=targetOf(u.person); });
+    Object.values(units).forEach(u=>{
+      if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,rp:0,pt:0};
+      dTot[u.dept].total+=u.total; dTot[u.dept].target+=targetOf(u.person);
+      dTot[u.dept].rp+=u.rp; dTot[u.dept].pt+=u.pt;
+    });
     let tT=0,tA=0; Object.values(dTot).forEach(t=>{tT+=t.target;tA+=t.total;});
     const overall = tT>0 ? Math.round(tA/tT*100) : (tA>0?100+tA:0);
-    let mvp=null; Object.values(units).forEach(u=>{ if(u.total>0&&(!mvp||u.total>mvp.total)) mvp={person:u.person,total:u.total}; });
+    // MVP도 오버홀 대수 기준. 대수가 같으면 난이도(포인트)가 높은 쪽
+    let mvp=null; Object.values(units).forEach(u=>{ if(u.total>0&&(!mvp||u.total>mvp.total||(u.total===mvp.total&&u.pt>mvp.pt))) mvp={person:u.person,total:u.total,pt:u.pt}; });
 
     const order = [...DEPT_ORDER, ...Object.keys(dTot).filter(d=>!DEPT_ORDER.includes(d))];
     let lines = [];
-    order.forEach(d=>{ if(!dTot[d]) return; const t=dTot[d]; const pct=t.target>0?Math.round(t.total/t.target*100):(t.total>0?100+t.total:0); lines.push('• '+d+'  '+t.total+'/'+t.target+'  '+pct+'%'); });
+    order.forEach(d=>{
+      if(!dTot[d]) return; const t=dTot[d];
+      const pct=t.target>0?Math.round(t.total/t.target*100):(t.total>0?100+t.total:0);
+      // 수리는 달성률에 안 들어가므로, 한 일이 없어 보이지 않게 옆에 적는다
+      const side = (t.rp||t.pt) ? '   (수리 '+t.rp+'대 · '+t.pt+'pt)' : '';
+      lines.push('• '+d+'  '+t.total+'/'+t.target+'대  '+pct+'%'+side);
+    });
 
-    const head = (type==='quarter'?'📈':'📊')+' '+label+' 정량목표 달성  전체 '+overall+'% ('+tA+'/'+tT+')';
-    const mvpLine = mvp ? '🏅 '+(type==='quarter'?'분기':'이주의')+' MVP: '+mvp.person+' ('+mvp.total+')' : '';
+    const head = (type==='quarter'?'📈':'📊')+' '+label+' 오버홀 목표 달성  전체 '+overall+'% ('+tA+'/'+tT+'대)';
+    const mvpLine = mvp ? '🏅 '+(type==='quarter'?'분기':'이주의')+' MVP: '+mvp.person+' ('+mvp.total+'대)' : '';
     let text = [head, '────────────', ...lines, mvpLine].filter(Boolean).join('\n');
 
     // === 미달성 인원 안내 (주간만) ===
@@ -245,24 +272,35 @@ module.exports = async (req, res) => {
     if (type !== 'quarter') {
       const byPerson = {};
       Object.values(units).forEach(u=>{
-        if (!byPerson[u.person]) byPerson[u.person] = 0;
-        byPerson[u.person] += u.total;
+        if (!byPerson[u.person]) byPerson[u.person] = { oh:0, rp:0, ohpt:0 };
+        byPerson[u.person].oh   += u.total;
+        byPerson[u.person].rp   += u.rp;
+        byPerson[u.person].ohpt += u.ohpt;
       });
       const under = [];
       Object.keys(byPerson).forEach(nm=>{
-        const tot = byPerson[nm];
+        const b = byPerson[nm];
         const goal = targetOf(nm);
-        if (!(goal > 0) || tot >= goal) return;
-        under.push({ name: nm, total: tot, goal: goal, pct: Math.round(tot / goal * 100) });
+        if (!(goal > 0) || b.oh >= goal) return;
+        under.push({ name: nm, total: b.oh, rp: b.rp, ohpt: b.ohpt, goal: goal, pct: Math.round(b.oh / goal * 100) });
       });
       under.sort((a,b)=> (a.pct - b.pct) || String(a.name).localeCompare(String(b.name), 'ko'));
       if (under.length) {
-        text += '\n\n⚠️ 미달성 인원';
-        under.forEach(u=>{ text += '\n' + u.name + ' ' + u.total + '/' + u.goal + ' ' + u.pct + '%'; });
+        text += '\n\n⚠️ 오버홀 목표 미달 인원';
+        under.forEach(u=>{
+          // 평균 난이도 = 오버홀 포인트 ÷ 오버홀 대수. 대수만 채우려고 오버홀1만 고르는 쏠림이 보인다.
+          const avg = u.total > 0 ? (u.ohpt / u.total).toFixed(1) : null;
+          const side = [avg ? '평균 '+avg : null, u.rp ? '수리 '+u.rp+'대' : null].filter(Boolean).join(' · ');
+          text += '\n' + u.name + ' ' + u.total + '/' + u.goal + '대 ' + u.pct + '%' + (side ? '  ('+side+')' : '');
+        });
         text += '\n\n📋 AAR 보고 요청';
         text += '\n\n위 미달성 인원에 대해서는 해당 팀장 또는 파트장이 미달성 원인을 파악한 후 AAR 방식으로 간단히 보고해 주세요.';
       }
     }
+
+    // 기준이 바뀐 주에 '저번 주엔 170%였는데' 가 반드시 나온다. 한 줄로 못박아 둔다.
+    text += '\n\n※ 2026-11-04부터 달성률은 오버홀 대수 기준입니다.'
+          + '\n수리·부품제조는 달성률에 들어가지 않고 괄호 안에 따로 표시합니다. pt는 난이도 참고치입니다.';
 
     res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=900');
     res.setHeader('Content-Type','text/plain; charset=utf-8');
