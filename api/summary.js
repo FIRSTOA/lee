@@ -44,13 +44,29 @@ function rpPart(s){
 }
 
 function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && r.수리품목); }
-// 2026-11-04 기준 변경 — 달성률은 '오버홀 대수'로 센다.
-// 목표는 '주 N대'인데 실적을 포인트로 재면 1대가 최대 5대로 부풀어(10월 실측 176%)
-// 아무도 목표를 안 넘길 수가 없었다. 포인트는 난이도 참고치로만 옆에 붙인다.
-//   · 오버홀 대수 = 오버홀품목이 적힌 건(기기폐기 포함, 부품정리·없음 제외) 1건 = 1대
-//   · 수리 대수   = 오버홀 없이 수리만 한 건. 달성률에는 안 들어가고 옆에 표시만 한다
-function ohUnit(r){ return ohPart(r && r.오버홀품목) > 0 ? 1 : 0; }
-function rpUnit(r){ return (ohPart(r && r.오버홀품목) === 0 && rpPart(r && r.수리품목) > 0) ? 1 : 0; }
+// 2026-11-06 확정 — 포인트를 없애고 '목표 대수'에 직접 반영한다.
+// 레벨이 올라갈수록 작업 시간이 길어지는 만큼만 대수로 쳐준다(종전 1~5 포인트는 너무 컸다).
+//   오버홀1·2·3 = 1대 · 오버홀4 = 2대 · 오버홀5 = 3대 · 오버홀C = 1대 · 기기폐기 = 1대 · 부품정리 = 0
+//   수리1 = 0 · 수리2·3 = 1대 · 수리4 = 2대 · 수리5 = 3대 · 수리B = 1대
+//   부품제조·재수리 = 0 — 기기 작업이 아니라서 목표 대수에 넣지 않는다
+// 한 행에 오버홀과 수리가 같이 적혀 있으면 둘 다 더한다.
+const OH_UNIT = { '1':1, '2':1, '3':1, '4':2, '5':3 };
+const RP_UNIT = { '1':0, '2':1, '3':1, '4':2, '5':3 };
+function ohUnit(r){
+  const t=String((r && r.오버홀품목)||'').replace(/\s+/g,'');
+  const m=/^오버홀([1-5])/.exec(t);
+  if(m) return OH_UNIT[m[1]];
+  if(/^오버홀C/.test(t)) return 1;
+  if(/^기기폐기/.test(t)) return 1;
+  return 0;
+}
+function rpUnit(r){
+  const t=String((r && r.수리품목)||'').replace(/\s+/g,'');
+  const m=/^수리([1-5])/.exec(t);
+  if(m) return RP_UNIT[m[1]];
+  if(/^수리B/.test(t)) return 1;
+  return 0;
+}
 
 // 2026-11-06 기준 변경 — 목표를 '주차 수'가 아니라 '평일 수'로 잰다.
 // '주 N대'는 평일 5일에 N대라는 뜻인데, 달력 주차를 그냥 세면 금·토 이틀뿐인
@@ -182,7 +198,7 @@ module.exports = async (req, res) => {
       rows.forEach(r=>{
         if(!r._ov || !r._d || r._d < from || r._d > to) return;
         const p = normPerson(r.담당자, r.부서명); if(!p) return;
-        got[p]   = (got[p]||0)   + ohUnit(r);     // 달성률 분자는 오버홀 대수
+        got[p]   = (got[p]||0)   + ohUnit(r) + rpUnit(r);   // 달성률 분자 = 오버홀 대수 + 수리 대수
         gotRp[p] = (gotRp[p]||0) + rpUnit(r);
       });
 
@@ -220,7 +236,7 @@ module.exports = async (req, res) => {
         arr.forEach(b=>{
           mt += '\n· '+b.name+'  '+b.cur+'/'+b.goal+'대'
              + (b.cur===0 ? '   ← 이번 주 0대' : '')
-             + (b.rp ? '   (수리만 '+b.rp+'대)' : '');
+             + (b.rp ? '   (수리 '+b.rp+'대 포함)' : '');
         });
       });
       mt += '\n\n나머지 인원은 주간 오버홀 목표 페이스를 지키고 있습니다.';
@@ -248,11 +264,12 @@ module.exports = async (req, res) => {
       const person=normPerson(r.담당자,r.부서명);
       if(excluded.has(person) || resigned.has(person)) return;
       const dept=r.부서명||'(미지정)'; const k=person+'|'+dept;
-      if(!units[k]) units[k]={person:person,dept,total:0,rp:0,ohpt:0,pt:0};
-      units[k].total += ohUnit(r);              // 달성률 분자 = 오버홀 대수
-      units[k].rp    += rpUnit(r);              // 수리만 한 대수 (참고 표시)
-      units[k].ohpt  += ohPart(r.오버홀품목);    // 오버홀 난이도 합 (평균 레벨 계산용)
-      units[k].pt    += overhaulWeight(r);      // 종전 포인트 (참고 표시)
+      if(!units[k]) units[k]={person:person,dept,total:0,oh:0,rp:0,ohpt:0,ohcnt:0};
+      const ou=ohUnit(r), ru=rpUnit(r), lv=ohPart(r.오버홀품목);
+      units[k].total += ou + ru;                // 달성률 분자 = 오버홀 대수 + 수리 대수
+      units[k].oh    += ou;
+      units[k].rp    += ru;
+      if(lv>0){ units[k].ohpt += lv; units[k].ohcnt++; }   // 평균 등급 = 난이도합 ÷ 오버홀 건수
     });
     const settingsDept={}; hrRoster.forEach(p=>{ if(p.dept) settingsDept[p.name]=p.dept; });
     Object.keys(quotaConfig.persons).forEach(nm=>{ const c=quotaConfig.persons[nm]; if(c&&typeof c==='object'&&c.dept) settingsDept[nm]=c.dept; });
@@ -260,7 +277,7 @@ module.exports = async (req, res) => {
     [...new Set([...Object.keys(quotaConfig.persons),...hrRoster.map(p=>p.name)])].forEach(nm=>{
       if(excluded.has(nm)||resigned.has(nm)||hasRec.has(nm)) return;
       const dept=settingsDept[nm]||'(미지정)'; const k=nm+'|'+dept;
-      if(!units[k]) units[k]={person:nm,dept,total:0,rp:0,ohpt:0,pt:0};
+      if(!units[k]) units[k]={person:nm,dept,total:0,oh:0,rp:0,ohpt:0,ohcnt:0};
     });
 
     // 효력 시작월: 각 주차의 월에 맞는 유효 목표 합산
@@ -273,23 +290,23 @@ module.exports = async (req, res) => {
       : Math.round(effQ(person,dfltYM)*targetWeeks);
     const dTot={};
     Object.values(units).forEach(u=>{
-      if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,rp:0,ohpt:0};
+      if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,oh:0,rp:0,ohpt:0,ohcnt:0};
       dTot[u.dept].total+=u.total; dTot[u.dept].target+=targetOf(u.person);
-      dTot[u.dept].rp+=u.rp; dTot[u.dept].ohpt+=u.ohpt;
+      dTot[u.dept].oh+=u.oh; dTot[u.dept].rp+=u.rp;
+      dTot[u.dept].ohpt+=u.ohpt; dTot[u.dept].ohcnt+=u.ohcnt;
     });
     let tT=0,tA=0; Object.values(dTot).forEach(t=>{tT+=t.target;tA+=t.total;});
     const overall = tT>0 ? Math.round(tA/tT*100) : (tA>0?100+tA:0);
     // MVP도 오버홀 대수 기준. 대수가 같으면 난이도(포인트)가 높은 쪽
-    let mvp=null; Object.values(units).forEach(u=>{ if(u.total>0&&(!mvp||u.total>mvp.total||(u.total===mvp.total&&u.pt>mvp.pt))) mvp={person:u.person,total:u.total,pt:u.pt}; });
+    let mvp=null; Object.values(units).forEach(u=>{ if(u.total>0&&(!mvp||u.total>mvp.total||(u.total===mvp.total&&u.ohpt>mvp.ohpt))) mvp={person:u.person,total:u.total,ohpt:u.ohpt}; });
 
     const order = [...DEPT_ORDER, ...Object.keys(dTot).filter(d=>!DEPT_ORDER.includes(d))];
     let lines = [];
     order.forEach(d=>{
       if(!dTot[d]) return; const t=dTot[d];
       const pct=t.target>0?Math.round(t.total/t.target*100):(t.total>0?100+t.total:0);
-      // 포인트를 '수리 N대' 옆에 붙였더니 수리 포인트로 읽혔다(수리 0대인데 5pt).
-      // 포인트는 오버홀분까지 합친 값이라 그 자리에 둘 수 없다 → 오버홀 평균 등급으로 바꾼다.
-      const side = t.target>0 ? '   (오버홀 평균 '+(t.total>0?(t.ohpt/t.total).toFixed(1)+'등급':'—')+' · 수리만 '+t.rp+'대)' : '';
+      // 대수를 오버홀/수리로 쪼개 보여주고, 난이도는 오버홀 평균 등급으로 따로 본다.
+      const side = t.target>0 ? '   (오버홀 '+t.oh+'대 · 수리 '+t.rp+'대'+(t.ohcnt>0?' · 평균 '+(t.ohpt/t.ohcnt).toFixed(1)+'등급':'')+')' : '';
       lines.push('• '+d+'  '+t.total+'/'+t.target+'대  '+pct+'%'+side);
     });
 
@@ -303,25 +320,26 @@ module.exports = async (req, res) => {
     if (type !== 'quarter') {
       const byPerson = {};
       Object.values(units).forEach(u=>{
-        if (!byPerson[u.person]) byPerson[u.person] = { oh:0, rp:0, ohpt:0 };
-        byPerson[u.person].oh   += u.total;
-        byPerson[u.person].rp   += u.rp;
-        byPerson[u.person].ohpt += u.ohpt;
+        if (!byPerson[u.person]) byPerson[u.person] = { oh:0, rp:0, ohpt:0, ohcnt:0 };
+        byPerson[u.person].oh    += u.total;
+        byPerson[u.person].rp    += u.rp;
+        byPerson[u.person].ohpt  += u.ohpt;
+        byPerson[u.person].ohcnt += u.ohcnt;
       });
       const under = [];
       Object.keys(byPerson).forEach(nm=>{
         const b = byPerson[nm];
         const goal = targetOf(nm);
         if (!(goal > 0) || b.oh >= goal) return;
-        under.push({ name: nm, total: b.oh, rp: b.rp, ohpt: b.ohpt, goal: goal, pct: Math.round(b.oh / goal * 100) });
+        under.push({ name: nm, total: b.oh, rp: b.rp, ohpt: b.ohpt, ohcnt: b.ohcnt, goal: goal, pct: Math.round(b.oh / goal * 100) });
       });
       under.sort((a,b)=> (a.pct - b.pct) || String(a.name).localeCompare(String(b.name), 'ko'));
       if (under.length) {
         text += '\n\n⚠️ 오버홀 목표 미달 인원';
         under.forEach(u=>{
-          // 평균 난이도 = 오버홀 포인트 ÷ 오버홀 대수. 대수만 채우려고 오버홀1만 고르는 쏠림이 보인다.
-          const avg = u.total > 0 ? (u.ohpt / u.total).toFixed(1) : null;
-          const side = [avg ? '평균 '+avg+'등급' : null, u.rp ? '수리만 '+u.rp+'대' : null].filter(Boolean).join(' · ');
+          // 평균 난이도 = 난이도합 ÷ 오버홀 건수. 대수만 채우려고 오버홀1만 고르는 쏠림이 보인다.
+          const avg = u.ohcnt > 0 ? (u.ohpt / u.ohcnt).toFixed(1) : null;
+          const side = [avg ? '평균 '+avg+'등급' : null, u.rp ? '수리 '+u.rp+'대' : null].filter(Boolean).join(' · ');
           text += '\n' + u.name + ' ' + u.total + '/' + u.goal + '대 ' + u.pct + '%' + (side ? '  ('+side+')' : '');
         });
         text += '\n\n📋 AAR 보고 요청';
@@ -330,8 +348,10 @@ module.exports = async (req, res) => {
     }
 
     // 기준이 바뀐 주에 '저번 주엔 170%였는데' 가 반드시 나온다. 한 줄로 못박아 둔다.
-    text += '\n\n※ 2026-11-04부터 달성률은 오버홀 대수 기준입니다.'
-          + '\n수리·부품제조는 달성률에 들어가지 않고 \'수리만\'으로 따로 표시합니다.'
+    text += '\n\n※ 2026-11-06부터 포인트를 없애고 \'대수\'로만 집계합니다.'
+          + '\n오버홀1·2·3=1대 · 오버홀4=2대 · 오버홀5=3대 · 기기폐기=1대'
+          + '\n수리2·3=1대 · 수리4=2대 · 수리5=3대 (수리1·부품제조·부품정리는 0)'
+          + '\n한 대에 오버홀과 수리를 같이 했으면 둘 다 더합니다.'
           + '\n평균 등급은 오버홀 난이도(1~5)입니다. 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.';
 
     res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=900');
