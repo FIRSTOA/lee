@@ -51,6 +51,32 @@ function overhaulWeight(r){ return ohPart(r && r.오버홀품목) + rpPart(r && 
 //   · 수리 대수   = 오버홀 없이 수리만 한 건. 달성률에는 안 들어가고 옆에 표시만 한다
 function ohUnit(r){ return ohPart(r && r.오버홀품목) > 0 ? 1 : 0; }
 function rpUnit(r){ return (ohPart(r && r.오버홀품목) === 0 && rpPart(r && r.수리품목) > 0) ? 1 : 0; }
+
+// 2026-11-06 기준 변경 — 목표를 '주차 수'가 아니라 '평일 수'로 잰다.
+// '주 N대'는 평일 5일에 N대라는 뜻인데, 달력 주차를 그냥 세면 금·토 이틀뿐인
+// 조각 주에도 N대가 통째로 붙었다 (2026년 5월: 6주 12대 → 평일로는 8대).
+// 달 경계는 한 주가 양쪽 달에서 각각 1주로 세어져 목표가 두 배가 됐다.
+//   11/29~12/5 한 주 → 종전 11월 2대 + 12월 2대 = 4대 / 변경 후 0.2+0.8 = 정확히 1주분
+// 진행 중인 달은 오늘까지 지난 평일만 센다. 아니면 월초마다 달성률이 폭락한다.
+function kstToday(){ const k=new Date(Date.now()+9*3600*1000); return {y:k.getUTCFullYear(),m:k.getUTCMonth()+1,d:k.getUTCDate()}; }
+function weekdaysInWeek(year,month,weekNo){
+  const fd=new Date(year,month-1,1).getDay();        // 그 달 1일의 요일 (일=0)
+  const last=new Date(year,month,0).getDate();
+  let from=(weekNo-1)*7-fd+1, to=weekNo*7-fd;
+  if(from<1) from=1;
+  if(to>last) to=last;
+  const t=kstToday();
+  if(year===t.y && month===t.m && to>t.d) to=t.d;    // 아직 안 지난 날은 목표에 넣지 않는다
+  let n=0;
+  for(let d=from; d<=to; d++){ const w=new Date(year,month-1,d).getDay(); if(w>=1&&w<=5) n++; }
+  return n;
+}
+// '11월3주차' → 그 주의 목표 배수 (1.0 = 평일 5일이 꽉 찬 주)
+function wkFactor(year,label){
+  const m=/(\d+)월(\d+)주차/.exec(String(label));
+  if(!m) return 1;
+  return weekdaysInWeek(year, parseInt(m[1],10), parseInt(m[2],10)) / 5;
+}
 // 엄재현 주간/야간 분리(2026-09-09) 이전 기록은 담당자가 '엄재현'(부서 외부인력)으로 남아 있다.
 // 주간은 CSS 이므로 '엄재현 + 외부인력'은 야간뿐이다. 시트 원본은 그대로, 집계할 때만 야간으로 읽는다.
 function normPerson(name, dept){
@@ -240,7 +266,11 @@ module.exports = async (req, res) => {
     // 효력 시작월: 각 주차의 월에 맞는 유효 목표 합산
     const wkMonths={}; periodRows.forEach(r=>{ if(r._wk && !wkMonths[r._wk]) wkMonths[r._wk]=tgtY+'-'+String(r._m).padStart(2,'0'); });
     const allWeeks=Object.keys(wkMonths); const dfltYM=tgtY+'-'+String(tgtM).padStart(2,'0');
-    const targetOf=(person)=> allWeeks.length ? allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w]),0) : (effQ(person,dfltYM)*targetWeeks);
+    // 주차 수가 아니라 '그 주가 그 달에 가진 평일 수 ÷ 5' 를 곱해서 더한다.
+    // 사람마다 한 번만 반올림해 목표를 정수로 둔다(화면에 0.4대 같은 숫자가 안 나오게).
+    const targetOf=(person)=> allWeeks.length
+      ? Math.round(allWeeks.reduce((s,w)=>s+effQ(person,wkMonths[w])*wkFactor(tgtY,w),0))
+      : Math.round(effQ(person,dfltYM)*targetWeeks);
     const dTot={};
     Object.values(units).forEach(u=>{
       if(!dTot[u.dept]) dTot[u.dept]={total:0,target:0,rp:0,ohpt:0};
