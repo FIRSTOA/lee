@@ -3368,7 +3368,8 @@ document.addEventListener('DOMContentLoaded', function(){
 // 주소가 들어오면 DP_SHEET_URL 한 줄만 채우면 된다.
 const DP_SHEET_ID  = '1-3s9OMwEKABGTrbjfIeBMdzLWLo9DwfFtcSUTktpavI';
 const DP_SHEET_TAB = '폐장비리스트';
-const DP_SHEET_URL = '';   // ← 폐장비리스트 Apps Script 웹앱 주소 (받으면 여기에)
+// 폐장비리스트 전용 웹앱 (2026-11-06 배포·쓰기 확인 완료). 오버홀 저장 스크립트와 별개다.
+const DP_SHEET_URL = 'https://script.google.com/macros/s/AKfycby50pfuP0XpT4dxz9pYxfcu8uvINkFUvsn7pApNc0ExfhGM9HL5wcq1N_MhLrwl7ojftw/exec';
 const DP_KEY = 'disposal_list';
 // 대시보드 부서명 → 폐장비리스트 지역 (시트는 수도권A~D 를 쓴다)
 const DP_AREA_MAP = { '강북A':'수도권A', '강서B':'수도권B', '강남C':'수도권C', '경기D':'수도권D', 'CSS':'CSS', '외부인력':'외부인력' };
