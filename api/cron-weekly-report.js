@@ -13,6 +13,24 @@ function kst(){ return new Date(Date.now() + 9*3600*1000); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveQ(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'report_queue',value:list})}); }
 
+// 2026-11-06 — 카톡은 긴 글을 '전체보기'로 접고 링크 카드도 안 만든다.
+// 짧은 요약 + 맨 끝 링크로 보내면 카드가 뜨고, 그 카드 그림이 report.html 실시간
+// 스크린샷(og:image=thum.io)이라 부서별 표가 방에서 바로 보인다.
+// 전문(미달 명단·AAR)은 카드를 눌러 들어가면 그대로 있다.
+function briefOf(sum){
+  const lines = String(sum || '').trim().split('\n');
+  const head = lines[0] || '';
+  const mvp  = lines.find(l => l.indexOf('\u{1F3C5}') === 0) || '';
+  const depts = lines.map(l => {
+    const m = /^\u2022\s*(\S+)\s+(\d+)\/(\d+)\uB300\s+(\d+)%/.exec(l);
+    return (m && Number(m[3]) > 0) ? (m[1] + ' ' + m[4] + '%') : null;
+  }).filter(Boolean);
+  const warn = lines.find(l => l.indexOf('\u26A0\uFE0F') === 0);
+  let under = 0;
+  if (warn) { for (let i = lines.indexOf(warn) + 1; i < lines.length; i++) { const t = lines[i].trim(); if (!t || t.indexOf('\u{1F4CB}') === 0) break; under++; } }
+  const l2 = [mvp, under ? '\u26A0\uFE0F \uBAA9\uD45C \uBBF8\uB2EC ' + under + '\uBA85' : ''].filter(Boolean).join('   ');
+  return [head, l2, depts.length ? depts.join(' \u00B7 ') : ''].filter(Boolean).join('\n');
+}
 module.exports = async (req, res) => {
   try {
     const k = kst();
@@ -45,9 +63,9 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // 자동 발송도 전문으로 보낸다 (2026-10-26). 예전엔 헤드라인+MVP 3줄만 보냈는데,
-    // 조치가 필요한 '미달성 인원·AAR 요청'이 거기서 잘려 나가 보고가 할 일을 못 했다.
-    const text = String(sum || '').trim() + '\n📋 자세히: ' + BASE + '/report.html?' + linkQs;
+    // 링크에 주차(w=)를 붙여야 카톡이 지난주 카드를 재사용하지 않고 새로 읽어온다.
+    const text = briefOf(sum) + '\n\n📄 부서별 표 · 미달 명단 · AAR 전문\n'
+               + BASE + '/report.html?' + linkQs + '&w=' + encodeURIComponent(md);
     list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: force ? 'manual' : (catchup ? 'cron-sat' : 'cron-fri') });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
