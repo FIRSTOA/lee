@@ -2167,7 +2167,10 @@ function computeAutoFields(d) {
   const year = dt.getFullYear() + '년';
   const month = (dt.getMonth() + 1) + '월';
   const dayOfMonth = dt.getDate();
-  const weekOfMonth = Math.ceil(dayOfMonth / 7); // 7일 단위: 1~7일=1주차, 8~14=2주차 …
+  // 2026-11-06 — 달력 기준(일요일 시작, 1일이 속한 주가 1주차)으로 통일.
+  // 종전 7일 단위(1~7일=1주차)라 저장 미리보기와 대시보드의 주차가 서로 달랐다.
+  const firstDow = new Date(dt.getFullYear(), dt.getMonth(), 1).getDay();
+  const weekOfMonth = Math.ceil((dayOfMonth + firstDow) / 7);
   const weekStr = (dt.getMonth() + 1) + '월' + weekOfMonth + '주차';
   const overhaulPt = ohPart(d.overhaul);
   const repairPt = rpPart(d.repair);
