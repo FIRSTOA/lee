@@ -450,6 +450,7 @@
   <div class="mode-toggle">
     <button type="button" id="tab-overhaul" class="mode-btn active" onclick="setMode('overhaul')">🛠 오버홀·수리 입력</button>
     <button type="button" id="tab-rebuild" class="mode-btn" onclick="setMode('rebuild')">🔧 재수리</button>
+    <button type="button" id="tab-disposal" class="mode-btn" onclick="setMode('disposal')">🗑 폐기</button>
   </div>
 
   <div id="mode-rebuild" style="display:none">
@@ -640,6 +641,133 @@
         </div>
         <div id="rbc-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== 폐기 모드 (복합기 전용) — 2026-11-06 추가 ===== -->
+  <div id="mode-disposal" style="display:none">
+    <div class="form-card">
+      <div class="section-title" style="color:#c53030">🗑 복합기 폐기 등록</div>
+      <div class="field">
+        <label>자산번호 또는 시리얼<span class="req">*</span></label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="dp-direct" placeholder="자산번호 또는 시리얼 입력" style="flex:1">
+          <button type="button" class="btn btn-primary" id="btn-dp-direct" style="white-space:nowrap">조회</button>
+        </div>
+        <p style="font-size:11.5px;color:#718096;margin-top:5px">조회하면 제조사·기종·시리얼이 자동으로 채워집니다.<br>안 나오는 기기는 아래 칸에 직접 입력하세요. (기록에 <b>미등록 자산</b>으로 남습니다)</p>
+      </div>
+      <div class="rborig" id="dp-orig">
+        <div class="t">✅ 조회된 기기</div>
+        <div class="rbgrid">
+          <div class="rbkv"><b>제조사</b><span id="dpo-brand">-</span></div>
+          <div class="rbkv"><b>기종</b><span id="dpo-model">-</span></div>
+          <div class="rbkv"><b>시리얼</b><span id="dpo-serial" style="word-break:break-all">-</span></div>
+          <div class="rbkv"><b>자산번호</b><span id="dpo-asset">-</span></div>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field"><label>제조사<span class="req">*</span></label><input type="text" id="dp-brand" placeholder="예: 삼성"></div>
+        <div class="field"><label>기종<span class="req">*</span></label><input type="text" id="dp-model" placeholder="예: SL-X3220NR"></div>
+      </div>
+      <div class="row-2">
+        <div class="field"><label>시리얼 (S/N)<span class="req">*</span></label><input type="text" id="dp-serial" placeholder="예: 0A6XBJLN20000AW"></div>
+        <div class="field"><label>자산번호</label><input type="text" id="dp-asset" placeholder="예: XRX-0137"></div>
+      </div>
+      <div class="row-2">
+        <div class="field"><label>폐기일<span class="req">*</span></label><input type="date" id="dp-date"></div>
+        <div class="field"><label>신청인<span class="req">*</span></label><input type="text" id="dp-person" placeholder="이름"></div>
+      </div>
+      <div class="field">
+        <label>지역<span class="req">*</span></label>
+        <div class="rbchips" id="dp-area">
+          <div class="rbchip" onclick="dpSingle(this)">강북A</div>
+          <div class="rbchip" onclick="dpSingle(this)">강서B</div>
+          <div class="rbchip" onclick="dpSingle(this)">강남C</div>
+          <div class="rbchip" onclick="dpSingle(this)">경기D</div>
+          <div class="rbchip" onclick="dpSingle(this)">CSS</div>
+          <div class="rbchip" onclick="dpSingle(this)">외부인력</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">카운터 — 폐기 시점 최종 수치</div>
+      <div class="rbchips" id="dp-cntok" style="margin-bottom:10px">
+        <div class="rbchip on" onclick="dpSingle(this)">카운터 읽음</div>
+        <div class="rbchip red" onclick="dpSingle(this)">확인불가 (전원 불량)</div>
+      </div>
+      <div id="dp-cnt-box">
+        <div class="row-2">
+          <div class="field"><label>흑백 카운터</label><input type="number" id="dp-bw" placeholder="예: 1000" oninput="dpSum()"></div>
+          <div class="field"><label>컬러 카운터</label><input type="number" id="dp-cl" placeholder="예: 2000" oninput="dpSum()"></div>
+        </div>
+        <div class="row-2">
+          <div class="field"><label>A3 컬러 카운터</label><input type="number" id="dp-a3" placeholder="예: 100" oninput="dpSum()"></div>
+          <div class="field"><label>총합 <span style="font-weight:400;color:#718096">(자동)</span></label><input type="text" id="dp-sum" value="0" readonly style="background:#f7fafc"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">폐기 사유</div>
+      <div class="field">
+        <label>사유<span class="req">*</span></label>
+        <div class="rbchips" id="dp-reason">
+          <div class="rbchip" onclick="dpSingle(this)">수리불가</div>
+          <div class="rbchip" onclick="dpSingle(this)">수리비과다</div>
+          <div class="rbchip" onclick="dpSingle(this)">부품단종</div>
+          <div class="rbchip" onclick="dpSingle(this)">노후</div>
+          <div class="rbchip" onclick="dpSingle(this)">파손</div>
+          <div class="rbchip" onclick="dpSingle(this)">침수</div>
+        </div>
+      </div>
+      <div class="field" id="dp-estbox" style="display:none">
+        <label>수리 견적액<span class="req">*</span> <span style="font-weight:400;color:#718096">(원)</span></label>
+        <input type="number" id="dp-est" placeholder="예: 420000">
+      </div>
+      <div class="field">
+        <label>사유 상세<span class="req">*</span></label>
+        <textarea id="dp-detail" placeholder="예: 메인보드 소손, 교체 부품 단종"></textarea>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">저장매체 · 부품 회수</div>
+      <div class="field">
+        <label>저장매체<span class="req">*</span></label>
+        <div class="rbchips" id="dp-media">
+          <div class="rbchip" onclick="dpSingle(this)">있음 · HDD</div>
+          <div class="rbchip" onclick="dpSingle(this)">있음 · SSD</div>
+          <div class="rbchip" onclick="dpSingle(this)">없음</div>
+          <div class="rbchip" onclick="dpSingle(this)">확인불가</div>
+        </div>
+        <div class="warn-note" id="dp-media-warn" style="display:none">⚠️ 복합기 하드에는 고객 스캔·출력 이미지가 그대로 남습니다.<br>파기하고 <b>파기 사진</b>을 꼭 첨부하세요.</div>
+      </div>
+      <div class="field" id="dp-destroybox" style="display:none">
+        <label>파기 방법<span class="req">*</span></label>
+        <div class="rbchips" id="dp-destroy">
+          <div class="rbchip" onclick="dpSingle(this)">물리파기 (천공·파쇄)</div>
+          <div class="rbchip" onclick="dpSingle(this)">전용 소거 후 보관</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>부품 회수<span class="req">*</span></label>
+        <div class="rbchips" id="dp-parts">
+          <div class="rbchip" onclick="dpSingle(this)">함</div>
+          <div class="rbchip" onclick="dpSingle(this)">안 함</div>
+        </div>
+      </div>
+      <div class="field" id="dp-partsbox" style="display:none">
+        <label>회수 품목<span class="req">*</span></label>
+        <input type="text" id="dp-partlist" placeholder="예: 드럼, ADF, 정착기">
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">사진</div>
+      <p style="font-size:11.5px;color:#718096;margin:-4px 0 10px">본체 전체 · 시리얼 · 자산번호는 <b>반드시</b> 찍어야 합니다.<br>나머지는 해당될 때만 나타납니다.</p>
+      <div id="dp-shots" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+      <div id="dp-status" style="font-size:13px;text-align:center;margin-top:10px"></div>
     </div>
   </div>
 
@@ -911,6 +1039,9 @@
 </div>
 <div class="footer-bar" id="rebuild-footer" style="display:none">
   <button class="btn btn-primary" id="btn-rb-submit" style="width:100%;background:#ff7a18">재수리 요청 등록 + 채팅방 알림</button>
+</div>
+<div class="footer-bar" id="disposal-footer" style="display:none">
+  <button class="btn btn-primary" id="btn-dp-submit" style="width:100%;background:#c53030">🗑 폐기 등록</button>
 </div>
 
 <!-- 저장 로그 모달 -->
@@ -2455,11 +2586,23 @@ const RB_DRIVE_URL='https://script.google.com/macros/s/AKfycbx6KkLobz74ppKwchfnV
 const RB_SUPA_H={apikey:RB_SUPA_KEY,Authorization:'Bearer '+RB_SUPA_KEY,'Content-Type':'application/json'};
 function rbEsc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setMode(m){
-  const ov=document.getElementById('mode-overhaul'),rb=document.getElementById('mode-rebuild');
-  const of=document.getElementById('overhaul-footer'),rf=document.getElementById('rebuild-footer');
-  const to=document.getElementById('tab-overhaul'),tr=document.getElementById('tab-rebuild');
-  if(m==='rebuild'){ ov.style.display='none';of.style.display='none';rb.style.display='block';rf.style.display='flex';tr.classList.add('active');to.classList.remove('active');rbInit();setRbSub('new'); }
-  else { ov.style.display='block';of.style.display='flex';rb.style.display='none';rf.style.display='none';to.classList.add('active');tr.classList.remove('active'); }
+  // 2026-11-06 폐기 탭 추가 — 셋 다 끄고 고른 것만 켠다(탭이 늘어도 이 틀은 그대로).
+  const panes={ overhaul:['mode-overhaul','overhaul-footer','tab-overhaul'],
+                rebuild :['mode-rebuild','rebuild-footer','tab-rebuild'],
+                disposal:['mode-disposal','disposal-footer','tab-disposal'] };
+  Object.keys(panes).forEach(k=>{
+    const [p,f,t]=panes[k].map(id=>document.getElementById(id));
+    if(p) p.style.display='none';
+    if(f) f.style.display='none';
+    if(t) t.classList.remove('active');
+  });
+  const key=panes[m]?m:'overhaul';
+  const [p,f,t]=panes[key].map(id=>document.getElementById(id));
+  if(p) p.style.display='block';
+  if(f) f.style.display='flex';
+  if(t) t.classList.add('active');
+  if(key==='rebuild'){ rbInit(); setRbSub('new'); }
+  if(key==='disposal'){ dpInit(); }
 }
 function rbSingle(el){ [...el.parentNode.children].forEach(c=>c.classList.remove('on')); el.classList.add('on'); rbReveal(); }
 function rbMulti(el){ el.classList.toggle('on'); rbReveal(); }
@@ -3232,6 +3375,228 @@ document.addEventListener('DOMContentLoaded', function(){
   if (bar) bar.onclick = function(){ ckPendingFlush(false); };
   if (ckPendingLoad().length) setTimeout(function(){ ckPendingFlush(true); }, 3000);
 });
+</script>
+<script>
+// ===== 폐기(disposal) 모드 — 복합기 전용, 2026-11-06 =====
+// 등록하면 그 자리에서 두 군데에 들어간다. 승인 단계는 없다.
+//   ① 폐장비리스트 14열(A~N) 한 줄  — 보낼 Apps Script 주소를 아직 몰라 Supabase 에 쌓아둔다.
+//      주소가 오면 DP_SHEET_URL 한 줄만 채우면 쌓인 것까지 그대로 밀어 넣는다.
+//   ② 오버홀 통계 시트에 '기기폐기' 작업 1건 — 이게 정량 목표 1대로 잡힌다.
+const DP_SHEET_URL = '';   // ← 폐장비리스트 Apps Script 웹앱 주소 (받으면 여기에)
+const DP_KEY = 'disposal_list';
+let DP_FILES = {}, DP_CUR = {}, DP_LIST = [], dpReady = false;
+
+// 사진 — 앞의 3장은 항상, 뒤의 3장은 해당될 때만 뜬다.
+const DP_SHOTS = [
+  { k:'body',   label:'본체 전체', always:true },
+  { k:'serial', label:'시리얼',    always:true },
+  { k:'asset',  label:'자산번호',  always:true },
+  { k:'parts',  label:'취외 부품', when:()=> dpSel('dp-parts')==='함' },
+  { k:'media',  label:'매체 파기', when:()=> /있음/.test(dpSel('dp-media')) },
+  { k:'damage', label:'손상 부위', when:()=> ['파손','침수'].indexOf(dpSel('dp-reason'))>=0 }
+];
+
+function dpSel(id){ const on=document.querySelector('#'+id+' .rbchip.on'); return on?on.textContent.trim():''; }
+function dpSingle(el){ [].slice.call(el.parentNode.children).forEach(c=>c.classList.remove('on')); el.classList.add('on'); dpReveal(); }
+function dpVal(id){ const e=document.getElementById(id); return e?String(e.value||'').trim():''; }
+function dpNum(id){ return Number(dpVal(id))||0; }
+function dpSum(){ document.getElementById('dp-sum').value=(dpNum('dp-bw')+dpNum('dp-cl')+dpNum('dp-a3')).toLocaleString(); }
+
+function dpReveal(){
+  const reason=dpSel('dp-reason'), hasMedia=/있음/.test(dpSel('dp-media'));
+  document.getElementById('dp-estbox').style.display   = (reason==='수리비과다')?'block':'none';
+  document.getElementById('dp-destroybox').style.display = hasMedia?'block':'none';
+  document.getElementById('dp-media-warn').style.display = hasMedia?'block':'none';
+  document.getElementById('dp-partsbox').style.display  = (dpSel('dp-parts')==='함')?'block':'none';
+  document.getElementById('dp-cnt-box').style.display   = (dpSel('dp-cntok')==='카운터 읽음')?'block':'none';
+  DP_SHOTS.forEach(s=>{
+    const el=document.querySelector('.dpshot[data-k="'+s.k+'"]');
+    if(el) el.style.display=(s.always||(s.when&&s.when()))?'block':'none';
+  });
+}
+
+function dpBuildShots(){
+  const box='display:flex;align-items:center;justify-content:center;height:72px;border:1.5px dashed #cbd5e0;border-radius:8px;background:#f7fafc;font-size:20px;cursor:pointer;overflow:hidden';
+  document.getElementById('dp-shots').innerHTML = DP_SHOTS.map(s=>
+    '<div class="dpshot" data-k="'+s.k+'">'
+    + '<div style="font-size:11px;color:#4a5568;margin-bottom:4px;text-align:center">'+s.label+(s.always?' <span style="color:#e53e3e">*</span>':'')+'</div>'
+    + '<div class="dpbox" id="dp-box-'+s.k+'" style="'+box+'">📷</div>'
+    + '<input type="file" accept="image/*" id="dp-file-'+s.k+'" style="display:none">'
+    + '</div>').join('');
+  DP_SHOTS.forEach(s=>{
+    const inp=document.getElementById('dp-file-'+s.k), bx=document.getElementById('dp-box-'+s.k);
+    bx.onclick=()=>inp.click();
+    inp.onchange=()=>{
+      const f=inp.files&&inp.files[0]; if(!f) return;
+      DP_FILES[s.k]=f;
+      bx.innerHTML='<img src="'+URL.createObjectURL(f)+'" style="width:100%;height:100%;object-fit:cover">';
+    };
+  });
+}
+
+async function dpInit(){
+  if(dpReady) return; dpReady=true;
+  document.getElementById('dp-date').value=new Date().toISOString().slice(0,10);
+  dpBuildShots();
+  dpReveal();
+  document.getElementById('btn-dp-direct').onclick=dpLookup;
+  document.getElementById('dp-direct').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); dpLookup(); } });
+  document.getElementById('btn-dp-submit').onclick=dpSubmit;
+  try{
+    const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.'+DP_KEY+'&select=value',{headers:RB_SUPA_H});
+    const j=await r.json(); DP_LIST=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[];
+  }catch(e){ DP_LIST=[]; }
+}
+
+async function dpLookup(){
+  const v=dpVal('dp-direct');
+  const st=document.getElementById('dp-status');
+  if(!v){ alert('자산번호 또는 시리얼을 입력하세요'); return; }
+  st.textContent='조회 중…';
+  let o=await rbErp('asset_no',v); if(!o) o=await rbErp('serial',v);
+  if(!o){
+    // ERP에 없는 기기(구형·라벨 분실)도 폐기는 해야 한다. 막지 않고 '미등록 자산'으로 남긴다.
+    DP_CUR={ unreg:true };
+    document.getElementById('dp-orig').classList.remove('show');
+    st.innerHTML='<span style="color:#c05621">ERP에서 못 찾았습니다. 아래 칸에 직접 입력하세요 — <b>미등록 자산</b>으로 기록됩니다.</span>';
+    return;
+  }
+  DP_CUR=o;
+  document.getElementById('dpo-brand').textContent=o.brand||'-';
+  document.getElementById('dpo-model').textContent=o.model||'-';
+  document.getElementById('dpo-serial').textContent=o.serial||'-';
+  document.getElementById('dpo-asset').textContent=o.asset_no||'-';
+  document.getElementById('dp-orig').classList.add('show');
+  if(o.brand)    document.getElementById('dp-brand').value=o.brand;
+  if(o.model)    document.getElementById('dp-model').value=o.model;
+  if(o.serial)   document.getElementById('dp-serial').value=o.serial;
+  if(o.asset_no) document.getElementById('dp-asset').value=o.asset_no;
+  st.textContent='';
+}
+
+async function dpSubmit(){
+  const st=document.getElementById('dp-status');
+  const date=dpVal('dp-date'), person=dpVal('dp-person'), area=dpSel('dp-area');
+  const brand=dpVal('dp-brand'), model=dpVal('dp-model'), serial=dpVal('dp-serial'), asset=dpVal('dp-asset');
+  const reason=dpSel('dp-reason'), detail=dpVal('dp-detail');
+  const media=dpSel('dp-media'), destroy=dpSel('dp-destroy');
+  const parts=dpSel('dp-parts'), partList=dpVal('dp-partlist');
+  const cntOk=dpSel('dp-cntok')==='카운터 읽음';
+
+  const err=[];
+  if(!date) err.push('폐기일');
+  if(!person) err.push('신청인');
+  if(!area) err.push('지역');
+  if(!brand) err.push('제조사');
+  if(!model) err.push('기종');
+  if(!serial) err.push('시리얼');
+  if(!reason) err.push('폐기 사유');
+  if(!detail) err.push('사유 상세');
+  if(!media) err.push('저장매체');
+  if(!parts) err.push('부품 회수');
+  if(reason==='수리비과다' && !dpNum('dp-est')) err.push('수리 견적액');
+  if(/있음/.test(media) && !destroy) err.push('파기 방법');
+  if(parts==='함' && !partList) err.push('회수 품목');
+  if(err.length){ alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
+
+  const needShots=DP_SHOTS.filter(s=>s.always||(s.when&&s.when()));
+  const missing=needShots.filter(s=>!DP_FILES[s.k]).map(s=>s.label);
+  if(missing.length){ alert('사진이 빠졌습니다.\n\n· '+missing.join('\n· ')); return; }
+
+  // 같은 기기를 두 번 폐기하는 것을 막는다 (되돌릴 수 없는 기록이라 중복이 치명적)
+  const dup=DP_LIST.find(x=>(serial&&x.serial===serial)||(asset&&x.asset&&x.asset===asset));
+  if(dup){ alert('이미 폐기 등록된 기기입니다.\n\n등록일: '+dup.date+'\n신청인: '+dup.person+'\n시리얼: '+(dup.serial||'-')); return; }
+
+  const btn=document.getElementById('btn-dp-submit');
+  btn.disabled=true; const label=btn.textContent;
+  try{
+    st.textContent='📤 사진 올리는 중…';
+    const urls={};
+    for(const s of needShots){
+      const up=await rbUploadFiles([DP_FILES[s.k]], st);
+      if(up&&up[0]) urls[s.k]=up[0];
+    }
+
+    const bw=cntOk?dpNum('dp-bw'):'', cl=cntOk?dpNum('dp-cl'):'', a3=cntOk?dpNum('dp-a3'):'';
+    const sum=cntOk?(dpNum('dp-bw')+dpNum('dp-cl')+dpNum('dp-a3')):'';
+    // 폐장비리스트에 자산번호·사진 열이 없다. 특이사항(N열)에 모아서 넣는다.
+    const note=[
+      asset?('자산 '+asset):(DP_CUR.unreg?'미등록 자산':''),
+      reason+(reason==='수리비과다'?(' '+dpNum('dp-est').toLocaleString()+'원'):''),
+      detail,
+      parts==='함'?(partList+' 취외'):'',
+      /있음/.test(media)?(media+' '+destroy):('저장매체 '+media),
+      cntOk?'':'카운터 확인불가(전원 불량)',
+      urls.body?('사진 '+urls.body):''
+    ].filter(Boolean).join(' / ');
+
+    const ym=date.slice(2,4)+'-'+date.slice(5,7);          // 26-11
+    const line=[date,ym,person,'',area,brand,model,bw,cl,a3,sum,serial,1,note].join('\t');
+
+    const rec={ date, ym, person, approver:'', area, brand, model, bw, cl, a3, sum,
+                serial, qty:1, note, asset, reason, detail, media, destroy, parts, partList,
+                counterOk:cntOk, photos:urls, line, sentToSheet:false, at:new Date().toISOString() };
+
+    // ① 폐장비리스트 — 주소가 들어오면 바로 보내고, 없으면 쌓아둔다 (등록분은 사라지지 않는다)
+    if(DP_SHEET_URL){
+      try{
+        const r=await fetch(DP_SHEET_URL,{method:'POST',body:JSON.stringify({responseText:line}),redirect:'follow'});
+        const j=await r.json().catch(()=>({}));
+        rec.sentToSheet=!!(j&&(j.ok||j.success));
+      }catch(e){ rec.sentToSheet=false; }
+    }
+    st.textContent='💾 폐기 기록 저장 중…';
+    DP_LIST.push(rec);
+    await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{
+      method:'POST', headers:{...RB_SUPA_H, Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({key:DP_KEY, value:DP_LIST})
+    });
+
+    // ② 오버홀 통계 시트에 '기기폐기' 1건 — 이게 정량 목표 1대로 잡힌다
+    st.textContent='📊 실적(기기폐기 1대) 기록 중…';
+    let workOk=false, workMsg='';
+    try{
+      const resp=await fetch(saveConfig.scriptUrl,{
+        method:'POST', redirect:'follow',
+        body:JSON.stringify({
+          date, person, dept:area, incoming:'', model,
+          serial: serial || (asset?('자산:'+asset):''),
+          part:'', overhaul:'기기폐기', repair:'', time:0, photos:{},
+          _config:{ mainSheet:saveConfig.mainSheet, mainTab:saveConfig.mainTab,
+                    stockSheet:saveConfig.stockSheet, stockTab:saveConfig.stockTab }
+        })
+      });
+      const jr=await resp.json();
+      workOk=!!jr.ok && !jr.mainError;
+      workMsg=jr.mainError||'';
+    }catch(e){ workMsg=e.message||String(e); }
+
+    const sheetLine = DP_SHEET_URL
+      ? (rec.sentToSheet ? '폐장비리스트 ✓' : '폐장비리스트 ✗ (나중에 다시 보냅니다)')
+      : '폐장비리스트 — 보관됨 (시트 주소 연결 전)';
+    alert('🗑 폐기 등록 완료\n\n'
+      + model+' / '+serial+'\n'
+      + sheetLine+'\n'
+      + (workOk?'오버홀 실적 ✓ 기기폐기 1대':('오버홀 실적 ✗ '+workMsg)));
+
+    // 다음 등록을 위해 비우기 (담당자·지역·날짜는 그대로 둔다 — 연속 등록이 많다)
+    ['dp-direct','dp-brand','dp-model','dp-serial','dp-asset','dp-detail','dp-est','dp-partlist','dp-bw','dp-cl','dp-a3'].forEach(id=>{
+      const e=document.getElementById(id); if(e) e.value='';
+    });
+    ['dp-reason','dp-media','dp-parts','dp-destroy'].forEach(id=>{
+      document.querySelectorAll('#'+id+' .rbchip.on').forEach(c=>c.classList.remove('on'));
+    });
+    DP_FILES={}; DP_CUR={};
+    document.getElementById('dp-orig').classList.remove('show');
+    dpBuildShots(); dpSum(); dpReveal();
+    st.textContent='';
+  }catch(e){
+    st.innerHTML='<span style="color:#c53030">저장 실패: '+rbEsc(e.message||String(e))+'</span>';
+    alert('저장에 실패했습니다.\n\n'+(e.message||e));
+  }finally{
+    btn.disabled=false; btn.textContent=label;
+  }
+}
 </script>
 <script>
 // PWA 서비스워커 등록 (앱 설치 지원)
