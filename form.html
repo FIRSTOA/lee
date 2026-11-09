@@ -682,7 +682,8 @@
           <input type="text" id="dp-model" placeholder="예: 3220 숫자만 입력 → 목록에서 고르기" autocomplete="off">
           <div id="dp-model-dropdown" class="autocomplete-dropdown hidden"></div>
         </div>
-        <p style="font-size:11px;color:#718096;margin-top:4px">※ 숫자만 쳐도 찾아줍니다. 목록에서 고르면 표기가 통일됩니다. 없는 기종은 그냥 쓰셔도 됩니다.</p>
+        <p style="font-size:11px;color:#718096;margin-top:4px">※ 숫자만 쳐도 찾아줍니다. 목록에서 고르면 표기가 통일되고 위쪽 <b>제조사</b>도 같이 선택됩니다.</p>
+        <div id="dp-brandmsg" style="font-size:12px;margin-top:5px"></div>
       </div>
       <div class="row-2">
         <div class="field"><label>시리얼 (S/N)<span class="req">*</span></label><input type="text" id="dp-serial" placeholder="예: 0A6XBJLN20000AW"></div>
@@ -1526,7 +1527,8 @@ async function loadHrRoster() { hrRoster = await fetchHrRoster(); rebuildPersons
 loadHrRoster();
 
 // === 자동완성 셋업 ===
-function setupAutocomplete(inputId, dropdownId, dataList) {
+// onPick: 목록에서 하나를 고른 직후 호출되는 선택 인자. 안 넘기면 종전과 똑같이 동작한다.
+function setupAutocomplete(inputId, dropdownId, dataList, onPick) {
   const input = document.getElementById(inputId);
   const dropdown = document.getElementById(dropdownId);
 
@@ -1558,6 +1560,7 @@ function setupAutocomplete(inputId, dropdownId, dataList) {
         e.preventDefault(); // blur 막아서 dropdown 닫히기 전에 처리
         input.value = el.dataset.value;
         dropdown.classList.add('hidden');
+        if (onPick) onPick(el.dataset.value);
       };
     });
   }
@@ -1608,6 +1611,7 @@ function setupAutocomplete(inputId, dropdownId, dataList) {
       if (activeItem && activeItem.dataset.value) {
         input.value = activeItem.dataset.value;
         dropdown.classList.add('hidden');
+        if (onPick) onPick(activeItem.dataset.value);
       }
     }
   });
@@ -3472,7 +3476,7 @@ async function dpInit(){
   document.getElementById('btn-dp-submit').onclick=dpSubmit;
   // 기종 자동완성 — 오버홀 탭이 쓰는 MODELS 목록을 그대로 쓴다(숫자만 쳐도 부분일치로 걸린다).
   // 폐장비리스트에 'CLX-C9201 / CLX-9201NA / 9301'처럼 같은 기기가 58가지 표기로 갈려 있어 목록에서 고르게 한다.
-  setupAutocomplete('dp-model','dp-model-dropdown',MODELS);
+  setupAutocomplete('dp-model','dp-model-dropdown',MODELS,dpPickModel);
   dpSyncArea();
   try{
     const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.'+DP_KEY+'&select=value',{headers:RB_SUPA_H});
@@ -3500,24 +3504,45 @@ async function dpLookup(){
   if(a.device_sn) document.getElementById('dp-serial').value=a.device_sn;
   if(a.asset_no)  document.getElementById('dp-asset').value=a.asset_no;
   const brand=dpGuessBrand(a.model);
-  if(brand){
-    document.getElementById('dp-brand').value=brand;
-    [].slice.call(document.querySelectorAll('#dp-brandchips .rbchip')).forEach(x=>x.classList.toggle('on', x.textContent.trim()===brand));
-  }
+  dpSetBrand(brand);
   msg.innerHTML='<span style="color:#2f855a">✅ 채웠습니다'
     + (c.business_name?(' · 거래처 '+rbEsc(c.business_name)):'')
     + (brand?'':' — <b>제조사는 직접 골라주세요</b>')+'</span>';
 }
-// 모델명으로 제조사 짐작 (ERP가 제조사를 안 주므로). 못 맞히면 빈 값 → 사용자가 버튼으로 고른다.
+// 모델명으로 제조사 판별 (ERP도 폐장비리스트도 제조사를 따로 안 주므로).
+// 폐기 기록 173건과 대조해 맞춰 둔 규칙이다 — D410=신도리코, ES5473=오키, HP-8720=HP 처럼
+// 종전 규칙이 못 맞히던 것들을 포함한다. 확신이 없으면 빈 값을 돌려 사용자가 직접 고르게 둔다.
+// 리코·캐논·렉스마크·대진코스탈처럼 제조사 버튼에 없는 것은 일부러 비워 둔다(‘기타’로 뭉개지 않는다).
 function dpGuessBrand(model){
   const m=String(model||'').toUpperCase().replace(/\s/g,'');
-  if(/^(SL-|AX|K7|K3|X3|X4|SCX|CLX|ML-)/.test(m)) return '삼성';
-  if(/^(ECOSYS|TASKALFA|FS-)/.test(m)) return '교세라';
-  if(/^(APEOS|DOCU)/.test(m)) return '후지제록스';
-  if(/^BIZHUB/.test(m)) return '미놀타';
-  if(/^(MFC|DCP|HL-)/.test(m)) return '브라더';
-  if(/^(LASERJET|OFFICEJET|PAGEWIDE|M[0-9]{3})/.test(m)) return 'HP';
+  if(/^(SL-|SCX|CLX|ML-|AX|ACM|A600|K7|K3|X3|X4)/.test(m)) return '삼성';
+  if(/^(D[0-9]{3}|N[0-9]{3}|MF[0-9]|DGWOX)/.test(m))       return '신도리코';
+  if(/^(ECOSYS|TASKALFA|FS-)/.test(m))                      return '교세라';
+  if(/^ES[0-9]/.test(m))                                    return '오키';
+  if(/^HP/.test(m))                                         return 'HP';
+  if(/^(APEOS|DOCU)/.test(m))                               return '후지제록스';
+  if(/^(MFC|DCP|HL-)/.test(m))                              return '브라더';
+  if(/^BIZHUB/.test(m))                                     return '미놀타';
+  if(/^(LASERJET|OFFICEJET|PAGEWIDE)/.test(m))              return 'HP';
   return '';
+}
+// 제조사 칸과 버튼을 함께 맞춘다. 빈 값이면 아무것도 건드리지 않는다(사용자가 고른 것을 지우지 않기 위해).
+function dpSetBrand(brand){
+  if(!brand) return false;
+  document.getElementById('dp-brand').value=brand;
+  [].slice.call(document.querySelectorAll('#dp-brandchips .rbchip'))
+    .forEach(x=>x.classList.toggle('on', x.textContent.trim()===brand));
+  return true;
+}
+// 기종을 목록에서 고르면 제조사까지 자동으로 맞춘다. 못 맞히는 기종은 안내만 띄운다.
+function dpPickModel(model){
+  const msg=document.getElementById('dp-brandmsg');
+  const b=dpGuessBrand(model);
+  if(dpSetBrand(b)){
+    msg.innerHTML='<span style="color:#2f855a">✅ 제조사를 <b>'+rbEsc(b)+'</b>(으)로 같이 골랐습니다</span>';
+  }else{
+    msg.innerHTML='<span style="color:#c05621">제조사는 직접 골라주세요 (목록에 없는 제조사입니다)</span>';
+  }
 }
 
 async function dpSubmit(){
@@ -3631,6 +3656,8 @@ async function dpSubmit(){
     ['dp-reason','dp-parts','dp-brandchips'].forEach(id=>{
       document.querySelectorAll('#'+id+' .rbchip.on').forEach(c=>c.classList.remove('on'));
     });
+    document.getElementById('dp-brandmsg').innerHTML='';
+    document.getElementById('dp-lookupmsg').innerHTML='';
     DP_FILES={}; DP_CUR={};
     document.getElementById('dp-lookupmsg').textContent='';
     dpBuildShots(); dpSum(); dpReveal();
