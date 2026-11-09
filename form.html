@@ -273,6 +273,16 @@
   #mode-rebuild .rbchip.red.on, #mode-disposal .rbchip.red.on { border-color:#ef4444; background:#fef2f2; color:#b91c1c; }
   #mode-disposal textarea, #mode-disposal input[type=text], #mode-disposal input[type=number], #mode-disposal input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; }
   #mode-disposal textarea { min-height:60px; resize:vertical; }
+  /* 저장 중에 돌아가는 표시 — 멈춘 게 아니라 되고 있다는 걸 눈으로 알 수 있게 */
+  .dpspin { display:inline-block; width:14px; height:14px; border:2.5px solid rgba(0,0,0,.14);
+            border-top-color:#2b6cb0; border-radius:50%; vertical-align:-3px; margin-right:7px;
+            animation:dpspin .7s linear infinite; }
+  #disposal-footer .dpspin { border-color:rgba(255,255,255,.4); border-top-color:#fff; }
+  @keyframes dpspin { to { transform:rotate(360deg); } }
+  /* 사진 몇 장까지 올라갔는지 보여주는 막대 */
+  .dpbar { height:7px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:8px; }
+  .dpbar > i { display:block; height:100%; background:#2b6cb0; border-radius:4px;
+               width:0; transition:width .3s ease; }
   #mode-rebuild .rbetc { display:none; margin-top:8px; width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; min-height:54px; }
   #mode-rebuild .rbetc.show { display:block; }
   #mode-rebuild .rbreclist { margin-top:8px; border:1px solid #e5e7eb; border-radius:10px; max-height:220px; overflow:auto; }
@@ -3385,6 +3395,8 @@ const DP_KEY = 'disposal_list';
 // 대시보드 부서명 → 폐장비리스트 지역 (시트는 수도권A~D 를 쓴다)
 const DP_AREA_MAP = { '강북A':'수도권A', '강서B':'수도권B', '강남C':'수도권C', '경기D':'수도권D', 'CSS':'CSS', '외부인력':'외부인력' };
 let DP_FILES = {}, DP_CUR = {}, DP_LIST = [], dpReady = false;
+// 이미 올라간 사진의 주소. 중간에 끊겨 다시 누를 때 처음부터 올리지 않기 위해 남겨 둔다.
+let DP_UPLOADED = {};
 
 // 사진 — 3장은 항상, 취외 부품 사진은 뺀 게 있을 때만.
 const DP_SHOTS = [
@@ -3545,6 +3557,70 @@ function dpPickModel(model){
   }
 }
 
+// 사진 줄이기 — 요즘 폰 사진은 1장 4~6MB라 원본 그대로 올리면 느리고 중간에 끊긴다.
+// 긴 변 1800px / JPEG 0.82 로 줄이면 1장 300~500KB가 되고 시리얼·자산번호 라벨 글씨는 그대로 읽힌다.
+function dpShrink(file){
+  return new Promise(res=>{
+    if(!file || !/^image\//.test(file.type||'')) return res(file);
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const max=1800, s=Math.min(1, max/Math.max(img.width,img.height));
+      if(s>=1 && file.size<=900*1024) return res(file);   // 이미 작으면 그대로 둔다
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>{
+        if(!b || b.size>=file.size) return res(file);     // 줄여서 더 커지면 원본을 쓴다
+        res(new File([b],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}));
+      },'image/jpeg',0.82);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); res(file); };
+    img.src=url;
+  });
+}
+function dpKB(n){ return Math.round(n/1024).toLocaleString()+'KB'; }
+
+// 진행 표시 — 돌아가는 표시 + 지금 하는 일 + 흐른 시간 + 막대.
+// 멈춘 것처럼 보이지 않게 1초마다 시간을 다시 쓴다.
+let DP_T0=0, DP_TIMER=null, DP_MSG='', DP_PCT=0;
+function dpPaint(){
+  const sec=Math.floor((Date.now()-DP_T0)/1000);
+  document.getElementById('dp-status').innerHTML=
+      '<div style="text-align:left">'
+    + '<span class="dpspin"></span>'
+    + '<span style="color:#2b6cb0">'+rbEsc(DP_MSG)+'</span>'
+    + '<span style="color:#a0aec0;margin-left:8px">'+sec+'초</span>'
+    + '<div class="dpbar"><i style="width:'+DP_PCT+'%"></i></div>'
+    + '</div>';
+}
+function dpStep(text, btn, short, pct){
+  DP_MSG=text;
+  if(typeof pct==='number') DP_PCT=Math.max(0,Math.min(100,pct));
+  if(!DP_TIMER){ DP_T0=Date.now(); DP_TIMER=setInterval(dpPaint,1000); }
+  dpPaint();
+  if(btn) btn.innerHTML='<span class="dpspin"></span>등록 중… '+rbEsc(short||'');
+}
+function dpStepStop(){ if(DP_TIMER){ clearInterval(DP_TIMER); DP_TIMER=null; } DP_PCT=0; }
+// 사진 1장 올리기 — 모바일은 순간 끊김이 잦아 3번까지 다시 시도한다.
+async function dpUploadOne(file, onTry){
+  const small=await dpShrink(file);
+  const b64=await rbB64(small);
+  let last='';
+  for(let t=1;t<=3;t++){
+    if(onTry) onTry(t, small.size);
+    try{
+      const r=await fetch(RB_DRIVE_URL,{method:'POST',redirect:'follow',
+        body:JSON.stringify({files:[{name:small.name,mimeType:small.type,type:'photo',base64:b64}]})});
+      const j=await r.json();
+      if(j && j.ok && j.urls && j.urls[0]) return j.urls[0];
+      last='구글이 사진 주소를 주지 않았습니다';
+    }catch(e){ last=e.message||String(e); }
+    if(t<3) await new Promise(z=>setTimeout(z, t*2000));
+  }
+  throw new Error(last);
+}
+
 async function dpSubmit(){
   const st=document.getElementById('dp-status');
   const date=dpVal('dp-date'), person=dpVal('dp-person');
@@ -3578,13 +3654,27 @@ async function dpSubmit(){
   if(dup){ alert('이미 폐기 등록된 기기입니다.\n\n등록일: '+dup.date+'\n신청인: '+dup.person+'\n시리얼: '+(dup.serial||'-')); return; }
 
   const btn=document.getElementById('btn-dp-submit');
-  btn.disabled=true; const label=btn.textContent;
+  btn.disabled=true; const label=(btn.textContent==='완료!'?'🗑 폐기 등록':btn.textContent);
+  let done=false;
   try{
-    st.textContent='📤 사진 올리는 중…';
-    const urls={};
-    for(const s of needShots){
-      const up=await rbUploadFiles([DP_FILES[s.k]], st);
-      if(up&&up[0]) urls[s.k]=up[0];
+    // 이미 올라간 사진은 건너뛴다 — 끊겨서 다시 누를 때 남은 것부터 이어서 올린다.
+    const urls=DP_UPLOADED;
+    const total=needShots.length;
+    for(let i=0;i<total;i++){
+      const s=needShots[i];
+      if(urls[s.k]) continue;
+      dpStep('📤 사진 '+(i+1)+'/'+total+' — '+s.label+' 줄이는 중…', btn, (i+1)+'/'+total,
+             Math.round(i/total*70));
+      try{
+        urls[s.k]=await dpUploadOne(DP_FILES[s.k], (t,sz)=>{
+          dpStep('📤 사진 '+(i+1)+'/'+total+' — '+s.label+' 올리는 중 ('+dpKB(sz)+')'
+                 +(t>1?'  · '+t+'번째 시도':''), btn, (i+1)+'/'+total,
+                 Math.round((i+0.5)/total*70));
+        });
+      }catch(e){
+        throw new Error('사진 '+(i+1)+'/'+total+' ('+s.label+')를 올리다 끊겼습니다.\n\n'
+          +(e.message||e)+'\n\n입력하신 내용은 그대로 있습니다.\n[폐기 등록]을 다시 누르면 남은 사진부터 이어서 올립니다.');
+      }
     }
 
     // 카운터는 173건 중 19건만 숫자가 적혀 있다. 안 읽었으면 기존 관행대로 '없음'.
@@ -3609,21 +3699,25 @@ async function dpSubmit(){
 
     // ① 폐장비리스트 — 주소가 들어오면 바로 보내고, 없으면 쌓아둔다 (등록분은 사라지지 않는다)
     if(DP_SHEET_URL){
+      dpStep('📋 폐장비리스트에 적는 중…', btn, '폐장비리스트', 78);
       try{
         const r=await fetch(DP_SHEET_URL,{method:'POST',body:JSON.stringify({responseText:line}),redirect:'follow'});
         const j=await r.json().catch(()=>({}));
         rec.sentToSheet=!!(j&&(j.ok||j.success));
       }catch(e){ rec.sentToSheet=false; }
     }
-    st.textContent='💾 폐기 기록 저장 중…';
-    DP_LIST.push(rec);
-    await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{
+    // 저장이 확인된 뒤에 목록에 넣는다 (실패했는데 넣어 두면 다음에 '이미 등록됨'으로 막힌다)
+    dpStep('💾 폐기 기록 저장 중…', btn, '기록 저장', 88);
+    const nextList=DP_LIST.concat([rec]);
+    const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{
       method:'POST', headers:{...RB_SUPA_H, Prefer:'resolution=merge-duplicates'},
-      body:JSON.stringify({key:DP_KEY, value:DP_LIST})
+      body:JSON.stringify({key:DP_KEY, value:nextList})
     });
+    if(!up.ok) throw new Error('폐기 기록 저장에 실패했습니다 ('+up.status+')\n\n입력하신 내용은 그대로 있습니다. 잠시 뒤 다시 눌러주세요.');
+    DP_LIST=nextList;
 
     // ② 오버홀 통계 시트에 '기기폐기' 1건 — 이게 정량 목표 1대로 잡힌다
-    st.textContent='📊 실적(기기폐기 1대) 기록 중…';
+    dpStep('📊 실적(기기폐기 1대) 적는 중…', btn, '실적', 95);
     let workOk=false, workMsg='';
     try{
       const resp=await fetch(saveConfig.scriptUrl,{
@@ -3644,10 +3738,18 @@ async function dpSubmit(){
     const sheetLine = DP_SHEET_URL
       ? (rec.sentToSheet ? '폐장비리스트 ✓' : '폐장비리스트 ✗ (나중에 다시 보냅니다)')
       : '폐장비리스트 — 보관됨 (시트 주소 연결 전)';
+    const workLine = workOk ? '오버홀 실적 ✓ 기기폐기 1대' : ('오버홀 실적 ✗ '+workMsg);
+    // 화면에도 완료 표시를 남긴다 (알림창을 닫은 뒤에도 끝난 걸 알 수 있게)
+    st.innerHTML='<div style="background:#f0fff4;border:1.5px solid #38a169;border-radius:10px;'
+      + 'padding:11px 13px;color:#22543d;font-size:13px;line-height:1.75;text-align:left">'
+      + '<b style="font-size:14px">✅ 폐기 등록 완료</b><br>'
+      + rbEsc(brand)+' '+rbEsc(model)+' / '+rbEsc(serial)+'<br>'
+      + rbEsc(sheetLine)+'<br>'+rbEsc(workLine)+'</div>';
+    btn.textContent='완료!';
     alert('🗑 폐기 등록 완료\n\n'
       + model+' / '+serial+'\n'
       + sheetLine+'\n'
-      + (workOk?'오버홀 실적 ✓ 기기폐기 1대':('오버홀 실적 ✗ '+workMsg)));
+      + workLine);
 
     // 다음 등록을 위해 비우기 (담당자·지역·날짜는 그대로 둔다 — 연속 등록이 많다)
     ['dp-direct','dp-brand','dp-model','dp-serial','dp-asset','dp-partetc','dp-bw','dp-cl','dp-a3'].forEach(id=>{
@@ -3658,15 +3760,19 @@ async function dpSubmit(){
     });
     document.getElementById('dp-brandmsg').innerHTML='';
     document.getElementById('dp-lookupmsg').innerHTML='';
-    DP_FILES={}; DP_CUR={};
-    document.getElementById('dp-lookupmsg').textContent='';
+    DP_FILES={}; DP_CUR={}; DP_UPLOADED={};
     dpBuildShots(); dpSum(); dpReveal();
-    st.textContent='';
+    // 완료 표시(st)는 지우지 않는다 — 다음 등록을 시작하면 그때 바뀐다.
+    done=true;
   }catch(e){
-    st.innerHTML='<span style="color:#c53030">저장 실패: '+rbEsc(e.message||String(e))+'</span>';
-    alert('저장에 실패했습니다.\n\n'+(e.message||e));
+    st.innerHTML='<div style="background:#fff5f5;border:1.5px solid #e53e3e;border-radius:10px;'
+      + 'padding:11px 13px;color:#742a2a;font-size:13px;line-height:1.7;text-align:left">'
+      + '<b>❌ 저장하지 못했습니다</b><br>'+rbEsc(e.message||String(e)).replace(/\n/g,'<br>')+'</div>';
+    alert('저장하지 못했습니다.\n\n'+(e.message||e));
   }finally{
-    btn.disabled=false; btn.textContent=label;
+    dpStepStop();
+    btn.disabled=false;
+    btn.textContent = done ? '완료!' : label;
   }
 }
 </script>
