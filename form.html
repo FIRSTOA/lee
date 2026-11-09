@@ -676,7 +676,14 @@
         <input type="text" id="dp-brand" placeholder="제조사" style="margin-top:6px">
         <p style="font-size:11px;color:#718096;margin-top:4px">※ 지금까지 <b>신도리코</b>(29건)와 <b>신도</b>(21건)가 따로 쌓였습니다. 버튼으로 고르면 안 갈립니다.</p>
       </div>
-      <div class="field"><label>기종<span class="req">*</span></label><input type="text" id="dp-model" placeholder="예: SL-X3220NR"></div>
+      <div class="field">
+        <label>기종<span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="dp-model" placeholder="예: 3220 숫자만 입력 → 목록에서 고르기" autocomplete="off">
+          <div id="dp-model-dropdown" class="autocomplete-dropdown hidden"></div>
+        </div>
+        <p style="font-size:11px;color:#718096;margin-top:4px">※ 숫자만 쳐도 찾아줍니다. 목록에서 고르면 표기가 통일됩니다. 없는 기종은 그냥 쓰셔도 됩니다.</p>
+      </div>
       <div class="row-2">
         <div class="field"><label>시리얼 (S/N)<span class="req">*</span></label><input type="text" id="dp-serial" placeholder="예: 0A6XBJLN20000AW"></div>
         <div class="field"><label>자산번호</label><input type="text" id="dp-asset" placeholder="예: XRX-0137"></div>
@@ -3463,6 +3470,9 @@ async function dpInit(){
   document.getElementById('dp-direct').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); dpLookup(); } });
   document.getElementById('dp-person').addEventListener('input',dpSyncArea);
   document.getElementById('btn-dp-submit').onclick=dpSubmit;
+  // 기종 자동완성 — 오버홀 탭이 쓰는 MODELS 목록을 그대로 쓴다(숫자만 쳐도 부분일치로 걸린다).
+  // 폐장비리스트에 'CLX-C9201 / CLX-9201NA / 9301'처럼 같은 기기가 58가지 표기로 갈려 있어 목록에서 고르게 한다.
+  setupAutocomplete('dp-model','dp-model-dropdown',MODELS);
   dpSyncArea();
   try{
     const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.'+DP_KEY+'&select=value',{headers:RB_SUPA_H});
