@@ -136,7 +136,8 @@
   .photo-label { font-weight: 600; font-size: 13px; color: #2d3748; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
   .photo-label .photo-tag { background: #2b6cb0; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 
-  .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 14px; border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 8px rgba(0,0,0,0.04); display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
+  /* 아이폰 홈 인디케이터(아래 가로줄)에 버튼이 가리지 않게 그만큼 아래 여백을 더 준다 */
+  .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 14px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid #e2e8f0; box-shadow: 0 -2px 8px rgba(0,0,0,0.04); display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
   .footer-bar .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }
   .footer-bar .btn-primary { background: #2b6cb0; color: #fff; }
   .footer-bar .btn-primary:active { background: #2c5282; }
@@ -214,7 +215,7 @@
     .photo-slot img { max-height: 160px; }
 
     /* 하단 고정 버튼바 */
-    .footer-bar { max-width: 100%; padding: 10px 12px; }
+    .footer-bar { max-width: 100%; padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
     .footer-bar .btn { padding: 13px; font-size: 14px; }
 
     /* 모달 — 화면 거의 꽉 채우기 */
@@ -252,7 +253,9 @@
   }
   /* 모드 토글 */
   .mode-toggle { display:flex; gap:8px; margin-bottom:14px; }
-  .mode-btn { flex:1; padding:12px; border:1px solid #cbd5e0; border-radius:10px; background:#fff; font-size:14px; font-weight:700; cursor:pointer; color:#64748b; }
+  /* 2026-11-10 탭이 4개가 되어 폰에서 글자가 두 줄로 깨졌다 → 한 줄에 들어가게 줄인다 */
+  .mode-btn { flex:1; padding:12px 6px; border:1px solid #cbd5e0; border-radius:10px; background:#fff; font-size:13px; font-weight:700; cursor:pointer; color:#64748b; white-space:nowrap; }
+  @media (max-width:420px){ .mode-btn { font-size:12px; padding:11px 4px; letter-spacing:-.3px; } }
   #tab-overhaul.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
   #tab-rebuild.active { background:#ff7a18; color:#fff; border-color:#ff7a18; }
   .rb-subtoggle { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
@@ -283,6 +286,10 @@
   #mode-disposal .idbox .field label { font-size:12.5px; font-weight:600; color:#4a5568; }
   #mode-disposal .idbox .errline { font-size:12.5px; color:#c53030; font-weight:700; margin:0 0 11px; display:none; }
   #mode-disposal .idbox.bad .errline { display:block; }
+  /* 못 채운 칸을 잠깐 빨갛게 — 경고창만으로는 어디가 빈지 알 수 없다 */
+  .needfix { outline:2px solid #fc8181; outline-offset:3px; border-radius:10px;
+             animation:needfix 1s ease-in-out 2; }
+  @keyframes needfix { 0%,100%{ outline-color:#fc8181; } 50%{ outline-color:rgba(252,129,129,.25); } }
   /* ===== 리페어 탭 (2026-11-10) ===== */
   #mode-repair .rbchips { display:flex; flex-wrap:wrap; gap:8px; }
   #mode-repair .rbchip { border:1.5px solid #e5e7eb; border-radius:20px; padding:8px 15px; font-size:13.5px;
@@ -512,7 +519,7 @@
 <div class="container">
 
   <div class="mode-toggle">
-    <button type="button" id="tab-overhaul" class="mode-btn active" onclick="setMode('overhaul')">🛠 오버홀·수리 입력</button>
+    <button type="button" id="tab-overhaul" class="mode-btn active" onclick="setMode('overhaul')">🛠 오버홀·수리</button>
     <button type="button" id="tab-rebuild" class="mode-btn" onclick="setMode('rebuild')">🔧 재수리</button>
     <button type="button" id="tab-disposal" class="mode-btn" onclick="setMode('disposal')">🗑 폐기</button>
     <button type="button" id="tab-repair" class="mode-btn" onclick="setMode('repair')">🔩 리페어</button>
@@ -3689,15 +3696,17 @@ async function rpSubmit(){
   const part=rpPartName(), qty=rpNum('rp-qty'), mins=rpNum('rp-time');
   const area=rpArea2();
 
+  // 못 채운 칸이 화면 밖에 있으면 '왜 안 되는지' 알 수가 없다 → 그 칸으로 데려가 빨갛게 표시한다
   const err=[];
-  if(!date) err.push('작업일');
-  if(!person) err.push('담당자');
-  if(!area) err.push('지역');
-  if(!model) err.push('모델');
-  if(!part) err.push('부품');
-  if(qty<=0) err.push('수량');
-  if(mins<=0) err.push('1개당 소요시간');
-  if(err.length){ alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
+  const miss=(label,id)=>err.push({label,id});
+  if(!date) miss('작업일','rp-date');
+  if(!person) miss('담당자','rp-person');
+  if(!area) miss('지역','rp-area');
+  if(!model) miss('모델','rp-model');
+  if(!part) miss('부품','rp-parts');
+  if(qty<=0) miss('수량','rp-qty');
+  if(mins<=0) miss('1개당 소요시간','rp-tchips');
+  if(err.length){ rpShowMiss(err); return; }
 
   const label=btn.textContent;
   btn.disabled=true;
@@ -3891,6 +3900,18 @@ function dpBuildShots(){
   });
 }
 
+// 못 채운 칸을 화면에 띄우고 잠깐 빨갛게 표시한다. 경고창만으로는 어디가 빈지 알 수 없다.
+function dpShowMiss(list){
+  const first=document.getElementById(list[0].id);
+  if(first){
+    first.scrollIntoView({behavior:'smooth', block:'center'});
+    list.forEach(e=>{ const el=document.getElementById(e.id); if(el) el.classList.add('needfix'); });
+    setTimeout(()=>list.forEach(e=>{ const el=document.getElementById(e.id); if(el) el.classList.remove('needfix'); }), 3000);
+  }
+  alert('아래 항목을 채워주세요.\n\n· '+list.map(e=>e.label).join('\n· '));
+}
+function rpShowMiss(list){ dpShowMiss(list); }
+
 // 시리얼·자산번호가 둘 다 비면 묶음을 빨갛게 하고 안내 줄을 보여준다.
 // 처음 화면에서는 부르지 않는다 — 아직 아무것도 안 적은 사람에게 빨간 경고를 띄우지 않기 위해서다.
 function dpIdCheck(){
@@ -4064,17 +4085,18 @@ async function dpSubmit(){
   const cntOk=(dpNum('dp-bw')+dpNum('dp-cl')+dpNum('dp-a3'))>0;
 
   const err=[];
-  if(!date) err.push('폐기일');
-  if(!person) err.push('신청인');
-  if(mins<=0) err.push('소요시간 (버튼을 누르거나 분을 적어주세요)');
-  if(!area) err.push('지역');
-  if(!brand) err.push('제조사');
-  if(!model) err.push('기종');
+  const miss=(label,id)=>err.push({label,id});
+  if(!date) miss('폐기일','dp-date');
+  if(!person) miss('신청인','dp-person');
+  if(!area) miss('지역','dp-area');
+  if(mins<=0) miss('소요시간 (버튼을 누르거나 분을 적어주세요)','dp-time-chips');
+  if(!model) miss('기종','dp-model');
   // 시리얼 라벨이 떨어진 기기가 있다. 둘 중 하나만 있으면 받되, 둘 다 없으면 막는다
   // (중복 등록 방지와 나중의 조회가 둘 다 이 번호로 돌아간다)
-  if(!serial && !asset) err.push('시리얼 또는 자산번호 (둘 중 하나는 반드시 적어주세요)');
-  if(!noneParts && partAll.length===0) err.push("취외한 부품 (뺀 게 없으면 '없음'을 누르세요)");
-  if(err.length){ dpIdCheck(); alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
+  if(!serial && !asset) miss('시리얼 또는 자산번호 (둘 중 하나는 반드시 적어주세요)','dp-idbox');
+  if(!brand) miss('제조사','dp-brandchips');
+  if(!noneParts && partAll.length===0) miss("취외한 부품 (뺀 게 없으면 '없음'을 누르세요)",'dp-parts');
+  if(err.length){ dpIdCheck(); dpShowMiss(err); return; }
 
   const needShots=DP_SHOTS.filter(s=>s.always||(s.when&&s.when()));
   const missing=needShots.filter(s=>!DP_FILES[s.k]).map(s=>s.label);
