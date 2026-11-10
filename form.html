@@ -1551,6 +1551,23 @@ function addSaveLog(entry) {
 }
 function clearAllSaveLog() { localStorage.removeItem(SAVE_LOG_KEY); }
 
+// 2026-11-10 — 폐기·리페어 탭은 저장 로그에 아무것도 남기지 않아서
+// "저장했는데 로그에 없다"로 보였다. 세 탭이 같은 방식으로 남기게 한다.
+// 서버에서 받아 둔 옛 목록(LOG_CACHE_KEY)도 비워, 다음에 열 때 새로 읽게 한다.
+function logSaved(tab, d2, okFlag, row) {
+  try {
+    addSaveLog({
+      time: new Date().toISOString(),
+      date: d2.date, person: d2.person, model: d2.model,
+      ok: okFlag !== false, row: row || '', tab: tab,
+      formData: { date: d2.date, person: d2.person, dept: d2.dept || '', incoming: '',
+                  model: d2.model, serial: d2.serial || '', part: d2.part || '',
+                  overhaul: d2.overhaul || '', repair: d2.repair || '', time: d2.time || 0 }
+    });
+  } catch (e) {}
+  try { localStorage.removeItem('overhaul_savelog_cache_v1'); } catch (e) {}
+}
+
 // === 세션 확인 (선택) — 폼은 로그인 없이도 사용 가능. 세션이 있으면 자동 채움 ===
 const SESSION_KEY = 'overhaul_session';
 const AUTH_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBCwbum3bohh9tlRboZWJo1J1yoAXcOx_PHdmuJcmwMoLG7joTaL4DQIuEp2CP0c0KsQ/exec';
@@ -2711,6 +2728,8 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
       } else {
         addSaveLog(newEntry);
       }
+      // 서버에서 받아 둔 옛 목록을 비운다 — 방금 저장한 게 로그에 바로 보이게
+      try { localStorage.removeItem('overhaul_savelog_cache_v1'); } catch (e) {}
       document.getElementById('preview-modal').classList.add('hidden');
       // 수정 모드 종료 + 시리얼 캐시 무효화
       if (wasEditing) { exitEditMode(); }
@@ -3772,7 +3791,12 @@ async function rpSubmit(){
         })
       });
       const jr=await resp.json();
-      if(jr&&jr.ok&&!jr.mainError) sheetOk++; else lastErr=(jr&&jr.mainError)||'';
+      if(jr&&jr.ok&&!jr.mainError){
+        sheetOk++;
+        // 저장 로그에도 남긴다 — 수량만큼 줄을 쓰므로 줄마다 한 건씩
+        logSaved('리페어', { date, person, dept:area, model, serial:'', part,
+                             overhaul:'', repair:'부품제조', time:mins }, true, (jr&&jr.row)||'');
+      } else lastErr=(jr&&jr.mainError)||'';
     }catch(e){ lastErr=e.message||String(e); }
   }
 
@@ -4199,6 +4223,9 @@ async function dpSubmit(){
       const jr=await resp.json();
       workOk=!!jr.ok && !jr.mainError;
       workMsg=jr.mainError||'';
+      // 저장 로그에도 남긴다 (폐기 탭은 지금까지 아무것도 안 남겼다)
+      if(workOk) logSaved('폐기', { date, person, dept:area, model, serial:idKey, part:'',
+                                    overhaul:'기기폐기', repair:'', time:mins }, true, (jr&&jr.row)||'');
     }catch(e){ workMsg=e.message||String(e); }
 
     const sheetLine = DP_SHEET_URL
