@@ -765,9 +765,9 @@
       <div class="field">
         <label>부품<span class="req">*</span></label>
         <div class="rbchips" id="rp-parts">
-          <div class="rbchip" onclick="rpPart(this)" data-v="정착기">정착기</div>
-          <div class="rbchip" onclick="rpPart(this)" data-v="현상기">현상기</div>
-          <div class="rbchip" onclick="rpPart(this)" data-v="전사벨트">전사벨트</div>
+          <div class="rbchip" onclick="rpPickPart(this)" data-v="정착기">정착기</div>
+          <div class="rbchip" onclick="rpPickPart(this)" data-v="현상기">현상기</div>
+          <div class="rbchip" onclick="rpPickPart(this)" data-v="전사벨트">전사벨트</div>
           <div class="rbchip rpmore" id="rp-more" onclick="rpMoreToggle()">그 외 ▾</div>
         </div>
         <div class="rpbox" id="rp-box">
@@ -3604,7 +3604,9 @@ function rpNum(id){ return Math.max(0, parseInt(rpVal(id),10)||0); }
 function rpPartName(){ return RP_PARTS==='__etc' ? rpVal('rp-etc') : RP_PARTS; }
 
 function rpClearParts(){ document.querySelectorAll('#rp-parts .rbchip').forEach(c=>c.classList.remove('on')); }
-function rpPart(el){
+// 이름을 rpPart 로 지었다가 '수리품목 → 포인트'를 계산하는 기존 rpPart(s) 를 덮어써서
+// 오버홀 저장이 통째로 막혔다(2026-11-10). 리페어 탭 함수는 rpPick* 로 구분한다.
+function rpPickPart(el){
   rpClearParts(); el.classList.add('on'); RP_PARTS = el.dataset.v;
   document.getElementById('rp-box').classList.remove('open');
   document.getElementById('rp-more').textContent = '그 외 ▾';
