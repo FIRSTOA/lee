@@ -169,6 +169,28 @@
   .rb-st.req { background:#fef3c7; color:#92400e; } .rb-st.prog { background:#dbeafe; color:#1e40af; } .rb-st.done { background:#dcfce7; color:#166534; }
   .rb-warn { background:#fff5f5; color:#c53030; border-radius:6px; padding:1px 7px; font-weight:700; }
   @media (max-width:760px){ .rebuild-summary{grid-template-columns:repeat(2,1fr)} .rebuild-2col{grid-template-columns:1fr} }
+  /* 폐기 통계 카드 (2026-11-10) — 재수리 카드와 같은 모양, 기종명이 길어 이름 칸만 넓힘 */
+  .dp-sum { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:6px; }
+  .dp-sum .b { border:1px solid #edf2f7; border-radius:10px; padding:12px; text-align:center; background:#fafbfc; }
+  .dp-sum .b .v { font-size:22px; font-weight:800; color:#2c7a7b; }
+  .dp-sum .b .l { font-size:11px; color:#718096; margin-top:2px; }
+  .dp-sub { font-size:12.5px; font-weight:700; color:#4a5568; margin:16px 0 8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .dp-2col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .dp-bars .b { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12.5px; }
+  .dp-bars .b .nm { width:150px; color:#374151; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dp-bars .b .tk { flex:1; background:#eef2f7; border-radius:6px; height:15px; overflow:hidden; }
+  .dp-bars .b .fl { height:100%; border-radius:6px; background:linear-gradient(90deg,#2c7a7b,#4fd1c5); }
+  .dp-bars .b .vv { width:46px; text-align:right; color:#718096; }
+  .dp-bars .b.none .nm { color:#a0aec0; font-weight:500; font-style:italic; }
+  .dp-bars .b.none .fl { background:repeating-linear-gradient(45deg,#cbd5e0 0 6px,#e2e8f0 6px 12px); }
+  .dp-bars .empty { font-size:12px; color:#a0aec0; padding:10px 2px; }
+  .dp-seg { display:inline-flex; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+  .dp-seg button { border:0; background:#fff; padding:5px 13px; font-size:12px; cursor:pointer; color:#4a5568; font-family:inherit; }
+  .dp-seg button.on { background:#2c7a7b; color:#fff; font-weight:700; }
+  .dp-note { font-size:11.5px; color:#718096; background:#f7fafc; border:1px solid #edf2f7; border-radius:8px; padding:8px 11px; line-height:1.7; margin-bottom:10px; }
+  .dp-gap { font-size:11.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 11px; line-height:1.7; margin-bottom:12px; }
+  .dp-gap:empty { display:none; }
+  @media (max-width:760px){ .dp-sum{grid-template-columns:repeat(2,1fr)} .dp-2col{grid-template-columns:1fr} .dp-bars .b .nm{width:110px} }
   .qp-cards { display: flex; flex-wrap: wrap; gap: 10px; }
   .qp-card { flex: 1 1 150px; min-width: 140px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 13px; background: #f8fafc; }
   .qp-card .qp-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; color: #2b6cb0; }
@@ -207,6 +229,11 @@
     .card.expanded > *:not(h3) { display: block; margin-top: 10px; }
     .card.expanded .quota-filters { display: flex; }
     .card.expanded .scroll { display: block; }
+    /* 폐기 통계 카드는 모눈/가로 배치를 써서, 위 규칙에 덮이지 않게 되돌린다 */
+    .card.expanded > .dp-sum { display: grid; }
+    .card.expanded > .dp-2col { display: grid; }
+    .card.expanded > .dp-sub { display: flex; }
+    .card.expanded > .dp-gap:empty { display: none; }
     /* 카드 사이 간격 줄임 */
     .dashboard-grid { gap: 8px; }
     /* 터치 영역 키우기 (드래그/숨김 버튼) */
@@ -369,6 +396,33 @@
         <div class="scroll" style="max-height:200px"><table id="rebuildRepeat"><thead><tr><th style="text-align:left">시리얼/자산</th><th style="text-align:left">모델</th><th>원담당</th><th>횟수</th><th>최근</th></tr></thead><tbody></tbody></table></div>
         <div class="rebuild-subtitle">재수리 요청 목록 <span id="rebuildListInfo" style="font-size:11px;color:#718096;font-weight:400"></span></div>
         <div class="scroll" style="max-height:340px"><table id="rebuildListTable"><thead><tr><th>요청일</th><th style="text-align:left">시리얼/자산</th><th style="text-align:left">모델</th><th>부위</th><th>긴급</th><th>요청자</th><th>담당</th><th>보관</th><th>상태</th><th>첨부</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card full-width" data-card-id="disposalStats" data-card-name="폐기 통계">
+        <h3><span class="title-text">🗑 폐기 통계 <span style="font-size:11px;font-weight:400;color:#718096">(기기폐기 작업만 분리 집계)</span></span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
+        <div class="dp-note">※ 상단의 <b>년도 · 월 · 주차 · 부서 · 담당자</b> 필터가 이 카드에도 그대로 적용됩니다. (<b>작업유형</b> 필터는 적용되지 않습니다 — 기기폐기만 보는 카드입니다)</div>
+        <div class="dp-gap" id="dpGap"></div>
+        <div class="dp-sum">
+          <div class="b"><div class="v" id="dpS1">0</div><div class="l">폐기 대수</div></div>
+          <div class="b"><div class="v" id="dpS2">0</div><div class="l">폐기 기종</div></div>
+          <div class="b"><div class="v" id="dpS3">0</div><div class="l">담당 인원</div></div>
+          <div class="b"><div class="v" id="dpS4">0</div><div class="l">평균 소요시간(분)</div></div>
+        </div>
+        <div class="dp-2col">
+          <div><div class="dp-sub">기종별 폐기 분포</div><div class="dp-bars" id="dpByModel"></div></div>
+          <div><div class="dp-sub">담당자별 폐기 순위</div><div class="dp-bars" id="dpByPerson"></div></div>
+        </div>
+        <div class="dp-sub">기간별 폐기 추이
+          <span class="dp-seg" id="dpSeg">
+            <button type="button" data-k="y">년도별</button><button type="button" data-k="m" class="on">월별</button><button type="button" data-k="w">주차별</button>
+          </span>
+        </div>
+        <div class="dp-bars" id="dpByTime"></div>
+        <div class="dp-sub">부서별 폐기 현황</div>
+        <div class="dp-bars" id="dpByDept"></div>
+        <div class="dp-sub">폐기 내역 <span id="dpListInfo" style="font-weight:400;color:#718096;font-size:11px"></span></div>
+        <div class="scroll" style="max-height:300px">
+          <table id="dpListTable"><thead><tr><th>날짜</th><th>담당자</th><th>부서</th><th style="text-align:left">기종</th><th>소요시간</th></tr></thead><tbody></tbody></table>
+        </div>
       </div>
       <div class="card full-width" data-card-id="modelTable" data-card-name="기종별 오버홀 통계">
         <h3><span class="title-text" id="modelTableTitle">기종별 오버홀 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
@@ -769,6 +823,23 @@ function migrateRebuildAfterQuota() {
   saveLayout(layoutConfig);
 }
 
+// 1회 마이그레이션: 폐기 통계 카드를 재수리 통계(rebuildStats) 바로 아래로.
+// 안 하면 이미 순서를 저장해 둔 사람에게는 새 카드가 맨 끝으로 밀려난다.
+function migrateDisposalAfterRebuild() {
+  if (layoutConfig.movedDisposal) return;
+  const grid = document.getElementById('dashboardGrid');
+  if (!grid) return;
+  let order = (layoutConfig.order && layoutConfig.order.length)
+    ? [...layoutConfig.order]
+    : Array.from(grid.querySelectorAll(':scope > .card')).map(c => c.dataset.cardId);
+  order = order.filter(id => id !== 'disposalStats');
+  const ri = order.indexOf('rebuildStats');
+  if (ri >= 0) order.splice(ri + 1, 0, 'disposalStats'); else order.push('disposalStats');
+  layoutConfig.order = order;
+  layoutConfig.movedDisposal = true;
+  saveLayout(layoutConfig);
+}
+
 function initCardControls() {
   const grid = document.getElementById('dashboardGrid');
   if (!grid) return;
@@ -1155,6 +1226,104 @@ function stackedDatasets(keys, map, cats) {
   return cats.map(cat => ({ label: cat, data: keys.map(k => map.get(k)[cat] || 0), backgroundColor: CAT_COLORS[cat], stack: 'a' }));
 }
 
+// ============ 🗑 폐기 통계 (2026-11-10) ============
+// 오버홀 통계 시트에서 '기기폐기' 행만 따로 모아 본다.
+// 작업유형 필터는 일부러 빼고 거른다 — '오버홀'만 골랐을 때 이 카드가 통째로 0이 되는 걸 막는다.
+let dpPeriod = 'm';
+
+function dpFiltered() {
+  return RAW_DATA.filter(r => {
+    if (hrResigned.has(r.담당자)) return false;   // 다른 집계와 같은 규칙 (인사DB 퇴사자 제외)
+    for (const f of ['년','월','주차별','부서명','담당자']) {
+      if (filterState[f].size > 0 && !filterState[f].has(r[f])) return false;
+    }
+    return String(r.오버홀품목 || '').replace(/\s/g, '') === '기기폐기';
+  });
+}
+
+function dpCount(rows, keyFn) {
+  const m = {}; rows.forEach(r => { const k = keyFn(r); m[k] = (m[k] || 0) + 1; }); return m;
+}
+
+function dpBars(elId, map, order) {
+  const el = document.getElementById(elId); if (!el) return;
+  const keys = order ? order(Object.keys(map)) : Object.keys(map).sort((a, b) => {
+    // '(기종 미입력)'은 순위를 어지럽히므로 항상 맨 아래로 내린다
+    const na = (a === '(기종 미입력)') ? 1 : 0, nb = (b === '(기종 미입력)') ? 1 : 0;
+    return (na - nb) || (map[b] - map[a]);
+  });
+  if (!keys.length) { el.innerHTML = '<div class="empty">선택한 조건에 해당하는 폐기 기록이 없습니다.</div>'; return; }
+  const mx = Math.max(1, ...keys.map(k => map[k]));
+  el.innerHTML = keys.map(k =>
+    '<div class="b' + (k === '(기종 미입력)' ? ' none' : '') + '">'
+    + '<div class="nm" title="' + rbEscH(k) + '">' + rbEscH(k) + '</div>'
+    + '<div class="tk"><div class="fl" style="width:' + Math.round(map[k] / mx * 100) + '%"></div></div>'
+    + '<div class="vv">' + map[k] + '대</div></div>').join('');
+}
+
+// '2026/4/6' 같은 글자를 그대로 비교하면 4/6 이 11/9 보다 뒤로 가므로 숫자로 바꿔 비교한다
+function dpDateNum(s) {
+  const m = String(s).match(/(\d{4})[\/.\-]\s*(\d{1,2})[\/.\-]\s*(\d{1,2})/);
+  return m ? Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]) : 0;
+}
+function dpMonthNum(s) { const p = s.split('. '); return Number(p[0]) * 100 + Number(String(p[1]).replace('월','')); }
+function dpWeekNum(s) {
+  const m = s.match(/(\d+)년\s*(\d+)월(\d+)주차/);
+  return m ? Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]) : 0;
+}
+
+function renderDisposal() {
+  const rows = dpFiltered();
+  const model = r => (r.모델명 || '').trim();
+
+  dpBars('dpByModel',  dpCount(rows, r => model(r) || '(기종 미입력)'));
+  dpBars('dpByPerson', dpCount(rows, r => r.담당자 || '(미지정)'));
+  dpBars('dpByDept',   dpCount(rows, r => r.부서명 || '(미지정)'));
+
+  const segKey = {
+    y: [r => r.년, ks => ks.sort()],
+    m: [r => String(r.년).replace('년','') + '. ' + r.월, ks => ks.sort((a,b) => dpMonthNum(a) - dpMonthNum(b))],
+    w: [r => String(r.년).replace(/^20/,'').replace('년','') + '년 ' + r.주차별, ks => ks.sort((a,b) => dpWeekNum(a) - dpWeekNum(b))]
+  }[dpPeriod];
+  dpBars('dpByTime', dpCount(rows, segKey[0]), segKey[1]);
+
+  const nModel  = Object.keys(dpCount(rows, model)).filter(k => k !== '').length;
+  const nPerson = Object.keys(dpCount(rows, r => r.담당자 || '(미지정)')).length;
+  const noModel = rows.filter(r => !model(r)).length;
+  const withMin = rows.filter(r => r.소요시간 > 0);
+  const sumMin  = withMin.reduce((s, r) => s + r.소요시간, 0);
+  document.getElementById('dpS1').textContent = rows.length;
+  document.getElementById('dpS2').textContent = nModel;
+  document.getElementById('dpS3').textContent = nPerson;
+  document.getElementById('dpS4').textContent = withMin.length ? Math.round(sumMin / withMin.length) : 0;
+
+  const noMin = rows.length - withMin.length;
+  const gaps = [];
+  if (noModel) gaps.push('기종 미입력 <b>' + noModel + '건</b>');
+  if (noMin)   gaps.push('소요시간 미입력 <b>' + noMin + '건</b>');
+  document.getElementById('dpGap').innerHTML = gaps.length
+    ? '⚠ ' + gaps.join(' · ') + ' — 해당 건은 기종별 분포와 평균 소요시간에서 제외됩니다.'
+    : '';
+
+  const tb = document.querySelector('#dpListTable tbody'); tb.innerHTML = '';
+  rows.slice().sort((a, b) => dpDateNum(b.날짜) - dpDateNum(a.날짜)).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + rbEscH(r.날짜) + '</td><td>' + rbEscH(r.담당자) + '</td><td>' + rbEscH(r.부서명) + '</td>'
+      + '<td style="text-align:left">' + (model(r) ? rbEscH(model(r)) : '<span style="color:#a0aec0">(미입력)</span>') + '</td>'
+      + '<td class="num">' + (r.소요시간 > 0 ? r.소요시간 + '분' : '<span style="color:#a0aec0">-</span>') + '</td>';
+    tb.appendChild(tr);
+  });
+  document.getElementById('dpListInfo').textContent =
+    '총 ' + rows.length + '건 (기종 기재 ' + (rows.length - noModel) + '건 · 소요시간 기재 ' + withMin.length + '건)';
+}
+
+document.getElementById('dpSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  dpPeriod = b.dataset.k;
+  [...document.querySelectorAll('#dpSeg button')].forEach(x => x.classList.toggle('on', x === b));
+  renderDisposal();
+});
+
 function render() {
   // 재렌더(필터 변경 등) 시 현재 스크롤 위치 기억 — 표 행수가 줄어 문서가 짧아질 때
   // 브라우저가 스크롤을 위로 당겨 "화면이 위로 튀는" 모바일 문제 방지
@@ -1531,6 +1700,7 @@ function render() {
   setTimeout(restoreScroll, 60);
 
   try { renderRebuild(); } catch (e) {}
+  try { renderDisposal(); } catch (e) {}
 }
 
 // Re-render on viewport change (mobile <-> desktop switch)
@@ -2003,6 +2173,7 @@ function applyQuotaFilters(rows) {
 // 카드 레이아웃 적용 (저장된 순서 + 숨김 상태)
 migrateQuotaCardTop();   // 정량목표 카드를 작업유형별 비중 위로 (1회)
 migrateRebuildAfterQuota(); // 재수리 통계 카드를 정량목표 바로 아래로 (1회)
+migrateDisposalAfterRebuild(); // 폐기 통계 카드를 재수리 통계 바로 아래로 (1회)
 applyLayout();
 initCardControls();
 
