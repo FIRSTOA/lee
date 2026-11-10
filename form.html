@@ -283,6 +283,47 @@
   #mode-disposal .idbox .field label { font-size:12.5px; font-weight:600; color:#4a5568; }
   #mode-disposal .idbox .errline { font-size:12.5px; color:#c53030; font-weight:700; margin:0 0 11px; display:none; }
   #mode-disposal .idbox.bad .errline { display:block; }
+  /* ===== 리페어 탭 (2026-11-10) ===== */
+  #mode-repair .rbchips { display:flex; flex-wrap:wrap; gap:8px; }
+  #mode-repair .rbchip { border:1.5px solid #e5e7eb; border-radius:20px; padding:8px 15px; font-size:13.5px;
+                         cursor:pointer; background:#fff; user-select:none; }
+  #mode-repair .rbchip.on { border-color:#3182ce; background:#ebf8ff; color:#2c5282; font-weight:700; }
+  #mode-repair .rbchip.rpmore { border-style:dashed; color:#4a5568; }
+  #mode-repair textarea, #mode-repair input[type=text], #mode-repair input[type=number],
+  #mode-repair input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb;
+                                  border-radius:9px; font-size:14px; font-family:inherit; box-sizing:border-box; }
+  /* 자주 안 쓰는 부품은 접어 둔다 — 평소엔 칩 3개만 보인다 */
+  .rpbox { margin-top:10px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; display:none; }
+  .rpbox.open { display:block; }
+  .rpbox .it { padding:12px 14px; border-bottom:1px solid #f1f5f9; font-size:13.5px; cursor:pointer;
+               display:flex; justify-content:space-between; align-items:center; }
+  .rpbox .it:last-child { border-bottom:none; }
+  .rpbox .it:active { background:#ebf8ff; }
+  .rpbox .it .n { color:#a0aec0; font-size:11.5px; }
+  .rpetc { display:none; margin-top:9px; }
+  .rpetc.show { display:block; }
+  .rpqty { display:flex; align-items:center; gap:8px; }
+  .rpqty button { width:46px; height:46px; border:1.5px solid #e5e7eb; background:#fff; border-radius:10px;
+                  font-size:21px; cursor:pointer; color:#2d3748; font-family:inherit; line-height:1; flex-shrink:0; }
+  .rpqty button:active { background:#ebf8ff; border-color:#3182ce; }
+  .rpqty input { text-align:center; font-size:19px; font-weight:800; color:#2c5282; }
+  .rpcalc { background:#ebf8ff; border:1px solid #bee3f8; border-radius:10px; padding:11px 13px;
+            margin-top:12px; font-size:13px; color:#2c5282; line-height:1.8; }
+  .rpcalc b { font-size:15px; }
+  .rpcalc .sub { color:#4a6fa5; font-size:11.5px; }
+  .rpadd { display:block; width:100%; border:2px dashed #cbd5e0; border-radius:12px; background:#fafbfc;
+           padding:20px 12px; text-align:center; cursor:pointer; color:#4a5568; font-size:13.5px; font-family:inherit; }
+  .rpadd:active { border-color:#3182ce; background:#ebf8ff; color:#2c5282; }
+  .rpadd .big { display:block; font-size:26px; margin-bottom:5px; }
+  .rpgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+  .rpgrid:empty { display:none; }
+  .rpit { position:relative; padding-top:100%; border-radius:10px; overflow:hidden; background:#edf2f7; }
+  .rpit img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .rpit .x { position:absolute; top:4px; right:4px; width:26px; height:26px; border-radius:50%; border:0;
+             background:rgba(0,0,0,.6); color:#fff; font-size:15px; cursor:pointer; line-height:26px; padding:0; }
+  .rpcnt { font-size:12px; color:#718096; margin-top:9px; }
+  .rpcnt b { color:#2c5282; }
+  #repair-footer .dpspin { border-color:rgba(255,255,255,.4); border-top-color:#fff; }
   /* 저장 중에 돌아가는 표시 — 멈춘 게 아니라 되고 있다는 걸 눈으로 알 수 있게 */
   .dpspin { display:inline-block; width:14px; height:14px; border:2.5px solid rgba(0,0,0,.14);
             border-top-color:#2b6cb0; border-radius:50%; vertical-align:-3px; margin-right:7px;
@@ -474,6 +515,7 @@
     <button type="button" id="tab-overhaul" class="mode-btn active" onclick="setMode('overhaul')">🛠 오버홀·수리 입력</button>
     <button type="button" id="tab-rebuild" class="mode-btn" onclick="setMode('rebuild')">🔧 재수리</button>
     <button type="button" id="tab-disposal" class="mode-btn" onclick="setMode('disposal')">🗑 폐기</button>
+    <button type="button" id="tab-repair" class="mode-btn" onclick="setMode('repair')">🔩 리페어</button>
   </div>
 
   <div id="mode-rebuild" style="display:none">
@@ -665,6 +707,111 @@
         <div id="rbc-status" style="font-size:13px;text-align:center;margin-top:6px"></div>
       </div>
     </div>
+  </div>
+
+  <!-- ===== 리페어 모드 (부품제조) — 2026-11-10 추가 =====
+       지금까지 1,164건 중 84%가 같은 작업을 여러 줄로 쪼개 적혀 있었다(최대 20줄).
+       수량 칸이 없어서 폼을 20번 제출한 것이다. 여기서는 수량을 한 번 받고
+       시트에는 그 수만큼 줄을 자동으로 쓴다 — 기존 통계·포인트 규칙을 그대로 두기 위해서다. -->
+  <div id="mode-repair" style="display:none">
+    <div class="form-card">
+      <div class="section-title" style="color:#2c5282">🔩 리페어 등록</div>
+      <div class="row-2">
+        <div class="field"><label>작업일<span class="req">*</span></label><input type="date" id="rp-date"></div>
+        <div class="field"><label>담당자<span class="req">*</span></label><input type="text" id="rp-person" placeholder="이름"></div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>지역</label>
+        <div id="rp-areaview" style="font-size:13px;color:#718096;background:#f7fafc;border:1px solid #e5e7eb;
+             border-radius:9px;padding:10px 12px">담당자를 입력하면 자동으로 정해집니다</div>
+        <div class="rbchips" id="rp-area" style="display:none;margin-top:8px">
+          <div class="rbchip" onclick="rpArea(this)">강북A</div>
+          <div class="rbchip" onclick="rpArea(this)">강서B</div>
+          <div class="rbchip" onclick="rpArea(this)">강남C</div>
+          <div class="rbchip" onclick="rpArea(this)">경기D</div>
+          <div class="rbchip" onclick="rpArea(this)">CSS</div>
+          <div class="rbchip" onclick="rpArea(this)">외부인력</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">만든 부품</div>
+      <div class="field">
+        <label>모델<span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="rp-model" placeholder="예: 3220 숫자만 입력 → 목록에서 고르기" autocomplete="off">
+          <div id="rp-model-dropdown" class="autocomplete-dropdown hidden"></div>
+        </div>
+        <p style="font-size:11px;color:#718096;margin-top:4px">※ 숫자만 쳐도 찾아줍니다. 오버홀 탭과 같은 목록입니다.</p>
+      </div>
+      <div class="field">
+        <label>부품<span class="req">*</span></label>
+        <div class="rbchips" id="rp-parts">
+          <div class="rbchip" onclick="rpPart(this)" data-v="정착기">정착기</div>
+          <div class="rbchip" onclick="rpPart(this)" data-v="현상기">현상기</div>
+          <div class="rbchip" onclick="rpPart(this)" data-v="전사벨트">전사벨트</div>
+          <div class="rbchip rpmore" id="rp-more" onclick="rpMoreToggle()">그 외 ▾</div>
+        </div>
+        <div class="rpbox" id="rp-box">
+          <div class="it" onclick="rpPickMore(this)" data-v="잉크젯 헤드챔버">잉크젯 헤드챔버<span class="n">4건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="전사브레이드">전사브레이드<span class="n">4건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="리타드커버">리타드커버<span class="n">5건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="정착모터">정착모터<span class="n">1건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="PTB">PTB<span class="n">1건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="디스펜서">디스펜서<span class="n">1건</span></div>
+          <div class="it" onclick="rpPickMore(this)" data-v="__etc">기타 (직접 입력)<span class="n"></span></div>
+        </div>
+        <input type="text" id="rp-etc" class="rpetc" placeholder="부품 이름을 적어주세요">
+      </div>
+      <div class="field">
+        <label>수량<span class="req">*</span></label>
+        <div class="rpqty">
+          <button type="button" onclick="rpStep(-1)">&minus;</button>
+          <input type="number" id="rp-qty" value="1" min="1" max="50">
+          <button type="button" onclick="rpStep(1)">&plus;</button>
+        </div>
+        <div class="rbchips" id="rp-qchips" style="margin-top:9px">
+          <div class="rbchip" onclick="rpQty(this)">1개</div>
+          <div class="rbchip" onclick="rpQty(this)">2개</div>
+          <div class="rbchip" onclick="rpQty(this)">3개</div>
+          <div class="rbchip" onclick="rpQty(this)">5개</div>
+          <div class="rbchip" onclick="rpQty(this)">10개</div>
+          <div class="rbchip" onclick="rpQty(this)">20개</div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>1개당 소요시간<span class="req">*</span></label>
+        <div class="rbchips" id="rp-tchips" style="margin-bottom:9px">
+          <div class="rbchip" onclick="rpTime(this)">5분</div>
+          <div class="rbchip" onclick="rpTime(this)">10분</div>
+          <div class="rbchip" onclick="rpTime(this)">20분</div>
+          <div class="rbchip" onclick="rpTime(this)">30분</div>
+          <div class="rbchip" onclick="rpTime(this)">50분</div>
+        </div>
+        <input type="number" id="rp-time" min="1" placeholder="직접 입력 (분)">
+        <p style="font-size:11px;color:#718096;margin-top:4px">※ <b>1개 만드는 데</b> 걸린 시간입니다. 전체 시간이 아닙니다.</p>
+        <div class="rpcalc" id="rp-calc"></div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="section-title">사진</div>
+      <div class="field" style="margin-bottom:0">
+        <label>만든 부품 사진</label>
+        <input type="file" id="rp-file" accept="image/*" multiple style="display:none">
+        <button type="button" class="rpadd" id="rp-addph">
+          <span class="big">📷</span>사진 추가<br>
+          <span style="font-size:11.5px;color:#718096">여러 장을 한 번에 고를 수 있습니다</span>
+        </button>
+        <div class="rpgrid" id="rp-ph"></div>
+        <p class="rpcnt" id="rp-phcnt"></p>
+        <p style="font-size:11px;color:#718096;margin-top:6px;line-height:1.6">※ 꼭 안 찍어도 등록됩니다.
+          여러 개 만들었을 때 <b>모아놓고 한 장</b> 찍어두면 나중에 확인하기 좋습니다.</p>
+      </div>
+    </div>
+
+    <div id="rp-status" style="margin-top:10px;font-size:13px;text-align:center"></div>
   </div>
 
   <!-- ===== 폐기 모드 (복합기 전용) — 2026-11-06 추가 ===== -->
@@ -916,7 +1063,9 @@
         <div class="chip repair" data-repair="수리4">수리4</div>
         <div class="chip repair" data-repair="수리5">수리5</div>
         <div class="chip repair" data-repair="재수리">재수리</div>
-        <div class="chip refurb" data-repair="부품제조">부품제조 (리페어)</div>
+        <!-- 2026-11-10 — 리페어 등록은 [리페어] 탭으로 일원화해서 평소에는 감춘다.
+             과거 '부품제조' 기록 1,164건을 수정으로 불러올 때만 나타난다(기존 값이 지워지지 않게). -->
+        <div class="chip refurb" id="chip-refurb" data-repair="부품제조" style="display:none">부품제조 (리페어)</div>
       </div>
     </div>
   </div>
@@ -1078,6 +1227,9 @@
 <div class="footer-bar" id="disposal-footer" style="display:none">
   <button class="btn btn-primary" id="btn-dp-submit" style="width:100%;background:#c53030">🗑 폐기 등록</button>
 </div>
+<div class="footer-bar" id="repair-footer" style="display:none">
+  <button class="btn btn-primary" id="btn-rp-submit" style="width:100%;background:#3182ce">🔩 리페어 등록</button>
+</div>
 
 <!-- 저장 로그 모달 -->
 <div id="log-modal" class="modal-overlay hidden">
@@ -1232,6 +1384,8 @@ function enterEditMode(row, formData) {
   // 과거 '기기폐기' 기록을 수정할 때는 감춰 둔 칩을 꺼내 보여 준다 (값이 지워지지 않게)
   const _dc = document.getElementById('chip-discard');
   if (_dc) _dc.style.display = (formData.overhaul === '기기폐기') ? '' : 'none';
+  const _rf = document.getElementById('chip-refurb');
+  if (_rf) _rf.style.display = (formData.repair === '부품제조') ? '' : 'none';
   document.querySelectorAll('.chip[data-overhaul]').forEach(c => {
     c.classList.toggle('selected', c.dataset.overhaul === formData.overhaul);
   });
@@ -1349,6 +1503,7 @@ function exitEditMode() {
   document.getElementById('edit-mode-bar').style.display = 'none';
   var ep = document.getElementById('edit-photos'); if (ep) ep.style.display = 'none';
   var dc = document.getElementById('chip-discard'); if (dc) dc.style.display = 'none';
+  var rf = document.getElementById('chip-refurb'); if (rf) rf.style.display = 'none';
 }
 // 수정 모드 취소 버튼
 document.addEventListener('DOMContentLoaded', () => {
@@ -2631,7 +2786,8 @@ function setMode(m){
   // 2026-11-06 폐기 탭 추가 — 셋 다 끄고 고른 것만 켠다(탭이 늘어도 이 틀은 그대로).
   const panes={ overhaul:['mode-overhaul','overhaul-footer','tab-overhaul'],
                 rebuild :['mode-rebuild','rebuild-footer','tab-rebuild'],
-                disposal:['mode-disposal','disposal-footer','tab-disposal'] };
+                disposal:['mode-disposal','disposal-footer','tab-disposal'],
+                repair  :['mode-repair','repair-footer','tab-repair'] };
   Object.keys(panes).forEach(k=>{
     const [p,f,t]=panes[k].map(id=>document.getElementById(id));
     if(p) p.style.display='none';
@@ -2645,6 +2801,7 @@ function setMode(m){
   if(t) t.classList.add('active');
   if(key==='rebuild'){ rbInit(); setRbSub('new'); }
   if(key==='disposal'){ dpInit(); }
+  if(key==='repair'){ rpInit(); }
 }
 function rbSingle(el){ [...el.parentNode.children].forEach(c=>c.classList.remove('on')); el.classList.add('on'); rbReveal(); }
 function rbMulti(el){ el.classList.toggle('on'); rbReveal(); }
@@ -3419,6 +3576,213 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 <script>
+// ===== 리페어(repair) 모드 — 부품제조, 2026-11-10 =====
+// 저장 순서: ① Supabase 에 1줄(수량 포함)로 먼저 넣고 바로 '완료'를 띄운다
+//            ② 그 뒤 구글 시트에 수량만큼 줄을 쓴다 (기존 통계가 1줄=1건으로 세기 때문)
+//            ③ 사진은 마지막에 올린다. ②③ 가 실패해도 ①이 남아 다음에 이어서 보낸다.
+const RP_KEY = 'repair_list';
+let RP_PARTS = '', RP_FILES = [], rpReady = false;
+
+function rpArea(el){ [...el.parentNode.children].forEach(c=>c.classList.remove('on')); el.classList.add('on'); }
+function rpVal(id){ const e=document.getElementById(id); return e? e.value.trim():''; }
+function rpNum(id){ return Math.max(0, parseInt(rpVal(id),10)||0); }
+function rpPartName(){ return RP_PARTS==='__etc' ? rpVal('rp-etc') : RP_PARTS; }
+
+function rpClearParts(){ document.querySelectorAll('#rp-parts .rbchip').forEach(c=>c.classList.remove('on')); }
+function rpPart(el){
+  rpClearParts(); el.classList.add('on'); RP_PARTS = el.dataset.v;
+  document.getElementById('rp-box').classList.remove('open');
+  document.getElementById('rp-more').textContent = '그 외 ▾';
+  document.getElementById('rp-etc').classList.remove('show');
+  rpCalc();
+}
+function rpMoreToggle(){
+  const box=document.getElementById('rp-box'), m=document.getElementById('rp-more');
+  const open=box.classList.toggle('open');
+  if(!m.classList.contains('on')) m.textContent = open ? '그 외 ▴' : '그 외 ▾';
+}
+function rpPickMore(el){
+  rpClearParts(); RP_PARTS = el.dataset.v;
+  const m=document.getElementById('rp-more');
+  m.classList.add('on');
+  m.textContent = (RP_PARTS==='__etc') ? '기타 ▾' : RP_PARTS+' ▾';
+  document.getElementById('rp-box').classList.remove('open');
+  const etc=document.getElementById('rp-etc');
+  etc.classList.toggle('show', RP_PARTS==='__etc');
+  if(RP_PARTS==='__etc') etc.focus();
+  rpCalc();
+}
+function rpStep(d){
+  const e=document.getElementById('rp-qty');
+  e.value = Math.min(50, Math.max(1, (parseInt(e.value,10)||1) + d));
+  rpCalc();
+}
+function rpQty(el){ document.getElementById('rp-qty').value = parseInt(el.textContent,10); rpCalc(); }
+function rpTime(el){ document.getElementById('rp-time').value = parseInt(el.textContent,10); rpCalc(); }
+
+function rpCalc(){
+  const n=rpNum('rp-qty'), m=rpNum('rp-time'), p=rpPartName(), tot=n*m;
+  document.getElementById('rp-calc').innerHTML = (n&&m&&p)
+    ? '<b>'+rbEsc(p)+' '+n+'개 × '+m+'분 = 모두 '+tot+'분</b>'
+      + (tot>=60 ? ' ('+(tot/60).toFixed(1)+'시간)' : '')
+      + '<br><span class="sub">시트에는 지금까지와 똑같이 <b>'+n+'줄</b>로 기록됩니다 — 통계 숫자가 바뀌지 않게.</span>'
+    : '<span class="sub">부품 · 수량 · 1개당 시간을 넣으면 전체 시간이 여기에 나옵니다.</span>';
+  document.querySelectorAll('#rp-qchips .rbchip').forEach(c=>c.classList.toggle('on', parseInt(c.textContent,10)===n));
+  document.querySelectorAll('#rp-tchips .rbchip').forEach(c=>c.classList.toggle('on', parseInt(c.textContent,10)===m));
+  const btn=document.getElementById('btn-rp-submit');
+  if(btn && !btn.disabled) btn.textContent = n>1 ? '🔩 리페어 '+n+'개 등록' : '🔩 리페어 등록';
+}
+
+function rpDrawPh(){
+  document.getElementById('rp-ph').innerHTML = RP_FILES.map((f,i)=>
+    '<div class="rpit"><img src="'+URL.createObjectURL(f)+'">'
+    + '<button type="button" class="x" data-i="'+i+'">×</button></div>').join('');
+  const kb = RP_FILES.reduce((s,f)=>s+f.size,0)/1024;
+  document.getElementById('rp-phcnt').innerHTML = RP_FILES.length
+    ? '<b>'+RP_FILES.length+'장</b> 골랐습니다 ('
+      + (kb>1024 ? (kb/1024).toFixed(1)+'MB' : Math.round(kb)+'KB') + ' → 올릴 때 줄여서 보냅니다)'
+    : '';
+}
+
+// 담당자 → 지역. 폐기 탭과 같은 인사DB를 쓴다(엄재현은 주간 CSS·야간 외부인력으로 갈린다).
+function rpSyncArea(){
+  const nm=rpVal('rp-person'), view=document.getElementById('rp-areaview'), chips=document.getElementById('rp-area');
+  if(!nm){ view.textContent='담당자를 입력하면 자동으로 정해집니다'; view.style.display='block'; chips.style.display='none'; return; }
+  // 폐기 탭과 같은 명단을 쓴다 — 인사DB(재직) + 외부인력 수동 명단을 합친 것.
+  // 엄재현은 주간(CSS)과 야간(외부인력)이 다른 사람이라 여기서 갈린다.
+  const hit=(typeof personsData!=='undefined'?personsData:[]).find(p=>p.name===nm);
+  if(hit && hit.dept){
+    view.innerHTML='<b style="color:#2c5282">'+rbEsc(nm)+'</b> → <b>'+rbEsc(hit.dept)+'</b>';
+    view.style.display='block'; chips.style.display='none';
+    [].slice.call(chips.children).forEach(c=>c.classList.toggle('on', c.textContent.trim()===hit.dept));
+  }else{
+    view.textContent='명단에 없는 이름입니다. 아래에서 직접 고르세요.';
+    view.style.display='block'; chips.style.display='flex';
+  }
+}
+function rpArea2(){ const on=document.querySelector('#rp-area .rbchip.on'); return on?on.textContent.trim():''; }
+
+async function rpInit(){
+  if(rpReady) return; rpReady=true;
+  document.getElementById('rp-date').value=new Date().toISOString().slice(0,10);
+  setupAutocomplete('rp-model','rp-model-dropdown',MODELS);
+  document.getElementById('rp-person').addEventListener('input',rpSyncArea);
+  document.getElementById('rp-qty').addEventListener('input',rpCalc);
+  document.getElementById('rp-time').addEventListener('input',rpCalc);
+  document.getElementById('rp-etc').addEventListener('input',rpCalc);
+  document.getElementById('rp-addph').onclick=()=>document.getElementById('rp-file').click();
+  document.getElementById('rp-file').onchange=function(){
+    [...this.files].forEach(f=>{ if(/^image\//.test(f.type||'')) RP_FILES.push(f); });
+    this.value=''; rpDrawPh();
+  };
+  document.getElementById('rp-ph').onclick=function(e){
+    const b=e.target.closest('.x'); if(!b) return;
+    RP_FILES.splice(Number(b.dataset.i),1); rpDrawPh();
+  };
+  document.getElementById('btn-rp-submit').onclick=rpSubmit;
+  rpSyncArea(); rpCalc();
+}
+
+async function rpSubmit(){
+  const btn=document.getElementById('btn-rp-submit'), st=document.getElementById('rp-status');
+  const date=rpVal('rp-date'), person=rpVal('rp-person'), model=rpVal('rp-model');
+  const part=rpPartName(), qty=rpNum('rp-qty'), mins=rpNum('rp-time');
+  const area=rpArea2();
+
+  const err=[];
+  if(!date) err.push('작업일');
+  if(!person) err.push('담당자');
+  if(!area) err.push('지역');
+  if(!model) err.push('모델');
+  if(!part) err.push('부품');
+  if(qty<=0) err.push('수량');
+  if(mins<=0) err.push('1개당 소요시간');
+  if(err.length){ alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
+
+  const label=btn.textContent;
+  btn.disabled=true;
+  btn.innerHTML='<span class="dpspin"></span>저장 중…';
+  st.innerHTML='<span class="dpspin"></span><span style="color:#2b6cb0">기록을 저장하는 중…</span>';
+  const rec={ date, person, area, model, part, qty, minutes:mins, total:qty*mins,
+              photos:[], sheetDone:0, at:new Date().toISOString() };
+  let list=[];
+  try{
+    // ① Supabase — 여기까지 되면 기록은 안전하다
+    const r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.'+RP_KEY+'&select=value',{headers:RB_SUPA_H});
+    const j=await r.json();
+    list=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[];
+    const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{
+      method:'POST', headers:{...RB_SUPA_H, Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({key:RP_KEY, value:list.concat([rec])})
+    });
+    if(!up.ok) throw new Error('기록 저장에 실패했습니다 ('+up.status+')');
+  }catch(e){
+    st.innerHTML='<div style="background:#fff5f5;border:1.5px solid #e53e3e;border-radius:10px;padding:11px 13px;'
+      + 'color:#742a2a;font-size:13px;text-align:left"><b>❌ 저장하지 못했습니다</b><br>'
+      + rbEsc(e.message||String(e))+'<br>입력하신 내용은 그대로 있습니다. 잠시 뒤 다시 눌러주세요.</div>';
+    btn.disabled=false; btn.textContent=label;
+    return;
+  }
+
+  // 여기부터는 실패해도 기록이 사라지지 않는다. 사용자는 기다리지 않아도 된다.
+  const head='<div style="background:#f0fff4;border:1.5px solid #38a169;border-radius:10px;padding:11px 13px;'
+    + 'color:#22543d;font-size:13px;line-height:1.8;text-align:left"><b style="font-size:14px">✅ 등록 완료</b><br>'
+    + rbEsc(model)+' / '+rbEsc(part)+' '+qty+'개 (모두 '+(qty*mins)+'분)<br>';
+  st.innerHTML=head+'<span class="dpspin"></span>시트에 '+qty+'줄 기록 중… (기다리지 않아도 됩니다)</div>';
+  btn.textContent='완료!';
+
+  // ② 사진 — 폐기 탭의 축소·재시도를 그대로 쓴다
+  let phOk=0;
+  for(let i=0;i<RP_FILES.length;i++){
+    st.innerHTML=head+'<span class="dpspin"></span>사진 '+(i+1)+'/'+RP_FILES.length+' 올리는 중…</div>';
+    try{ rec.photos.push(await dpUploadOne(RP_FILES[i], ()=>{})); phOk++; }catch(e){ /* 실패해도 진행 */ }
+  }
+
+  // ③ 오버홀 통계 시트에 수량만큼 — 기존 집계가 '1줄 = 1건'이라 줄을 나눠 쓴다
+  let sheetOk=0, lastErr='';
+  for(let i=0;i<qty;i++){
+    st.innerHTML=head+'<span class="dpspin"></span>시트에 '+(i+1)+'/'+qty+'줄 기록 중…</div>';
+    try{
+      const resp=await fetch(saveConfig.scriptUrl,{
+        method:'POST', redirect:'follow',
+        body:JSON.stringify({
+          date, person, dept:area, incoming:'', model, serial:'', part,
+          overhaul:'', repair:'부품제조', time:mins, photos:{},
+          _config:{ mainSheet:saveConfig.mainSheet, mainTab:saveConfig.mainTab,
+                    stockSheet:saveConfig.stockSheet, stockTab:saveConfig.stockTab }
+        })
+      });
+      const jr=await resp.json();
+      if(jr&&jr.ok&&!jr.mainError) sheetOk++; else lastErr=(jr&&jr.mainError)||'';
+    }catch(e){ lastErr=e.message||String(e); }
+  }
+
+  // 어디까지 됐는지 기록에 남긴다 — 다음에 못 보낸 것만 이어서 보낼 수 있게
+  rec.photos=rec.photos; rec.sheetDone=sheetOk;
+  try{
+    await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{
+      method:'POST', headers:{...RB_SUPA_H, Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({key:RP_KEY, value:list.concat([rec])})
+    });
+  }catch(e){}
+
+  st.innerHTML=head
+    + (RP_FILES.length ? ('사진 '+phOk+'/'+RP_FILES.length+'장 '+(phOk===RP_FILES.length?'✓':'✗')+'<br>') : '')
+    + '시트 '+sheetOk+'/'+qty+'줄 '+(sheetOk===qty?'✓':('✗ '+rbEsc(lastErr)))+'</div>';
+  alert('🔩 리페어 등록 완료\n\n'+model+' / '+part+' '+qty+'개\n모두 '+(qty*mins)+'분\n'
+    + '시트 '+sheetOk+'/'+qty+'줄'+(RP_FILES.length?('\n사진 '+phOk+'/'+RP_FILES.length+'장'):''));
+
+  // 다음 등록을 위해 비우기 (담당자·지역·날짜는 그대로 둔다 — 연속 등록이 많다)
+  ['rp-model','rp-etc','rp-time'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  document.getElementById('rp-qty').value=1;
+  rpClearParts(); RP_PARTS='';
+  document.getElementById('rp-more').classList.remove('on');
+  document.getElementById('rp-more').textContent='그 외 ▾';
+  document.getElementById('rp-etc').classList.remove('show');
+  RP_FILES=[]; rpDrawPh();
+  btn.disabled=false; rpCalc();
+}
+
 // ===== 폐기(disposal) 모드 — 복합기 전용, 2026-11-06 =====
 // 등록하면 그 자리에서 두 군데에 들어간다. 승인 단계는 없다.
 //   ① 폐장비리스트 14열(A~N) 한 줄  — 보낼 Apps Script 주소를 아직 몰라 Supabase 에 쌓아둔다.
