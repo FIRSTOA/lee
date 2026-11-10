@@ -273,6 +273,16 @@
   #mode-rebuild .rbchip.red.on, #mode-disposal .rbchip.red.on { border-color:#ef4444; background:#fef2f2; color:#b91c1c; }
   #mode-disposal textarea, #mode-disposal input[type=text], #mode-disposal input[type=number], #mode-disposal input[type=date] { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; }
   #mode-disposal textarea { min-height:60px; resize:vertical; }
+  /* 시리얼·자산번호 묶음 — 둘 중 하나만 있어도 되지만 둘 다 비면 빨갛게 알린다 */
+  #mode-disposal .idbox { border:1px solid #e5e7eb; border-radius:10px; padding:12px 12px 2px;
+                          margin-bottom:16px; transition:border-color .2s, background .2s; }
+  #mode-disposal .idbox.bad { border-color:#fc8181; background:#fff5f5; }
+  #mode-disposal .idbox > .cap { font-size:13.5px; font-weight:700; color:#2d3748; margin-bottom:3px; }
+  #mode-disposal .idbox > .hint { font-size:12px; color:#718096; margin:0 0 11px; line-height:1.6; }
+  #mode-disposal .idbox .field { margin-bottom:12px; }
+  #mode-disposal .idbox .field label { font-size:12.5px; font-weight:600; color:#4a5568; }
+  #mode-disposal .idbox .errline { font-size:12.5px; color:#c53030; font-weight:700; margin:0 0 11px; display:none; }
+  #mode-disposal .idbox.bad .errline { display:block; }
   /* 저장 중에 돌아가는 표시 — 멈춘 게 아니라 되고 있다는 걸 눈으로 알 수 있게 */
   .dpspin { display:inline-block; width:14px; height:14px; border:2.5px solid rgba(0,0,0,.14);
             border-top-color:#2b6cb0; border-radius:50%; vertical-align:-3px; margin-right:7px;
@@ -711,9 +721,16 @@
         <p style="font-size:11px;color:#718096;margin-top:4px">※ 숫자만 쳐도 찾아줍니다. 목록에서 고르면 표기가 통일되고 아래 <b>제조사</b>도 같이 선택됩니다.</p>
         <div id="dp-brandmsg" style="font-size:12px;margin-top:5px"></div>
       </div>
-      <div class="row-2">
-        <div class="field"><label>시리얼 (S/N)<span class="req">*</span></label><input type="text" id="dp-serial" placeholder="예: 0A6XBJLN20000AW"></div>
-        <div class="field"><label>자산번호</label><input type="text" id="dp-asset" placeholder="예: XRX-0137"></div>
+      <!-- 2026-11-10 — 시리얼을 못 읽는 기기가 있어 '둘 중 하나는 반드시'로 바꿨다.
+           라벨마다 *를 붙이면 둘 다 필수로 읽히므로 묶음에 하나만 붙인다. -->
+      <div class="idbox" id="dp-idbox">
+        <div class="cap">기기 식별 번호<span class="req">*</span></div>
+        <p class="hint">시리얼과 자산번호 중 <b>하나는 반드시</b> 적어주세요. 둘 다 적으면 가장 좋습니다.</p>
+        <p class="errline">시리얼과 자산번호가 모두 비어 있습니다. 하나는 적어주세요.</p>
+        <div class="row-2">
+          <div class="field"><label>시리얼 (S/N)</label><input type="text" id="dp-serial" placeholder="예: 0A6XBJLN20000AW"></div>
+          <div class="field"><label>자산번호</label><input type="text" id="dp-asset" placeholder="예: A5642"></div>
+        </div>
       </div>
       <div class="field" style="margin-bottom:0">
         <label>제조사<span class="req">*</span></label>
@@ -3510,6 +3527,13 @@ function dpBuildShots(){
   });
 }
 
+// 시리얼·자산번호가 둘 다 비면 묶음을 빨갛게 하고 안내 줄을 보여준다.
+// 처음 화면에서는 부르지 않는다 — 아직 아무것도 안 적은 사람에게 빨간 경고를 띄우지 않기 위해서다.
+function dpIdCheck(){
+  const box=document.getElementById('dp-idbox'); if(!box) return;
+  box.classList.toggle('bad', !dpVal('dp-serial') && !dpVal('dp-asset'));
+}
+
 async function dpInit(){
   if(dpReady) return; dpReady=true;
   document.getElementById('dp-date').value=new Date().toISOString().slice(0,10);
@@ -3519,6 +3543,9 @@ async function dpInit(){
   document.getElementById('dp-direct').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); dpLookup(); } });
   document.getElementById('dp-person').addEventListener('input',dpSyncArea);
   document.getElementById('dp-time').addEventListener('input',dpTimeSync);
+  ['dp-serial','dp-asset'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.addEventListener('input',dpIdCheck);
+  });
   document.getElementById('btn-dp-submit').onclick=dpSubmit;
   // 기종 자동완성 — 오버홀 탭이 쓰는 MODELS 목록을 그대로 쓴다(숫자만 쳐도 부분일치로 걸린다).
   // 폐장비리스트에 'CLX-C9201 / CLX-9201NA / 9301'처럼 같은 기기가 58가지 표기로 갈려 있어 목록에서 고르게 한다.
@@ -3679,9 +3706,11 @@ async function dpSubmit(){
   if(!area) err.push('지역');
   if(!brand) err.push('제조사');
   if(!model) err.push('기종');
-  if(!serial) err.push('시리얼');
+  // 시리얼 라벨이 떨어진 기기가 있다. 둘 중 하나만 있으면 받되, 둘 다 없으면 막는다
+  // (중복 등록 방지와 나중의 조회가 둘 다 이 번호로 돌아간다)
+  if(!serial && !asset) err.push('시리얼 또는 자산번호 (둘 중 하나는 반드시 적어주세요)');
   if(!noneParts && partAll.length===0) err.push("취외한 부품 (뺀 게 없으면 '없음'을 누르세요)");
-  if(err.length){ alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
+  if(err.length){ dpIdCheck(); alert('아래 항목을 채워주세요.\n\n· '+err.join('\n· ')); return; }
 
   const needShots=DP_SHOTS.filter(s=>s.always||(s.when&&s.when()));
   const missing=needShots.filter(s=>!DP_FILES[s.k]).map(s=>s.label);
@@ -3727,7 +3756,10 @@ async function dpSubmit(){
     const dateCell=_dt.getFullYear()+'. '+(_dt.getMonth()+1)+'. '+_dt.getDate();
     const ym=date.slice(2,4)+'-'+date.slice(5,7);               // 26-11
     const areaCell=DP_AREA_MAP[area]||area;                      // 강북A → 수도권A
-    const line=[dateCell,ym,person,'',areaCell,brand,model,bw,cl,a3,sum,serial,1,note].join('\t');
+    // 폐장비리스트에는 자산번호 열이 없다. 시리얼을 못 읽은 기기는 시리얼 칸을 비우면
+    // 시트에서 영영 못 찾으므로 '자산:A5642' 형태로 넣어 식별할 수 있게 한다.
+    const idKey = serial || (asset ? '자산:'+asset : '');
+    const line=[dateCell,ym,person,'',areaCell,brand,model,bw,cl,a3,sum,idKey,1,note].join('\t');
 
     // area = 우리 부서명(오버홀 통계용), areaSheet = 폐장비리스트에 들어간 지역
     const rec={ date, dateCell, ym, person, approver:'', area, areaSheet:areaCell, brand, model,
@@ -3762,7 +3794,7 @@ async function dpSubmit(){
         method:'POST', redirect:'follow',
         body:JSON.stringify({
           date, person, dept:area, incoming:'', model,
-          serial: serial || (asset?('자산:'+asset):''),
+          serial: idKey,
           part:'', overhaul:'기기폐기', repair:'', time:mins, photos:{},
           _config:{ mainSheet:saveConfig.mainSheet, mainTab:saveConfig.mainTab,
                     stockSheet:saveConfig.stockSheet, stockTab:saveConfig.stockTab }
@@ -3781,11 +3813,11 @@ async function dpSubmit(){
     st.innerHTML='<div style="background:#f0fff4;border:1.5px solid #38a169;border-radius:10px;'
       + 'padding:11px 13px;color:#22543d;font-size:13px;line-height:1.75;text-align:left">'
       + '<b style="font-size:14px">✅ 폐기 등록 완료</b><br>'
-      + rbEsc(brand)+' '+rbEsc(model)+' / '+rbEsc(serial)+'<br>'
+      + rbEsc(brand)+' '+rbEsc(model)+' / '+rbEsc(idKey)+'<br>'
       + rbEsc(sheetLine)+'<br>'+rbEsc(workLine)+'</div>';
     btn.textContent='완료!';
     alert('🗑 폐기 등록 완료\n\n'
-      + model+' / '+serial+'\n'
+      + model+' / '+idKey+'\n'
       + sheetLine+'\n'
       + workLine);
 
@@ -3798,6 +3830,8 @@ async function dpSubmit(){
     });
     document.getElementById('dp-brandmsg').innerHTML='';
     document.getElementById('dp-lookupmsg').innerHTML='';
+    // 칸을 비웠다고 빨간 경고가 남아 있으면 안 된다 (아직 아무것도 안 적은 상태다)
+    const _ib=document.getElementById('dp-idbox'); if(_ib) _ib.classList.remove('bad');
     DP_FILES={}; DP_CUR={}; DP_UPLOADED={};
     dpBuildShots(); dpSum(); dpReveal();
     // 완료 표시(st)는 지우지 않는다 — 다음 등록을 시작하면 그때 바뀐다.
