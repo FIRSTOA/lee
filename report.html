@@ -28,6 +28,34 @@
   .q-status .zero { color:#718096; } .q-status .zero b { color:#c53030; }
   .q-pace { background:#fffaf0; border:1px solid #fbd38d; border-radius:10px; padding:9px 14px; font-size:12.5px; margin-bottom:12px; }
   .q-pace b { color:#b7791f; }
+  /* 🗑 폐기 · 🔩 리페어 — 달성률 숫자에 섞여 안 보이던 것을 따로 보여준다.
+     한 주 수량이 보통 한 자리라 막대는 길이 차이가 안 나고, 종류가 하나면
+     막대 한 개짜리 그림이 된다 → 숫자를 크게 보여주고 내역은 글로 적는다.
+     두 칸을 같은 색으로 둬서 '같은 종류의 정보'로 읽히게 한다. */
+  .extra { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+  .ex { border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; background:#f8fafc; }
+  .ex .lb { font-size:12px; color:#718096; }
+  .ex .val { font-size:26px; font-weight:600; line-height:1.2; letter-spacing:-.01em; }
+  .ex .val .u { font-size:14px; margin-left:1px; }
+  /* 통계 화면의 폐기·리페어 카드와 같은 막대 — 같은 데이터는 같은 모양으로 보여야 한다 */
+  .ex .bars { margin-top:8px; }
+  .ex .bars .b { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:11.5px; }
+  .ex .bars .b .nm { flex:0 0 118px; color:#2d3748; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ex .bars .b .tk { flex:1; height:13px; background:#e9edf2; border-radius:4px; overflow:hidden; }
+  .ex .bars .b .fl { height:100%; border-radius:4px; }
+  .ex .bars .b .vv { flex:0 0 30px; text-align:right; color:#4a5568; font-weight:600; }
+  .ex .bars .b.none .nm { color:#a0aec0; font-style:italic; }
+  .ex .bars .b.none .fl { background:repeating-linear-gradient(45deg,#cbd5e0 0 6px,#e2e8f0 6px 12px) !important; }
+  .ex .more { font-size:11px; color:#a0aec0; margin-top:2px; }
+  .ex .who { margin-top:9px; padding-top:8px; border-top:1px solid #e2e8f0;
+             font-size:11.5px; color:#718096; display:flex; gap:7px; line-height:1.6; word-break:keep-all; }
+  .ex .who .it { white-space:nowrap; display:inline-block; }
+  .ex .who .k { flex:0 0 auto; color:#a0aec0; }
+  /* 폐기는 청록, 리페어는 파랑 — 통계 화면과 같은 색 */
+  .ex.dp .val { color:#2c7a7b; } .ex.dp .bars .fl { background:linear-gradient(90deg,#2c7a7b,#4fd1c5); }
+  .ex.rp .val { color:#2c5282; } .ex.rp .bars .fl { background:linear-gradient(90deg,#2c5282,#63b3ed); }
+  .q-summary .ex-in { color:#2b6cb0; font-weight:700; }
+  @media (max-width:760px){ .extra { grid-template-columns:1fr; } }
   .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
   .pc { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; background:#f8fafc; }
   .pc .pt { display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#2b6cb0; }
@@ -309,8 +337,27 @@ function build(data){
   const titleTxt=isQuarter?'📈 오버홀 목표 달성 현황 — 분기 보고':'📊 오버홀 목표 달성 현황 — 주간 보고';
   let h='<div class="rhead '+headClass+'"><div class="t">'+titleTxt+'</div><div class="p">'+periodSub+' · 실적·목표 모두 <b>대수</b> 기준 (2026-11-06 변경 — 오버홀4=2대·오버홀5=3대·수리2~3=1대)</div></div><div class="rbody">';
 
+  // 🗑 폐기 · 🔩 리페어 — 2026-11-10 추가.
+  // 달성률 숫자에는 이미 섞여 들어가 있어 따로는 안 보인다(기기폐기=1대, 부품제조=0대).
+  // periodRows 는 '포인트가 붙는 작업'만 걸러진 것이라 여기서는 rows 에서 직접 센다.
+  const inPeriod = (r)=> isQuarter
+    ? (r._year===curYear && monthsList.includes(r._month))
+    : (r._year===curYear && r._month===curMonth);
+  const wkOnly = (r)=> isQuarter ? true : (r.주차별===wkThis);
+  const topN = (list, field, n)=>{
+    const m={}; list.forEach(r=>{ const k=String(r[field]||'').trim(); if(k) m[k]=(m[k]||0)+1; });
+    const ks=Object.keys(m).sort((a,b)=>m[b]-m[a]).slice(0,n);
+    return ks.length ? ks.map(k=>k+' '+m[k]).join(' · ') : '';
+  };
+  const dpRows = rows.filter(r=>inPeriod(r) && wkOnly(r) && String(r.오버홀품목||'').replace(/\s/g,'')==='기기폐기');
+  const rpRows = rows.filter(r=>inPeriod(r) && wkOnly(r) && String(r.수리품목||'').replace(/\s/g,'')==='부품제조');
+
   // 요약
+  // 카톡 링크 카드는 그림을 위에서 얇게 잘라 쓴다 → 숫자는 맨 윗줄에도 넣어야 방에서 보인다.
+  const exBrief = [ dpRows.length ? '🗑 폐기 '+dpRows.length+'대' : '',
+                    rpRows.length ? '🔩 리페어 '+rpRows.length+'개' : '' ].filter(Boolean).join(' · ');
   h+='<div class="q-summary">'+(isQuarter?'📈':'📊')+' 전체 <span class="em">'+overallPct+'%</span> ('+tA+'/'+tT+'대)'
+    +(exBrief?' · <span class="ex-in">'+exBrief+'</span>':'')
     +(topPart?' · 달성률 1위 <span class="em">'+topPart.d+' '+topPart.pct+'%</span>':'')
     +(mvp?' · '+(isQuarter?'분기':'이주의')+' MVP <span class="em">'+mvp.p+'('+mvp.t+'대)</span>':'')
     +(lowParts.length?' · <span class="warn">⚠️ '+lowParts.join('·')+' 분발 필요</span>':'')+'</div>';
@@ -337,6 +384,53 @@ function build(data){
       +(t.ohcnt>0?' · 평균 '+(t.ohpt/t.ohcnt).toFixed(1)+'등급':'')+'</div>';
     return '<div class="pc"><div class="pt">'+d+' <small>'+dCount[d]+'명</small></div><div style="font-size:11px;color:#a0aec0;margin-top:6px">실적 / 목표 (대)</div><div class="big"><b>'+t.total+'</b><small> / '+t.target+'</small></div><div class="bar"><i style="width:'+Math.min(100,pct)+'%;background:'+bc+'"></i></div><div class="pct"><span style="color:'+pcol+'">달성률 '+ptxt+'</span></div>'+sideTxt+wow+'</div>';
   }).join('')+'</div>';
+
+  // 모델명·부품명·이름은 시트에서 그대로 온 값이라 화면에 넣기 전에 막아 둔다
+  const esc = (s)=>String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // 폐기·리페어 상세 — 숫자를 크게, 내역은 글로. 0이면 칸을 통째로 뺀다.
+  // 숫자 뒤에 단위를 꼭 붙인다 ('세이토 2'는 2대인지 2번인지 알 수 없다).
+  // 통계 화면과 같은 가로 막대. 안 적힌 건 빗금으로 따로 보여 준다(숫자에서 빠졌다는 표시).
+  const barsOf = (rowsIn, field, unit, emptyLabel)=>{
+    const m={}; let blank=0;
+    rowsIn.forEach(r=>{ const k=String(r[field]||'').trim(); if(k) m[k]=(m[k]||0)+1; else blank++; });
+    const ks=Object.keys(m).sort((a,b)=>m[b]-m[a]);
+    const show=ks.slice(0,3);
+    const mx=Math.max(1, ...ks.map(k=>m[k]), blank);
+    let out='<div class="bars">';
+    show.forEach(k=>{
+      out+='<div class="b"><div class="nm" title="'+esc(k)+'">'+esc(k)+'</div>'
+         + '<div class="tk"><div class="fl" style="width:'+Math.round(m[k]/mx*100)+'%"></div></div>'
+         + '<div class="vv">'+m[k]+unit+'</div></div>';
+    });
+    if(blank){
+      out+='<div class="b none"><div class="nm">('+emptyLabel+' 미입력)</div>'
+         + '<div class="tk"><div class="fl" style="width:'+Math.round(blank/mx*100)+'%"></div></div>'
+         + '<div class="vv">'+blank+unit+'</div></div>';
+    }
+    out+='</div>';
+    if(ks.length>3) out+='<div class="more">외 '+(ks.length-3)+'종</div>';
+    return out;
+  };
+  const whoOf = (rowsIn, unit)=>{
+    const m={}; rowsIn.forEach(r=>{ const k=String(r.담당자||'').trim(); if(k) m[k]=(m[k]||0)+1; });
+    const ks=Object.keys(m).sort((a,b)=>m[b]-m[a]);
+    if(!ks.length) return '';
+    return ks.slice(0,4).map(k=>'<span class="it">'+esc(k)+' '+m[k]+unit+'</span>').join(' · ')
+         + (ks.length>4 ? ' 외 '+(ks.length-4)+'명' : '');
+  };
+  const tile = (rowsIn, cls, icon, name, field, unit, emptyLabel)=>
+    '<div class="ex '+cls+'">'
+    + '<div class="lb">'+icon+' '+(isQuarter?'분기':'이번 주')+' '+name+'</div>'
+    + '<div class="val">'+rowsIn.length+'<span class="u">'+unit+'</span></div>'
+    + barsOf(rowsIn, field, unit, emptyLabel)
+    + (whoOf(rowsIn, unit) ? '<div class="who"><span class="k">담당</span><span>'+whoOf(rowsIn, unit)+'</span></div>' : '')
+    + '</div>';
+  if(dpRows.length || rpRows.length){
+    h+='<div class="extra">'
+      + (dpRows.length ? tile(dpRows,'dp','🗑','폐기','모델명','대','기종') : '')
+      + (rpRows.length ? tile(rpRows,'rp','🔩','리페어','부품명','개','부품') : '')
+      + '</div>';
+  }
 
   // 표
   const wowHdr=wkPrev?'<th>전주대비</th>':'';
