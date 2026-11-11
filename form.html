@@ -475,6 +475,29 @@
   #lookup-overlay .lk-catfilter{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px;}
   #lookup-overlay .lk-catfilter .lc{border:1.5px solid #cbd5e0;border-radius:20px;padding:6px 13px;font-size:13px;cursor:pointer;background:#fff;color:#475569;user-select:none;}
   #lookup-overlay .lk-catfilter .lc.on{background:#2b6cb0;color:#fff;border-color:#2b6cb0;font-weight:700;}
+  /* 2026-11-11 — 조회를 오버홀·재수리·폐기·리페어 통합으로. 탭은 2개 그대로 두고 종류 칩만 더한다 */
+  #lookup-overlay .lk-kinds{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;}
+  #lookup-overlay .lk-kinds .kc{border:1.5px solid #cbd5e0;border-radius:20px;padding:6px 12px;font-size:12.5px;cursor:pointer;background:#fff;color:#475569;user-select:none;white-space:nowrap;font-weight:600;}
+  #lookup-overlay .lk-kinds .kc .n{opacity:.7;font-weight:700;margin-left:3px;}
+  #lookup-overlay .lk-kinds .kc.on{color:#fff;font-weight:800;border-color:transparent;}
+  #lookup-overlay .lk-kinds .kc.on[data-k="ALL"]{background:#475569;}
+  #lookup-overlay .lk-kinds .kc.on[data-k="OH"]{background:#2b6cb0;}
+  #lookup-overlay .lk-kinds .kc.on[data-k="RB"]{background:#dd6b20;}
+  #lookup-overlay .lk-kinds .kc.on[data-k="DP"]{background:#2c7a7b;}
+  #lookup-overlay .lk-kinds .kc.on[data-k="RP"]{background:#6b46c1;}
+  #lookup-overlay .kbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:2px 8px;margin-bottom:4px;white-space:nowrap;}
+  #lookup-overlay .kbadge.OH{background:#e6effa;color:#1f4e82;}
+  #lookup-overlay .kbadge.RB{background:#fdecd9;color:#9c4e0d;}
+  #lookup-overlay .kbadge.DP{background:#dcf2f1;color:#1f5c5c;}
+  #lookup-overlay .kbadge.RP{background:#ebe4fa;color:#4c3194;}
+  #lookup-overlay .stag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:4px;padding:1px 6px;margin-left:5px;}
+  #lookup-overlay .stag.done{background:#dcfce7;color:#166534;}
+  #lookup-overlay .stag.req{background:#fef3c7;color:#92400e;}
+  #lookup-overlay .stag.cancel{background:#f1f5f9;color:#64748b;}
+  #lookup-overlay .lk-cnt{font-size:12px;color:#94a3b8;margin:-3px 0 10px;padding-left:2px;}
+  #lookup-overlay .lk-card .lk-model{word-break:keep-all;}
+  #lookup-overlay .lk-card .lk-sn{word-break:break-all;}
+  #lookup-overlay .lk-card .lk-meta{word-break:keep-all;}
   #ck-overlay.show{display:block;}
   #ck-overlay .ck-bar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#fff;border-bottom:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.06);}
   #ck-overlay .ck-bar button{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;}
@@ -1234,7 +1257,9 @@
   </div>
   <div class="lk-body">
     <div id="lk-panel-list">
-      <input type="text" id="lk-q1" class="lk-search" placeholder="🔍 시리얼 · 자산번호 · 모델 · 담당자 · 날짜 검색" autocomplete="off">
+      <input type="text" id="lk-q1" class="lk-search" placeholder="🔍 시리얼 · 자산번호 · 모델 · 담당자 · 부품 검색" autocomplete="off">
+      <div class="lk-kinds" id="lk-kinds"></div>
+      <div class="lk-cnt" id="lk-cnt"></div>
       <div id="lk-results-list" class="lk-results"></div>
     </div>
     <div id="lk-panel-manual" style="display:none">
@@ -3081,6 +3106,21 @@ async function rbDoneSubmit(){
     RB_LIST[idx].cause=cause; RB_LIST[idx].workDone=work; RB_LIST[idx].replacedParts=replaced; RB_LIST[idx].completedFiles=urls; RB_LIST[idx].completedAt=new Date().toISOString();
     const up=await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'rebuild_list',value:RB_LIST})});
     if(!up.ok) throw new Error('저장 실패('+up.status+')');
+    // 2026-11-11 — 재수리로 처리한 증상·처리내용도 🔧 조회에 쌓이게 한다.
+    // 전에는 오버홀 저장 때만 들어가서, 조회에 '재수리' 딱지를 그리는 코드만 있고 데이터는 0건이었다.
+    try{
+      var _sym=(RBD_CUR.symptom||'').trim();
+      var _work=[work,(replaced?'교체: '+replaced:''),(cause?'사유: '+cause:'')].filter(Boolean).join(' / ');
+      if(_sym||_work){
+        var _mr=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value',{headers:RB_SUPA_H});
+        var _mj=await _mr.json(); var _ml=(_mj&&_mj[0]&&Array.isArray(_mj[0].value))?_mj[0].value:[];
+        var _rec={ id:RBD_CUR.id, person:actual, symptom:_sym, work:_work, cat:[], model:RBD_CUR.model||'', date:cdate, src:'재수리' };
+        var _dup=-1;
+        for(var _i=0;_i<_ml.length;_i++){ if(_ml[_i]&&_ml[_i].id===RBD_CUR.id&&_ml[_i].src==='재수리'){ _dup=_i; break; } }
+        if(_dup>=0) _ml[_dup]=_rec; else _ml.push(_rec);
+        await fetch(RB_SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...RB_SUPA_H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'tech_manual',value:_ml})});
+      }
+    }catch(e){ console.warn('재수리 증상·처리내용 저장 실패(완료 처리는 정상)', e); }
     st.innerHTML='<b style="color:#16a34a">✅ 재수리 완료 등록! 재수리 리스트를 띄웁니다…</b>'; btn.textContent='완료!';
     var _doneRec=RB_LIST[idx];
     setTimeout(function(){ openRbSheet(_doneRec); }, 600);
@@ -3331,6 +3371,9 @@ function openRbSheet(rec){
 (function(){
   var ov=document.getElementById('lookup-overlay'); if(!ov) return;
   var listCache=null, manualCache=null;
+  // 2026-11-11 — 조회를 네 가지 전부로 넓힌다. 시리얼 하나로 그 기기의 오버홀→재수리→폐기가 한 화면에 모이게.
+  var rbCache=null, dpCache=null, rpCache=null, lkAll=null, lkKind='ALL', lkShown=[];
+  var LK_LABEL={ OH:'🔧 오버홀', RB:'🔁 재수리', DP:'🗑 폐기', RP:'🔩 리페어' };
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   // 동의어 그룹: 같은 뜻은 무엇으로 검색해도 함께 나옴
   var SYN=[
@@ -3352,35 +3395,126 @@ function openRbSheet(rec){
   }
   function openLk(){ ov.classList.add('show'); document.body.classList.add('ck-open'); loadData(); }
   function closeLk(){ ov.classList.remove('show'); var ck=document.getElementById('ck-overlay'); if(!ck||!ck.classList.contains('show')) document.body.classList.remove('ck-open'); }
+  async function lkGet(key){
+    try{
+      var r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.'+key+'&select=value',{headers:RB_SUPA_H});
+      var j=await r.json();
+      return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[];
+    }catch(e){ return []; }
+  }
   async function loadData(){
     if(listCache===null){
       document.getElementById('lk-results-list').innerHTML='<div class="lk-empty">불러오는 중...</div>';
-      try{ var r=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.overhaul_checklist&select=value',{headers:RB_SUPA_H}); var j=await r.json(); listCache=(j&&j[0]&&Array.isArray(j[0].value))?j[0].value.slice().reverse():[]; }catch(e){ listCache=[]; }
-      try{ var r2=await fetch(RB_SUPA_URL+'/rest/v1/app_config?key=eq.tech_manual&select=value',{headers:RB_SUPA_H}); var j2=await r2.json(); manualCache=(j2&&j2[0]&&Array.isArray(j2[0].value))?j2[0].value.slice().reverse():[]; }catch(e){ manualCache=[]; }
+      var got=await Promise.all([ lkGet('overhaul_checklist'), lkGet('tech_manual'), lkGet('rebuild_list'), lkGet('disposal_list'), lkGet('repair_list') ]);
+      listCache=got[0].slice().reverse(); manualCache=got[1].slice().reverse();
+      rbCache=got[2]; dpCache=got[3]; rpCache=got[4];
+      lkAll=lkBuild();
     }
     renderList(); renderManual();
   }
+  // 시리얼은 공백·하이픈·대소문자가 제각각이라 그대로 비교하면 못 찾는다. 전부 떼고 비교한다.
+  function lkNorm(s){ return String(s==null?'':s).replace(/[\s\-]/g,'').toUpperCase(); }
+  // 폐기·리페어·재수리는 사진 주소를 기록 안에 직접 들고 있다 (오버홀만 시리얼로 따로 조회)
+  function lkUrls(v,out){
+    out=out||[];
+    if(!v) return out;
+    if(typeof v==='string'){ if(/^https?:/.test(v)) out.push(v); return out; }
+    if(Array.isArray(v)){ for(var i=0;i<v.length;i++) lkUrls(v[i],out); return out; }
+    if(typeof v==='object'){ var ks=Object.keys(v); for(var k=0;k<ks.length;k++) lkUrls(v[ks[k]],out); return out; }
+    return out;
+  }
+  function lkBuild(){
+    var out=[];
+    (listCache||[]).forEach(function(r){
+      var ex=[r.overhaul,r.repair,r.symptom].filter(Boolean).join(' / ');
+      out.push({ kind:'OH', date:r.date||'', person:r.person||'', area:r.dept||'', model:r.model||'',
+        serial:r.serial||'', asset:r.asset_no||'', extra:ex, mins:r.time||0, status:'',
+        photos:(typeof r.photoCount==='number'?r.photoCount:0), urls:null, raw:r, at:r.createdAt||'' });
+    });
+    (rbCache||[]).forEach(function(r){
+      var d=r.reqDate||r.origDate||(r.createdAt?String(r.createdAt).slice(0,10):'');
+      var ex=[r.symptom, r.business, (r.handler?'담당 '+r.handler:''), (r.workDone?'처리: '+r.workDone:''),
+              (r.completedDate?'완료 '+r.completedDate:'')].filter(Boolean).join(' / ');
+      var u=lkUrls(r.files).concat(lkUrls(r.origPhotos)).concat(lkUrls(r.completedFiles));
+      out.push({ kind:'RB', date:d, person:r.requester||'', area:r.origDept||'', model:r.model||'',
+        serial:r.serial||'', asset:r.asset_no||'', extra:ex, mins:0, status:r.status||'요청',
+        photos:u.length, urls:u, raw:r, at:r.createdAt||'' });
+    });
+    (dpCache||[]).forEach(function(r){
+      var ex=[r.brand, r.note].filter(Boolean).join(' / ');
+      var u=lkUrls(r.photos);
+      out.push({ kind:'DP', date:r.date||'', person:r.person||'', area:r.area||'', model:r.model||'',
+        serial:r.serial||'', asset:r.asset||'', extra:ex, mins:r.minutes||0, status:'',
+        photos:u.length, urls:u, raw:r, at:r.at||'' });
+    });
+    (rpCache||[]).forEach(function(r){
+      var q=(typeof r.qty==='number'&&r.qty>0)?r.qty:1;
+      var u=lkUrls(r.photos);
+      out.push({ kind:'RP', date:r.date||'', person:r.person||'', area:r.area||'', model:r.model||'',
+        serial:'', asset:'', extra:(r.part||'')+' × '+q+'개', mins:r.total||r.minutes||0, status:'',
+        photos:u.length, urls:u, raw:r, at:r.at||'' });
+    });
+    // 최신이 맨 위 — 같은 시리얼·같은 담당자로 찾으면 한 줄기로 내려온다
+    out.sort(function(a,b){
+      if(a.date!==b.date) return (b.date||'').localeCompare(a.date||'');
+      return String(b.at||'').localeCompare(String(a.at||''));
+    });
+    return out;
+  }
+  function lkMatch(r,q){
+    if(!q) return true;
+    var hay=[r.model,r.serial,r.asset,r.person,r.area,r.extra,r.date,r.status,LK_LABEL[r.kind]].join(' ');
+    if(hay.toLowerCase().indexOf(q.toLowerCase())>=0) return true;
+    var qn=lkNorm(q);
+    return qn ? lkNorm(hay).indexOf(qn)>=0 : false;
+  }
+  function lkStatusTag(s){
+    if(!s) return '';
+    var cls=(s==='완료')?'done':((s==='취소')?'cancel':'req');
+    return '<span class="stag '+cls+'">'+esc(s)+'</span>';
+  }
+  function renderKinds(hits){
+    var c={ALL:hits.length,OH:0,RB:0,DP:0,RP:0};
+    hits.forEach(function(r){ c[r.kind]++; });
+    var order=[['ALL','전체'],['OH','🔧 오버홀'],['RB','🔁 재수리'],['DP','🗑 폐기'],['RP','🔩 리페어']];
+    document.getElementById('lk-kinds').innerHTML=order.map(function(o){
+      return '<span class="kc'+(lkKind===o[0]?' on':'')+'" data-k="'+o[0]+'">'+o[1]+'<span class="n">'+c[o[0]]+'</span></span>';
+    }).join('');
+    document.querySelectorAll('#lk-kinds .kc').forEach(function(el){
+      el.onclick=function(){ lkKind=el.dataset.k; renderList(); };
+    });
+  }
   function renderList(){
-    var q=(document.getElementById('lk-q1').value||'').trim().toLowerCase();
+    var q=(document.getElementById('lk-q1').value||'').trim();
     var box=document.getElementById('lk-results-list');
-    var arr=(listCache||[]).filter(function(r){ if(!q) return true; return ((r.model||'')+' '+(r.serial||'')+' '+(r.asset_no||'')+' '+(r.person||'')+' '+(r.date||'')+' '+(r.incoming||'')).toLowerCase().indexOf(q)>=0; });
-    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 오버홀 기록이 없습니다')+'</div>'; return; }
-    box.innerHTML=arr.slice(0,100).map(function(r){
-      var idx=(listCache||[]).indexOf(r);
-      var sn=r.serial||'';
-      var pc=(typeof r.photoCount==='number')?r.photoCount:null;
-      var pcHtml = (pc===null)?'' : (pc>=4
-        ? '<span style="color:#16a34a;font-weight:700">📷 사진 '+pc+'컷</span>'
-        : '<span style="color:#e53e3e;font-weight:800">⚠️ 사진 '+pc+'컷 (4컷 미만!)</span>');
-      return '<div class="lk-card"><div class="lk-top"><div style="min-width:0"><div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
-        +'<div class="lk-sn">'+[(r.asset_no?'자산번호: '+esc(r.asset_no):''),(r.serial?'S/N: '+esc(r.serial):'')].filter(Boolean).join('&nbsp;&nbsp; ')+'</div>'
-        +'<div class="lk-meta">'+esc(r.date||'')+' · '+esc(r.person||'')+(r.incoming?' · '+esc(r.incoming):'')+(pcHtml?'<br>'+pcHtml:'')+'<br>증상: '+esc((r.symptom||'-').slice(0,40))+'</div></div>'
+    var hits=(lkAll||[]).filter(function(r){ return lkMatch(r,q); });
+    renderKinds(hits);
+    var arr=hits.filter(function(r){ return lkKind==='ALL' || r.kind===lkKind; });
+    document.getElementById('lk-cnt').textContent=arr.length+'건'+(q?' — “'+q+'” 검색 결과':'');
+    if(!arr.length){ box.innerHTML='<div class="lk-empty">'+(q?'검색 결과 없음':'저장된 기록이 없습니다')+'</div>'; return; }
+    lkShown=arr.slice(0,100);
+    box.innerHTML=lkShown.map(function(r,i){
+      var ids=[(r.asset?'자산번호: '+esc(r.asset):''),(r.serial?'S/N: '+esc(r.serial):'')].filter(Boolean).join('&nbsp;&nbsp; ');
+      var meta=[esc(r.date),esc(r.person),esc(r.area)].filter(Boolean).join(' · ');
+      var mins=(r.mins&&r.mins>0)?' · '+r.mins+'분':'';
+      // 오버홀은 사진 4컷이 규칙이라 모자라면 빨갛게 짚어준다 (다른 종류는 그 규칙이 없다)
+      var pcHtml='';
+      if(r.kind==='OH'){ pcHtml = r.photos>=4
+        ? '<span style="color:#16a34a;font-weight:700">📷 사진 '+r.photos+'컷</span>'
+        : '<span style="color:#e53e3e;font-weight:800">⚠️ 사진 '+r.photos+'컷 (4컷 미만!)</span>'; }
+      else if(r.photos>0){ pcHtml='<span style="color:#64748b">📷 사진 '+r.photos+'컷</span>'; }
+      var canPhoto = (r.urls&&r.urls.length) || (r.kind==='OH'&&r.serial);
+      return '<div class="lk-card"><div class="lk-top"><div style="min-width:0">'
+        +'<span class="kbadge '+r.kind+'">'+LK_LABEL[r.kind]+'</span>'+lkStatusTag(r.status)
+        +'<div class="lk-model">'+esc(r.model||'(모델 미상)')+'</div>'
+        +(ids?'<div class="lk-sn">'+ids+'</div>':'')
+        +'<div class="lk-meta">'+meta+mins+(pcHtml?'<br>'+pcHtml:'')+(r.extra?'<br>'+esc(r.extra.slice(0,60)):'')+'</div></div>'
         +'<div style="display:flex;flex-direction:column;gap:6px">'
-        +(sn?'<button type="button" class="lk-photo" data-sn="'+esc(sn)+'" style="border:none;border-radius:8px;background:#2b6cb0;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap">📷 사진</button>':'')
-        +'<button type="button" class="lk-print" data-idx="'+idx+'">🖨 재출력</button>'
+        +(canPhoto?'<button type="button" class="lk-photo" data-i="'+i+'" style="border:none;border-radius:8px;background:#2b6cb0;color:#fff;font-size:13px;font-weight:800;padding:9px 14px;cursor:pointer;white-space:nowrap">📷 사진</button>':'')
+        +(r.kind==='OH'?'<button type="button" class="lk-print" data-i="'+i+'">🖨 재출력</button>':'')
         +'</div></div>'
         +'<div class="lk-photos" style="display:none;margin-top:10px"></div></div>'; }).join('');
-    box.querySelectorAll('.lk-print').forEach(function(b){ b.onclick=function(){ var rec=listCache[+b.dataset.idx]; if(rec) openCkFromRec(rec); }; });
+    box.querySelectorAll('.lk-print').forEach(function(b){ b.onclick=function(){ var rec=lkShown[+b.dataset.i]; if(rec&&rec.raw) openCkFromRec(rec.raw); }; });
     box.querySelectorAll('.lk-photo').forEach(function(b){ b.onclick=function(){ lkShowPhotos(b); }; });
   }
   async function lkShowPhotos(btn){
@@ -3388,8 +3522,12 @@ function openRbSheet(rec){
     if(strip.dataset.loaded==='1'){ strip.style.display = (strip.style.display==='none'?'block':'none'); return; }
     strip.style.display='block'; strip.innerHTML='<div style="font-size:12px;color:#94a3b8">사진 불러오는 중…</div>'; btn.disabled=true;
     try{
-      var r=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'serialPhotos',serial:btn.dataset.sn}),redirect:'follow'});
-      var j=await r.json(); var urls=(j&&j.ok&&Array.isArray(j.photos))?j.photos:[];
+      var rec=lkShown[+btn.dataset.i], urls=[];
+      if(rec&&rec.urls&&rec.urls.length){ urls=rec.urls; }   // 폐기·리페어·재수리는 기록 안에 주소가 있다
+      else {
+        var r=await fetch(RB_APPS_URL,{method:'POST',body:JSON.stringify({action:'serialPhotos',serial:(rec&&rec.serial)||''}),redirect:'follow'});
+        var j=await r.json(); urls=(j&&j.ok&&Array.isArray(j.photos))?j.photos:[];
+      }
       if(!urls.length){ strip.innerHTML='<div style="font-size:12px;color:#94a3b8">저장된 사진이 없습니다</div>'; }
       else {
         strip.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px">'+urls.map(function(u){
