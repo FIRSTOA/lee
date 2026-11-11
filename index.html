@@ -205,6 +205,10 @@
   .card[data-card-id="repairStats"] .dp-bars .b .fl { background:linear-gradient(90deg,#2c5282,#63b3ed); }
   .card[data-card-id="repairStats"] .dp-bars .b.none .fl { background:repeating-linear-gradient(45deg,#cbd5e0 0 6px,#e2e8f0 6px 12px); }
   .card[data-card-id="repairStats"] .dp-seg button.on { background:#2c5282; }
+  /* 2026-11-11 — 기종별 표를 브랜드 단위로도 볼 수 있게 (집계 대상·필터는 그대로) */
+  .mt-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:-4px 0 10px; }
+  .card[data-card-id="modelTable"] .dp-seg button.on { background:#2b6cb0; }
+  .mt-hint { font-size:11.5px; color:#718096; word-break:keep-all; }
   .card[data-card-id="repairStats"] .dp-find input:focus { border-color:#2c5282; box-shadow:0 0 0 3px rgba(44,82,130,.12); }
   #rpListTable b.hit { background:#fefcbf; font-weight:700; }
   @media (max-width:760px){ .dp-sum{grid-template-columns:repeat(2,1fr)} .dp-2col{grid-template-columns:1fr} .dp-bars .b .nm{width:110px} }
@@ -481,6 +485,13 @@
       </div>
       <div class="card full-width" data-card-id="modelTable" data-card-name="기종별 오버홀 통계">
         <h3><span class="title-text" id="modelTableTitle">기종별 오버홀 통계</span><span class="card-controls"><button class="hide-btn" title="숨기기">×</button><button class="drag-handle" title="드래그하여 이동">☰</button></span></h3>
+        <div class="mt-bar">
+          <span class="dp-seg" id="mtSeg">
+            <button type="button" data-v="model" class="on">기종별</button>
+            <button type="button" data-v="brand">브랜드별</button>
+          </span>
+          <span class="mt-hint" id="mtHint"></span>
+        </div>
         <div class="scroll">
           <table id="modelTable">
             <thead><tr><th>모델명</th><th>총 작업수</th></tr></thead>
@@ -1008,6 +1019,67 @@ const palette = ['#3182ce','#38a169','#d69e2e','#805ad5','#dd6b20','#e53e3e','#3
 
 let RAW_DATA = [];
 const charts = {};
+// === 기종별 표의 '브랜드별' 보기 (2026-11-11) ===
+// 시트에는 브랜드 열이 없어서 모델명 앞글자로 가른다. 실제 1,906건에 돌려 97.4%가 맞았고,
+// 못 가린 2.6%는 모델명 오타(X3220NR — SL- 누락)이거나 복합기가 아닌 것(세단기·공청기)이다.
+let MT_ROWS = [], MT_MONTHS = [], MT_VIEW = 'model';
+function brandOf(model) {
+  const t = String(model || '').trim().toUpperCase();
+  if (!t) return '(모델명 없음)';
+  if (/^(SL-|CLX|SCX|ML-|KS)/.test(t)) return '삼성';
+  if (/^(APEOS|DOCUCENTRE|DOCUPRINT)/.test(t)) return '후지제록스';
+  if (/^(ECOSYS|TASKALFA|FS-)/.test(t)) return '교세라';
+  if (/^(MFC|DCP|HL-)/.test(t)) return '브라더';
+  if (/^HP/.test(t)) return 'HP';
+  // D3xx·N5xx 는 신도리코 공식 카탈로그에서 확인(D320/D321, N500/N501/N502)
+  if (/^(D3|D4|D5|D6|N5|N6|N7|CM|CX)/.test(t)) return '신도리코';
+  if (/^ES/.test(t)) return 'OKI';
+  // 'SL-' 을 빠뜨리고 적은 삼성 모델(X3220NR·X4255LX). 같은 이름이 SL- 를 달고 수백 건 있다.
+  if (/^X\d/.test(t)) return '삼성';
+  return '기타';
+}
+function renderModelTable() {
+  const rows = MT_ROWS, months = MT_MONTHS;
+  const byBrand = (MT_VIEW === 'brand');
+  const keyOf = (m) => byBrand ? brandOf(m) : m;
+  const totals = {}, monthCounts = {}, members = {};
+  rows.forEach(r => {
+    const m = r.모델명.trim(), k = keyOf(m);
+    totals[k] = (totals[k] || 0) + 1;
+    if (!monthCounts[k]) { monthCounts[k] = {}; months.forEach(mo => monthCounts[k][mo] = 0); }
+    monthCounts[k][r.월] = (monthCounts[k][r.월] || 0) + 1;
+    if (!members[k]) members[k] = new Set();
+    members[k].add(m);
+  });
+  const sorted = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  const title = document.getElementById('modelTableTitle');
+  if (title) title.textContent = byBrand
+    ? '브랜드별 오버홀 통계 — ' + sorted.length + '개 브랜드 (' + rows.length + '건 기준)'
+    : '기종별 오버홀 통계 — 총 ' + sorted.length + '개 모델 (' + rows.length + '건 기준)';
+  const hint = document.getElementById('mtHint');
+  if (hint) {
+    const etc = totals['기타'] || 0;
+    hint.textContent = byBrand
+      ? ('모델명 앞글자로 가립니다' + (etc ? ' · 기타 ' + etc + '건은 모델명이 짧거나 복합기가 아닌 기록입니다' : ''))
+      : '';
+  }
+  const tbl = document.getElementById('modelTable');
+  if (!tbl) return;
+  const thead = tbl.querySelector('thead'); thead.innerHTML = '';
+  const hdrRow = document.createElement('tr');
+  hdrRow.innerHTML = '<th>' + (byBrand ? '브랜드' : '모델명') + '</th><th>총</th>' + months.map(mo => '<th>' + mo + '</th>').join('');
+  thead.appendChild(hdrRow);
+  const tb = tbl.querySelector('tbody'); tb.innerHTML = '';
+  sorted.forEach(k => {
+    const tr = document.createElement('tr');
+    const monthCells = months.map(mo => '<td class="num">' + (monthCounts[k][mo] || '') + '</td>').join('');
+    const label = byBrand
+      ? k + ' <span style="color:#a0aec0;font-size:11px">(' + members[k].size + '종)</span>'
+      : k;
+    tr.innerHTML = '<td style="text-align:left">' + label + '</td><td class="num"><b>' + totals[k] + '</b></td>' + monthCells;
+    tb.appendChild(tr);
+  });
+}
 let quotaDetail = {}; // 정량목표 셀 클릭 상세: key = 담당자+주차별 → [{날짜, 오버홀품목, 수리품목, weight}]
 const FILTER_FIELDS = ['년','월','주차별','부서명','담당자','카테고리'];
 const filterState = {};
@@ -1575,6 +1647,12 @@ document.getElementById('dpSeg').addEventListener('click', e => {
   [...document.querySelectorAll('#dpSeg button')].forEach(x => x.classList.toggle('on', x === b));
   renderDisposal();
 });
+document.getElementById('mtSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  MT_VIEW = b.dataset.v;
+  [...document.querySelectorAll('#mtSeg button')].forEach(x => x.classList.toggle('on', x === b));
+  renderModelTable();
+});
 
 function render() {
   // 재렌더(필터 변경 등) 시 현재 스크롤 위치 기억 — 표 행수가 줄어 문서가 짧아질 때
@@ -1642,24 +1720,10 @@ function render() {
     })) },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: legendOpt, datalabels: { display: false } }, scales: { x: { stacked: true, ticks: { font: { size: mobile ? 10 : 12 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: mobile ? 10 : 12 } } } } } });
 
-  const modelTableTitle = document.getElementById('modelTableTitle');
-  modelTableTitle.textContent = '기종별 오버홀 통계 — 총 ' + Object.keys(modelTotals).length + '개 모델 (' + overhaulRows.length + '건 기준)';
-  const allModelsSorted = Object.keys(modelTotals).sort((a,b)=>modelTotals[b]-modelTotals[a]);
-  const modelMonthCounts = {};
-  allModelsSorted.forEach(m => { modelMonthCounts[m] = {}; modelMonths.forEach(mo => modelMonthCounts[m][mo] = 0); });
-  overhaulRows.forEach(r => { const m = r.모델명.trim(); if (modelMonthCounts[m]) modelMonthCounts[m][r.월] = (modelMonthCounts[m][r.월] || 0) + 1; });
-  const modelTbl = document.getElementById('modelTable');
-  const thead = modelTbl.querySelector('thead'); thead.innerHTML = '';
-  const hdrRow = document.createElement('tr');
-  hdrRow.innerHTML = '<th>모델명</th><th>총</th>' + modelMonths.map(mo => '<th>' + mo + '</th>').join('');
-  thead.appendChild(hdrRow);
-  const modelTb = modelTbl.querySelector('tbody'); modelTb.innerHTML = '';
-  allModelsSorted.forEach(m => {
-    const tr = document.createElement('tr');
-    const monthCells = modelMonths.map(mo => '<td class="num">' + (modelMonthCounts[m][mo] || '') + '</td>').join('');
-    tr.innerHTML = '<td style="text-align:left">' + m + '</td><td class="num"><b>' + modelTotals[m] + '</b></td>' + monthCells;
-    modelTb.appendChild(tr);
-  });
+  // 기종별 표는 아래 renderModelTable() 이 그린다. 같은 행(overhaulRows)을 기종 단위로도,
+  // 브랜드 단위로도 묶을 수 있게 행과 월 목록만 넘겨둔다. 집계 대상·필터는 달라지지 않는다.
+  MT_ROWS = overhaulRows; MT_MONTHS = modelMonths;
+  renderModelTable();
 
   // === 정량 목표 달성 현황 (오버홀만 카운트, 주차별) ===
   // 메인 필터가 아닌 quota 카드의 로컬 필터를 사용
