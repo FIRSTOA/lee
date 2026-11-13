@@ -310,9 +310,24 @@ module.exports = async (req, res) => {
       lines.push('• '+d+'  '+t.total+'/'+t.target+'대  '+pct+'%'+side);
     });
 
+    // 🗑 폐기 · 🔩 리페어 — 2026-11-13 추가.
+    // report.html 은 2026-11-10 부터 이 둘을 따로 보여주는데, 카톡으로 가는 이 글에만 빠져 있었다
+    // (이번 주 폐기 44대·리페어 54개가 한 글자도 안 보였다). 집계 기준을 report.html 과 똑같이 맞춘다
+    // — 주간은 '기록이 있는 가장 최근 주차'만, 분기는 기간 전체. periodRows 는 포인트 붙는 작업만
+    // 걸러진 것이라 여기서는 rows 에서 직접 센다.
+    const wkNo = (w)=>{ const m=/(\d+)월(\d+)주차/.exec(String(w||'')); return m ? (+m[1])*100+(+m[2]) : 0; };
+    const wkSeen = [...new Set(periodRows.map(r=>r._wk).filter(Boolean))].sort((a,b)=>wkNo(a)-wkNo(b));
+    const wkThis = wkSeen.length ? wkSeen[wkSeen.length-1] : '';
+    const inScope = (r)=> type==='quarter'
+      ? (r._y===tgtY && Math.floor((r._m-1)/3)===Math.floor((tgtM-1)/3))
+      : (r._y===tgtY && r._m===tgtM && r._wk===wkThis);
+    const dpCnt = rows.filter(r=>inScope(r) && String(r.오버홀품목||'')==='기기폐기').length;
+    const rpCnt = rows.filter(r=>inScope(r) && String(r.수리품목||'').replace(/\s+/g,'')==='부품제조').length;
+    const exLine = [ dpCnt?('🗑 폐기 '+dpCnt+'대'):'', rpCnt?('🔩 리페어 '+rpCnt+'개'):'' ].filter(Boolean).join(' · ');
+
     const head = (type==='quarter'?'📈':'📊')+' '+label+' 오버홀 목표 달성  전체 '+overall+'% ('+tA+'/'+tT+'대)';
     const mvpLine = mvp ? '🏅 '+(type==='quarter'?'분기':'이주의')+' MVP: '+mvp.person+' ('+mvp.total+'대)' : '';
-    let text = [head, '────────────', ...lines, mvpLine].filter(Boolean).join('\n');
+    let text = [head, exLine, '────────────', ...lines, mvpLine].filter(Boolean).join('\n');
 
     // === 미달성 인원 안내 (주간만) ===
     // 목표가 1 이상인데 실적이 목표에 못 미친 사람만. 원인은 쓰지 않는다(추측 금지).
