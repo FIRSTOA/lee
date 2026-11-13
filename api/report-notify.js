@@ -165,23 +165,21 @@ module.exports = async (req, res) => {
     //     여기서 room 을 통계방으로 고정하므로, 봇의 방 등록이 어떻게 되어 있든
     //     운영지원 팀방으로는 가지 않는다. 보고는 그대로 다 나간다(기능을 끄지 않는다).
     //
-    // (2) 같은 항목을 MAX_TRY 번 내려보내고도 ack 가 없으면 서버가 스스로 멈춘다.
-    //     봇은 발송에 실패하면 ack 를 안 보내고, 서버는 그걸 '아직 안 갔다'로 보고
-    //     1분마다 같은 항목을 다시 내려줬다 → 2026-11-11 중간 점검이 18번 나갔다.
-    //     ※ 처음에 3회로 뒀더니 11/13 주간보고가 통로 복구 전에 꺼져 버렸다.
-    //        통로는 그 방에 글이 올라오면 다시 잡히므로, 복구될 틈을 주려고 10회로 둔다.
-    const MAX_TRY = 10;
+    // (2) 한 번 내려보낸 글은 두 번 다시 내려보내지 않는다.
+    //     전에는 봇이 'ack(보냈다)' 를 보내야 끝나는 구조였다. 그런데 봇은 발송에 성공하고도
+    //     ack 를 못 보내는 일이 있다(2026-11-13 봇 오류 ReferenceError). 그러면 서버는
+    //     '아직 안 갔다'로 보고 1분마다 같은 글을 다시 내려줬다 → 11/11 18번, 11/13 3번 반복.
+    //     재시도 횟수를 제한하는 걸로는 부족하다(그래도 그 횟수만큼은 반복된다).
+    //     그래서 내려보내는 순간 '보냄'으로 표시한다. 같은 글은 어떤 경우에도 한 번만 나간다.
+    //     발송이 실패해 못 받았으면 큐에서 되살려 다시 보낸다(사람이 판단해서 한 번 더).
     let touched = false;
     const items = [];
     list.forEach(x => {
       if (x.sent) return;
-      if (x.room) { delete x.room; touched = true; }   // (1) 공지방 지정은 버리고 통계방으로
-      const n = (x.tries || 0) + 1;                    // (2) 내려보낸 횟수를 센다
-      x.tries = n; touched = true;
-      if (n > MAX_TRY) {
-        x.sent = true; x.stoppedBy = 'auto-stop after ' + MAX_TRY + ' tries';
-        return;
-      }
+      if (x.room) delete x.room;                       // (1) 공지방 지정은 버리고 통계방으로
+      x.sent = true;                                   // (2) 내려보내는 즉시 '보냄'
+      x.handedAt = new Date().toISOString();
+      touched = true;
       items.push({ id: x.id, text: x.text, room: 'main' });
     });
     if (touched) await saveQ(list);
