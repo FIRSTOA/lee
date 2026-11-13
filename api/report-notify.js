@@ -96,9 +96,24 @@ async function maybeQueueWeekly(list){
   return list;
 }
 
+// 2026-11-13 — 주 중간 점검 중단. 운영지원 팀방으로 아무것도 보내지 말라는 지시.
+//
+// 왜 중간 점검만 샜나:
+//   봇은 통계방(main)과 공지방(notice) 두 개를 기억하는데, room='notice' 로 나가는 것은
+//   이 중간 점검 하나뿐이다. 주간보고는 room 이 없어 통계방으로 간다.
+//   10/16·10/23·10/30·11/6 주간보고는 4주 연속 정상이었고, 10/28·11/4·11/11 중간 점검만
+//   운영지원 팀방에 도착했다 → 공지방 등록이 운영지원 팀방으로 되어 있다는 뜻이다.
+//   봇은 설계대로 보낸 것이고, 봇 코드를 고쳐도 등록이 그대로면 또 간다.
+//
+// 그래서 서버에서 항목 자체를 만들지 않는다(폰 작업 없이 즉시 끊긴다).
+// 봇에서 '통계진단' 으로 공지방이 어느 방인지 확인하고 올바른 방으로 다시 등록한 뒤
+// 이 값을 true 로 되돌린다. 그때까지 중간 점검은 나가지 않는다.
+const MIDWEEK_ON = false;
+
 // 주 중간 점검 — 수요일 18:00 ~ 목요일 23:59 KST 사이에 그 주 수요일분이 없으면 만든다.
 // 공지방 room='notice' 로 보낸다. 금요일 주간보고와는 별개 항목이다.
 async function maybeQueueMidweek(list){
+  if (!MIDWEEK_ON) return list;
   try {
     const k = new Date(Date.now() + 9*3600*1000);
     const dow = k.getUTCDay(), hh = k.getUTCHours();   // 수=3, 목=4
@@ -149,8 +164,36 @@ module.exports = async (req, res) => {
     let list = await loadQ();
     list = await maybeQueueWeekly(list);
     list = await maybeQueueMidweek(list);
-    // room: 'notice' = 공지방, 없으면 통계방(기본). 구버전 봇은 room 을 무시하고 통계방으로 보낸다.
-    const items = list.filter(x => !x.sent).map(x => ({ id: x.id, text: x.text, room: x.room || 'main' }));
+
+    // 2026-11-13 — 내려보내기 전 안전장치 두 가지.
+    //
+    // (1) room='notice' 는 어떤 경우에도 내려보내지 않는다.
+    //     공지방이 운영지원 팀방으로 등록돼 있어서, 이 값이 붙은 항목은 그리로 간다.
+    //     위에서 새로 만들지 않도록 막았지만, 큐에 남아 있던 옛 항목까지 여기서 끊는다.
+    //
+    // (2) 같은 항목을 MAX_TRY 번 내려보내고도 ack 가 없으면 서버가 스스로 멈춘다.
+    //     봇은 발송에 실패하면 ack 를 안 보내고, 서버는 그걸 '아직 안 갔다'로 보고
+    //     1분마다 같은 항목을 다시 내려줬다 → 2026-11-11 중간 점검이 18번 나갔다.
+    //     봇이 어떤 상태든 서버 쪽에서 끊기므로 폰을 고치지 않아도 폭주는 막힌다.
+    const MAX_TRY = 3;
+    let touched = false;
+    const items = [];
+    list.forEach(x => {
+      if (x.sent) return;
+      if (x.room === 'notice') {                       // (1) 공지방행은 막는다
+        x.sent = true; x.stoppedBy = 'notice-blocked 2026-11-13'; touched = true;
+        return;
+      }
+      const n = (x.tries || 0) + 1;                    // (2) 내려보낸 횟수를 센다
+      x.tries = n; touched = true;
+      if (n > MAX_TRY) {
+        x.sent = true; x.stoppedBy = 'auto-stop after ' + MAX_TRY + ' tries';
+        return;
+      }
+      items.push({ id: x.id, text: x.text, room: 'main' });
+    });
+    if (touched) await saveQ(list);
+
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.status(200).json({ ok: true, count: items.length, items });
   } catch (e) {
