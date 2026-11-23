@@ -1952,6 +1952,10 @@ function setupSerialAutocomplete() {
       el.onmousedown = (e) => {
         e.preventDefault();
         input.value = el.dataset.serial;
+        // 2026-11-23 — 목록에서 고른 것도 ERP 조회가 돌게 한다.
+        // 코드로 input.value 를 넣으면 브라우저가 change 를 안 띄운다. 그래서 목록에서 고르면
+        // 자산번호·업체가 안 채워졌다(직접 쳐서 칸을 벗어났을 때만 됐다). 현장에선 고르는 쪽이 더 흔하다.
+        input.dispatchEvent(new Event('change'));
         // 모델이 비어있으면 자동 채움
         const modelInput = document.getElementById('f-model');
         if (modelInput && !modelInput.value && el.dataset.model) modelInput.value = el.dataset.model;
@@ -1986,30 +1990,56 @@ function setupAssetLookup() {
   const serialEl = document.getElementById('f-serial');
   const status = document.getElementById('asset-status');
   if (!assetEl || !serialEl || !status) return;
+  let lastTried = '';   // 방금 ERP에 걸어 본 값 — 같은 값을 연달아 묻지 않으려고 둔다
   function esc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // 2026-11-23 — ERP 자산코드 칸에는 번호가 아닌 글자도 들어 있다.
+  // 실측(23,844건): 미부착 5,641 · 위탁 589 · 0 299 · X 21 · 빈칸 174 = 28%.
+  // 전에는 이것을 그대로 자산번호 칸에 받아 적어서 '미부착' 8건, '없음' 2건이 기록으로 남았다.
+  const NOT_A_NUMBER = ['미부착', '위탁', '없음', '0', 'X', '-', '.'];
+  function realAssetNo(v) {
+    const t = String(v == null ? '' : v).trim();
+    if (!t) return '';
+    return NOT_A_NUMBER.indexOf(t.toUpperCase()) >= 0 ? '' : t;
+  }
   function show(j) {
     const a = j.asset || {}, c = j.client || {};
+    const an = realAssetNo(a.asset_no);
     // ERP는 빈칸만 채움(실물 입력값이 우선) · ERP엔 절대 쓰지 않고 시트에만 저장됨
-    if (a.asset_no && !assetEl.value.trim()) assetEl.value = a.asset_no;
+    if (an && !assetEl.value.trim()) assetEl.value = an;
     if (a.device_sn && !serialEl.value.trim()) serialEl.value = a.device_sn;
     const m = document.getElementById('f-model'); if (m && a.model && !m.value.trim()) m.value = a.model;
     const inc = document.getElementById('f-incoming');
     if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
-    status.innerHTML = '✅ ERP 임대리스트: 자산 ' + esc(a.asset_no || '') + ' · ' + esc(c.business_name || '')
+    // 자산번호가 '미부착' 같은 값이면 그 사실을 알려 준다 (칸에는 넣지 않는다)
+    const noteNo = an
+      ? ('자산 ' + esc(an))
+      : ('<b style="color:#b7791f">자산번호 없음(ERP에 ' + esc(String(a.asset_no || '미등록').trim()) + ')</b>');
+    status.innerHTML = '✅ ERP 임대리스트: ' + noteNo + ' · ' + esc(c.business_name || '')
       + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '')
       + ' &nbsp;<b style="color:#c53030">→ 실물과 대조 확인!</b>';
     status.style.color = '#2f855a';
   }
-  async function lookup(param, val) {
+  // retried = 대소문자를 바꿔 다시 거는 중인지 (시리얼 전용)
+  async function lookup(param, val, retried) {
     val = (val || '').trim();
     if (!val) return;
     if (param === 'asset_no') val = val.toUpperCase(); // 소문자로 입력해도 검색되게
+    lastTried = val;
     status.textContent = '🔎 ERP 임대리스트 조회 중...'; status.style.color = '#718096';
     try {
       const r = await fetch('/api/asset?' + param + '=' + encodeURIComponent(val));
       const j = await r.json();
-      if (!r.ok || j.error) { status.textContent = '❌ ' + (j.error || '조회 실패'); status.style.color = '#c53030'; return; }
-      if (param === 'asset_no') assetEl.value = (j.asset && j.asset.asset_no) || val;
+      if (!r.ok || j.error) {
+        // 시리얼은 ERP가 대소문자를 가려서 찾는다. 소문자로 치셨을 수 있으니 대문자로 한 번 더.
+        if (param === 'serial' && !retried && val !== val.toUpperCase()) { return lookup('serial', val.toUpperCase(), true); }
+        // 못 찾아도 입력은 그대로 저장된다 — 현장에서 멈추지 않게 그 사실을 적어 준다.
+        status.innerHTML = '❌ ' + esc(j.error || '조회 실패')
+          + ' <span style="color:#718096">— 적으신 내용 그대로 저장됩니다.</span>';
+        status.style.color = '#c53030';
+        return;
+      }
+      // ERP 자산코드가 '미부착' 같은 글자일 수 있다 → 그럴 땐 칸을 비워 둔다(전에는 그대로 적혔다)
+      if (param === 'asset_no') { const an = realAssetNo(j.asset && j.asset.asset_no) || realAssetNo(val); if (an) assetEl.value = an; }
       show(j);
     } catch (e) { status.textContent = '❌ 네트워크 오류'; status.style.color = '#c53030'; }
   }
@@ -2017,6 +2047,19 @@ function setupAssetLookup() {
   assetEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup('asset_no', assetEl.value); } });
   // 시리얼만 입력해도 → 자산번호 자동 매칭 (자산번호가 비어 있을 때)
   serialEl.addEventListener('change', () => { if (serialEl.value.trim() && !assetEl.value.trim()) lookup('serial', serialEl.value); });
+
+  // 2026-11-23 — 칸을 벗어나지 않아도 채워지게.
+  // 전에는 change(칸을 벗어날 때)에만 걸려 있어서, 시리얼을 찍고 바로 저장하면
+  // 자산번호가 빈 채로 저장됐다. 1초 쉬면 한 번만 조회한다(같은 값은 다시 안 건다).
+  let snTimer = null;
+  serialEl.addEventListener('input', () => {
+    clearTimeout(snTimer);
+    const v = serialEl.value.trim();
+    if (!v || v.length < 8) return;          // 치는 중인 짧은 값은 건너뛴다
+    if (assetEl.value.trim()) return;        // 자산번호가 이미 있으면 건드리지 않는다
+    if (v === lastTried) return;             // 방금 건 값이면 다시 걸지 않는다
+    snTimer = setTimeout(() => lookup('serial', v), 1000);
+  });
 }
 setupAssetLookup();
 
