@@ -4751,6 +4751,15 @@ async function dpSubmit(){
   function showWarn(sn, an, sRows, cRows){
     var me = pickLast(sRows);
     var erpNo = realNo(me.asset_code);
+    // 마지막 임대 줄의 자산번호가 '미부착' 같은 값이면, 번호가 적힌 다른 줄을 대표로 쓴다.
+    // (안 그러면 「　로 바꾸기」처럼 빈 단추가 나온다)
+    if (!erpNo) {
+      for (var z=0; z<sRows.length; z++) {
+        var zv = realNo(sRows[z].asset_code);
+        if (zv) { me = sRows[z]; erpNo = zv; break; }
+      }
+    }
+    if (!erpNo) return;                       // 끝내 번호가 없으면 띄우지 않는다
     var other = cRows.length === 1 ? cRows[0] : null;
     var amber = !other;
 
