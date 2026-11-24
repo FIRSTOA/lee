@@ -4867,14 +4867,22 @@ async function dpSubmit(){
     h += '<div class="ckv-clue">' + clue + '</div>';
     h += mineSay;
     h += '<div class="ckv-ask">지금 입력하신 게 맞습니까?</div><div class="ckv-btns">'
-       + '<button type="button" class="ckv-btn b" onclick="ckvFix(\'' + esc(erpNo).replace(/'/g,'') + '\')">아니요<br>' + esc(erpNo) + ' 로 바꾸기</button>'
-       + '<button type="button" class="ckv-btn w" onclick="ckvKeep()">네<br>실물이 맞습니다</button></div>'
-       + '<div class="ckv-note">「네」를 눌러도 적으신 대로 저장됩니다.<br>저장을 막지 않습니다.</div></div>';
+       + '<button type="button" class="ckv-btn b" onclick="ckvFix(\'' + esc(erpNo).replace(/'/g,'') + '\')">' + esc(erpNo) + ' 로 바꾸기</button>'
+       + '<button type="button" class="ckv-btn w" onclick="ckvKeep()">그대로 두기<br>실물이 맞습니다</button></div>'
+       + '<div class="ckv-note"><b>다른 기기를 보시려던 거면 왼쪽</b>을 누르세요 —<br>모델·입고처도 그 기기 것으로 함께 바뀝니다.<br>'
+       + '「그대로 두기」를 눌러도 적으신 대로 저장됩니다.</div></div>';
     document.getElementById('ckv-box').innerHTML = h;
     document.getElementById('ckv-modal').className = 'on';
   }
   window.ckvFix = function(v){
-    if (v) { assetEl.value = v; try { assetEl.dispatchEvent(new Event('change')); } catch(e){} }
+    if (v) {
+      var A = window.ckAuto || (window.ckAuto = {});
+      assetEl.value = v;
+      A.asset = v;            // '우리가 넣은 값'으로 기억 → 다음에 기기를 또 바꾸면 따라 바뀐다
+      // change 를 일으켜 ERP 를 다시 조회한다 → 모델·입고처·이력도 그 기기 것으로 바뀐다
+      try { assetEl.dispatchEvent(new Event('change')); } catch(e){}
+      if (window.ckwRefresh) window.ckwRefresh();
+    }
     document.getElementById('ckv-modal').className = '';
   };
   window.ckvKeep = function(){
