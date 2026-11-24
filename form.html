@@ -4894,6 +4894,14 @@ async function dpSubmit(){
     var sn = String(serialEl.value||'').trim();
     var an = realNo(assetEl.value);
     if (!sn || !an || isTemp(sn)) return;
+    // 2026-11-24 — 둘 중 하나가 '우리가 자동으로 넣은 값'이면 비교하지 않는다.
+    //   예) 자산번호 B8456 을 쳐서 시리얼 311232 가 자동으로 채워진 뒤,
+    //       자산번호만 B0264 로 바꾸면 '311232 vs B0264' 를 비교해 엉뚱한 경고가 떴다.
+    //       자동으로 채워진 값은 곧 새 기기 것으로 바뀔 값이라 비교할 이유가 없다.
+    //   사람이 직접 적은 값끼리 어긋날 때만 묻는다 — 실제 38건이 전부 그런 경우였다.
+    var A = window.ckAuto || {};
+    if (norm(sn) === norm(A.serial || '')) return;
+    if (norm(an) === norm(A.asset || '')) return;
     if (answered[norm(sn) + '|' + norm(an)]) return;
     if (busy) return;
     busy = true;
@@ -5027,6 +5035,22 @@ async function dpSubmit(){
   serialEl.addEventListener('change', onEdit);
   assetEl.addEventListener('input', onEdit);
   assetEl.addEventListener('change', onEdit);
+
+  // 2026-11-24 — 자산번호도 칸을 벗어나지 않아도 조회되게 한다(시리얼은 이미 그랬다).
+  //   전에는 자산번호를 바꾸고 칸 밖을 눌러야만 모델·시리얼·입고처가 따라왔다.
+  //   1.1초 멈추면 change 를 한 번 일으켜 기존 조회를 그대로 태운다(조회 코드는 건드리지 않는다).
+  var t4 = null, lastAuto = '';
+  assetEl.addEventListener('input', function(){
+    clearTimeout(t4);
+    var v = realNo(assetEl.value);
+    if (!v || v.length < 4) return;
+    if (v === lastAuto) return;
+    t4 = setTimeout(function(){
+      if (realNo(assetEl.value) !== v) return;    // 그새 더 쳤으면 기다린다
+      lastAuto = v;
+      try { assetEl.dispatchEvent(new Event('change')); } catch(e){}
+    }, 1100);
+  });
 })();
 </script>
 
