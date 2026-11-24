@@ -620,6 +620,20 @@
   .ckv-btn.b{background:#2b6cb0;border-color:#2b6cb0;color:#fff;}
   .ckv-btn.w{background:#fff;border-color:#cbd5e0;color:#4a5568;}
   .ckv-note{font-size:11.5px;color:#8b95a3;text-align:center;margin-top:9px;line-height:1.55;}
+
+  /* 입고처 — 반출 기록에서 가져온 값 / ERP 후보 */
+  #ckw-inc{margin-top:5px;}
+  .ckw-ok{font-size:12px;color:#276749;background:#f0fff4;border:1px solid #c6f6d5;border-radius:7px;
+          padding:7px 9px;line-height:1.55;word-break:keep-all;overflow-wrap:anywhere;}
+  .ckw-ok b{color:#1a202c;}
+  .ckw-ok .src{color:#68917a;font-size:11px;}
+  .ckw-cand{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11.5px;color:#718096;
+            background:#f7f9fb;border:1px solid #e6ebf1;border-radius:7px;padding:6px 8px;margin-top:5px;}
+  .ckw-cand .nm{color:#2d3748;font-weight:700;word-break:keep-all;overflow-wrap:anywhere;flex:1;min-width:110px;}
+  .ckw-put{padding:4px 11px;border:1.5px solid #cbd5e0;background:#fff;color:#2b6cb0;border-radius:6px;
+           font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .ckw-put:active{background:#ebf4ff;}
+  .ckw-warnsrc{color:#b7791f;font-size:11px;}
 </style>
 </head>
 <body>
@@ -1158,6 +1172,8 @@
       <label>입고처</label>
       <input type="text" id="f-incoming" class="warn-field" placeholder="예: 강남 OO지점, 본사 등">
       <div class="warn-note">⚠️ 자동입력될 수 있어요 — 실제 입고처 꼭 확인!!</div>
+      <!-- 2026-11-24 — 반출 기록에서 가져온 입고처 / ERP 후보 단추 (없으면 아무것도 안 보인다) -->
+      <div id="ckw-inc"></div>
     </div>
     <div class="field">
       <label>입고일</label>
@@ -2103,8 +2119,11 @@ function setupAssetLookup() {
     if (an && !assetEl.value.trim()) assetEl.value = an;
     if (a.device_sn && !serialEl.value.trim()) serialEl.value = a.device_sn;
     const m = document.getElementById('f-model'); if (m && a.model && !m.value.trim()) m.value = a.model;
-    const inc = document.getElementById('f-incoming');
-    if (inc && !inc.value.trim() && c.business_name) inc.value = c.business_name;
+    // 2026-11-24 — ERP 거래처명을 입고처에 그대로 넣던 줄이었다.
+    // ERP 는 '지금 임대 중인 곳'이라 입고처(회수해 온 곳)로는 실측 437건 중 82건(19%)만 맞았다.
+    // 반출되고 ERP 가 갱신되는 사이 시간차 때문이다. 틀린 값이 칸에 들어가면 그냥 넘어가게 되므로
+    // 이제 자동으로 넣지 않고, 아래 ckwErp() 가 「누르면 들어가는 후보」로만 보여준다.
+    if (c.business_name && window.ckwErp) window.ckwErp(c.business_name);
     // 자산번호가 '미부착' 같은 값이면 그 사실을 알려 준다 (칸에는 넣지 않는다)
     const noteNo = an
       ? ('자산 ' + esc(an))
@@ -4851,11 +4870,74 @@ async function dpSubmit(){
       .then(function(){ busy = false; });
   }
 
+  /* ---------- 입고처 : 반출 기록이 1순위, ERP 는 후보로만 ----------
+     ERP 거래처명은 '지금 임대 중인 곳'이라 입고처(회수해 온 곳)로는 실측 19%만 맞았다.
+     반출 기록은 반출 시점에 사람이 적은 값이라 같은 기간 실측 52건 중 47건(90%)이 맞았다. */
+  var incEl  = document.getElementById('f-incoming');
+  var dateEl = document.getElementById('f-date');
+  var incBox = document.getElementById('ckw-inc');
+  var wTried = '', wRow = null, erpName = '';
+
+  function paintInc(){
+    if (!incBox) return;
+    var h = '';
+    if (wRow) {
+      var full = String(wRow.company_full || wRow.company_name || '').trim();
+      var day  = String(wRow.created_at || '').slice(0, 10);
+      h += '<div class="ckw-ok">반출 기록에서 가져왔습니다 — <b>' + esc(full) + '</b>'
+         + '<br><span class="src">' + esc(day) + ' 반출'
+         + (wRow.reason ? ' · ' + esc(wRow.reason) : '')
+         + (wRow.region ? ' · ' + esc(wRow.region) : '')
+         + (wRow.delivery_date ? ' · 교체일 ' + esc(String(wRow.delivery_date).slice(0,10)) : '')
+         + '</span></div>';
+    }
+    // ERP 값은 반출 기록과 다를 때만, 그것도 '누르면 들어가는 단추'로만 보여준다
+    if (erpName && (!wRow || norm(erpName) !== norm(wRow.company_full || wRow.company_name || ''))) {
+      h += '<div class="ckw-cand"><span class="ckw-warnsrc">ERP 지금 임대처</span>'
+         + '<span class="nm">' + esc(erpName) + '</span>'
+         + '<button type="button" class="ckw-put" onclick="ckwPut()">이걸로</button></div>';
+    }
+    incBox.innerHTML = h;
+  }
+  window.ckwErp = function(nm){ erpName = String(nm == null ? '' : nm).trim(); paintInc(); };
+  window.ckwPut = function(){ if (incEl && erpName) { incEl.value = erpName; incBox.innerHTML = ''; } };
+
+  function lookupW(){
+    var sn = String(serialEl.value || '').trim();
+    if (!sn || isTemp(sn)) { wRow = null; wTried = ''; paintInc(); return; }
+    if (sn === wTried) return;
+    wTried = sn;
+    fetch('/api/withdrawal?serial=' + encodeURIComponent(sn))
+      .then(function(r){ return r.ok ? r.json() : null; })   // 503(설정 전)·404 는 조용히 넘어간다
+      .then(function(j){
+        if (String(serialEl.value || '').trim() !== sn) return;   // 그새 바뀌었으면 버린다
+        if (!j || !j.rows || !j.rows.length) { wRow = null; paintInc(); return; }
+        // 같은 기기가 여러 번 반출됐을 수 있다 → 작업 날짜보다 이전인 것 중 가장 가까운 것
+        var rows = j.rows.slice().sort(function(a, b){
+          return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        });
+        var pick = rows[0];
+        var work = (dateEl && dateEl.value) ? dateEl.value : '';
+        if (work) {
+          for (var i = 0; i < rows.length; i++) {
+            if (String(rows[i].created_at || '').slice(0, 10) <= work) { pick = rows[i]; break; }
+          }
+        }
+        wRow = pick;
+        var full = String(pick.company_full || pick.company_name || '').trim();
+        // 빈 칸일 때만 채운다 — 사람이 적은 값은 절대 덮지 않는다
+        if (full && incEl && !incEl.value.trim()) incEl.value = full;
+        paintInc();
+      })
+      .catch(function(){});
+  }
+
   /* ---------- 언제 도나 ---------- */
-  var t1 = null, t2 = null;
+  var t1 = null, t2 = null, t3 = null;
   function onEdit(){
     clearTimeout(t1); t1 = setTimeout(paint, 400);
     clearTimeout(t2); t2 = setTimeout(verify, 1200);
+    clearTimeout(t3); t3 = setTimeout(lookupW, 900);
   }
   serialEl.addEventListener('input', onEdit);
   serialEl.addEventListener('change', onEdit);
