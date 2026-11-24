@@ -547,11 +547,17 @@
             color:#9c4221;border-radius:8px;font-size:13px;font-weight:800;text-align:center;cursor:pointer;font-family:inherit;}
   .ckh-more:active{background:#fff7ed;}
 
+  /* 폰에서는 아래에서 올라오는 시트, PC에서는 가운데 작은 창.
+     내용 높이만큼만 열린다(전에는 화면을 꽉 채워서 아래가 텅 비었다). */
   #ckh-sheet{display:none;position:fixed;inset:0;z-index:200100;}
-  #ckh-sheet.on{display:block;}
+  #ckh-sheet.on{display:flex;align-items:flex-end;justify-content:center;}
   #ckh-sheet .ckh-dim{position:absolute;inset:0;background:rgba(26,32,44,.55);}
-  #ckh-sheet .ckh-box{position:absolute;left:0;right:0;bottom:0;top:28px;background:#fff;
-                      border-radius:16px 16px 0 0;display:flex;flex-direction:column;}
+  #ckh-sheet .ckh-box{position:relative;z-index:1;background:#fff;width:100%;max-width:560px;
+                      max-height:88vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;}
+  @media (min-width:760px){
+    #ckh-sheet.on{align-items:center;padding:24px;}
+    #ckh-sheet .ckh-box{max-height:82vh;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.3);}
+  }
   .ckh-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid #edf2f7;}
   .ckh-hd .t{font-size:15px;font-weight:800;color:#1a202c;}
   .ckh-hd .x{font-size:22px;color:#a0aec0;font-weight:700;background:none;border:none;cursor:pointer;padding:0 6px;line-height:1;}
