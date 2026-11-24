@@ -2112,13 +2112,24 @@ function setupAssetLookup() {
     if (!t) return '';
     return NOT_A_NUMBER.indexOf(t.toUpperCase()) >= 0 ? '' : t;
   }
+  // 2026-11-24 — 다른 기기 번호를 넣으면 나머지 칸도 그 기기 것으로 바뀌어야 한다.
+  //   전에는 '빈 칸일 때만' 채워서, 기기를 바꿔도 앞 기기의 모델·입고처가 그대로 남았다.
+  //   그렇다고 무조건 덮으면 손으로 고쳐 적은 값까지 날아간다.
+  //   그래서 '우리가 자동으로 넣은 값'을 window.ckAuto 에 기억해 두고,
+  //   칸이 비었거나 그 값 그대로일 때만 바꾼다. 사람이 고친 값은 건드리지 않는다.
+  function ckSet(el, v, key) {
+    if (!el || !v) return;
+    const A = window.ckAuto || (window.ckAuto = {});
+    const cur = String(el.value == null ? '' : el.value).trim();
+    if (!cur || cur === String(A[key] == null ? '' : A[key]).trim()) { el.value = v; A[key] = v; }
+  }
   function show(j) {
     const a = j.asset || {}, c = j.client || {};
     const an = realAssetNo(a.asset_no);
-    // ERP는 빈칸만 채움(실물 입력값이 우선) · ERP엔 절대 쓰지 않고 시트에만 저장됨
-    if (an && !assetEl.value.trim()) assetEl.value = an;
-    if (a.device_sn && !serialEl.value.trim()) serialEl.value = a.device_sn;
-    const m = document.getElementById('f-model'); if (m && a.model && !m.value.trim()) m.value = a.model;
+    // ERP엔 절대 쓰지 않고 시트에만 저장됨
+    if (an) ckSet(assetEl, an, 'asset');
+    if (a.device_sn) ckSet(serialEl, a.device_sn, 'serial');
+    const m = document.getElementById('f-model'); if (m && a.model) ckSet(m, a.model, 'model');
     // 2026-11-24 — ERP 거래처명을 입고처에 그대로 넣던 줄이었다.
     // ERP 는 '지금 임대 중인 곳'이라 입고처(회수해 온 곳)로는 실측 437건 중 82건(19%)만 맞았다.
     // 반출되고 ERP 가 갱신되는 사이 시간차 때문이다. 틀린 값이 칸에 들어가면 그냥 넘어가게 되므로
@@ -2132,6 +2143,8 @@ function setupAssetLookup() {
       + (a.model ? ' · ' + esc(a.model) : '') + (a.device_sn ? ' · 시리얼 ' + esc(a.device_sn) : '')
       + ' &nbsp;<b style="color:#c53030">→ 실물과 대조 확인!</b>';
     status.style.color = '#2f855a';
+    // 자산번호만 치면 시리얼이 여기서 채워진다 → 그 시리얼로 이력·반출을 다시 본다
+    if (window.ckwRefresh) window.ckwRefresh();
   }
   // retried = 대소문자를 바꿔 다시 거는 중인지 (시리얼 전용)
   async function lookup(param, val, retried) {
@@ -4900,18 +4913,37 @@ async function dpSubmit(){
     incBox.innerHTML = h;
   }
   window.ckwErp = function(nm){ erpName = String(nm == null ? '' : nm).trim(); paintInc(); };
-  window.ckwPut = function(){ if (incEl && erpName) { incEl.value = erpName; incBox.innerHTML = ''; } };
+  window.ckwPut = function(){
+    if (incEl && erpName) {
+      var A = window.ckAuto || (window.ckAuto = {});
+      incEl.value = erpName; A.incoming = erpName;   // 이것도 '자동으로 넣은 값'으로 기억
+      incBox.innerHTML = '';
+    }
+  };
+  // 자산번호를 바꿔 시리얼이 교체됐을 때 — ERP 조회 쪽(show)이 끝나고 불러 준다
+  window.ckwRefresh = function(){
+    wTried = '';
+    clearTimeout(t3); t3 = setTimeout(function(){ paint(); lookupW(); }, 250);
+  };
 
+  // 우리가 자동으로 넣은 입고처만 지운다 (사람이 고친 값은 그대로 둔다)
+  function clearAutoInc(){
+    var A = window.ckAuto || (window.ckAuto = {});
+    if (!incEl) return;
+    var cur = String(incEl.value || '').trim();
+    if (cur && cur === String(A.incoming == null ? '' : A.incoming).trim()) { incEl.value = ''; A.incoming = ''; }
+  }
   function lookupW(){
     var sn = String(serialEl.value || '').trim();
-    if (!sn || isTemp(sn)) { wRow = null; wTried = ''; paintInc(); return; }
+    if (!sn || isTemp(sn)) { wRow = null; wTried = ''; clearAutoInc(); paintInc(); return; }
     if (sn === wTried) return;
     wTried = sn;
     fetch('/api/withdrawal?serial=' + encodeURIComponent(sn))
       .then(function(r){ return r.ok ? r.json() : null; })   // 503(설정 전)·404 는 조용히 넘어간다
       .then(function(j){
         if (String(serialEl.value || '').trim() !== sn) return;   // 그새 바뀌었으면 버린다
-        if (!j || !j.rows || !j.rows.length) { wRow = null; paintInc(); return; }
+        // 기기가 바뀌었는데 반출 기록이 없으면, 앞 기기의 입고처가 남지 않게 지운다
+        if (!j || !j.rows || !j.rows.length) { wRow = null; clearAutoInc(); paintInc(); return; }
         // 같은 기기가 여러 번 반출됐을 수 있다 → 작업 날짜보다 이전인 것 중 가장 가까운 것
         var rows = j.rows.slice().sort(function(a, b){
           return String(b.created_at || '').localeCompare(String(a.created_at || ''));
@@ -4925,8 +4957,12 @@ async function dpSubmit(){
         }
         wRow = pick;
         var full = String(pick.company_full || pick.company_name || '').trim();
-        // 빈 칸일 때만 채운다 — 사람이 적은 값은 절대 덮지 않는다
-        if (full && incEl && !incEl.value.trim()) incEl.value = full;
+        // 비었거나 '우리가 넣은 값 그대로'일 때만 바꾼다 — 사람이 적은 값은 절대 덮지 않는다
+        if (full && incEl) {
+          var A = window.ckAuto || (window.ckAuto = {});
+          var cur = String(incEl.value || '').trim();
+          if (!cur || cur === String(A.incoming == null ? '' : A.incoming).trim()) { incEl.value = full; A.incoming = full; }
+        }
         paintInc();
       })
       .catch(function(){});
