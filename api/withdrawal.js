@@ -20,14 +20,19 @@ const TOKEN = process.env.BO_LOOKUP_TOKEN || '';
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const serial = (req.query && req.query.serial || '').trim();
-  if (!serial) { res.status(400).json({ error: '시리얼을 입력하세요.' }); return; }
+  // 시리얼이 어긋나는 경우가 있어(OCR 오독 등) 자산번호로도 찾게 한다.
+  const assetNo = (req.query && req.query.asset_no || '').trim();
+  if (!serial && !assetNo) { res.status(400).json({ error: '시리얼 또는 자산번호를 입력하세요.' }); return; }
   if (!TOKEN) {
     // 환경변수를 아직 안 넣었을 때. 폼은 이걸 받으면 조용히 넘어간다.
     res.status(503).json({ error: '반출 기록 연결 설정이 없습니다(BO_LOOKUP_TOKEN).' });
     return;
   }
+  const qs = [];
+  if (serial) qs.push('serial=' + encodeURIComponent(serial));
+  if (assetNo) qs.push('asset_no=' + encodeURIComponent(assetNo));
   try {
-    const r = await fetch(BO_URL + '?serial=' + encodeURIComponent(serial), {
+    const r = await fetch(BO_URL + '?' + qs.join('&'), {
       headers: { 'x-lookup-token': TOKEN },
       redirect: 'follow',
     });
