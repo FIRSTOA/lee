@@ -531,6 +531,89 @@
   #saving-overlay .sv-title{font-size:17px;font-weight:800;color:#1a202c;margin-bottom:6px;}
   #saving-overlay .sv-step{font-size:13px;color:#4a5568;line-height:1.5;min-height:20px;}
   #saving-overlay .sv-warn{font-size:12px;color:#a0aec0;margin-top:12px;}
+
+  /* ===== 2026-11-24 추가 : 재오버홀 이력 띠 + 자산번호 확인 창 =====
+     기존 선택자는 건드리지 않는다. 전부 ckh- / ckv- 로만 시작한다. */
+  #ckh-band{display:none;}
+  #ckh-band.on{display:block;border:1.5px solid #f6ad55;background:#fffdf7;border-radius:11px;padding:11px 12px;margin:2px 0 13px;}
+  .ckh-top{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;}
+  .ckh-nth{background:#c05621;color:#fff;font-size:12.5px;font-weight:800;padding:3px 11px;border-radius:999px;white-space:nowrap;}
+  .ckh-ttl{font-size:13.5px;font-weight:800;color:#744210;line-height:1.4;word-break:keep-all;}
+  .ckh-recent{font-size:12.5px;color:#5f370e;line-height:1.65;word-break:keep-all;overflow-wrap:anywhere;}
+  .ckh-recent .k{color:#9c7b4a;font-size:11.5px;font-weight:700;margin-right:3px;}
+  .ckh-reps{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+  .ckh-rep{background:#fed7d7;color:#9b2c2c;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .ckh-more{display:block;width:100%;margin-top:10px;padding:9px;border:1.5px solid #dd9b4e;background:#fff;
+            color:#9c4221;border-radius:8px;font-size:13px;font-weight:800;text-align:center;cursor:pointer;font-family:inherit;}
+  .ckh-more:active{background:#fff7ed;}
+
+  #ckh-sheet{display:none;position:fixed;inset:0;z-index:200100;}
+  #ckh-sheet.on{display:block;}
+  #ckh-sheet .ckh-dim{position:absolute;inset:0;background:rgba(26,32,44,.55);}
+  #ckh-sheet .ckh-box{position:absolute;left:0;right:0;bottom:0;top:28px;background:#fff;
+                      border-radius:16px 16px 0 0;display:flex;flex-direction:column;}
+  .ckh-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid #edf2f7;}
+  .ckh-hd .t{font-size:15px;font-weight:800;color:#1a202c;}
+  .ckh-hd .x{font-size:22px;color:#a0aec0;font-weight:700;background:none;border:none;cursor:pointer;padding:0 6px;line-height:1;}
+  .ckh-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 28px;}
+  .ckh-dev{background:#f7f9fb;border:1px solid #e6ebf1;border-radius:9px;padding:9px 11px;margin-bottom:13px;}
+  .ckh-dev .m{font-weight:800;color:#1a202c;font-size:13.5px;}
+  .ckh-dev .s{color:#718096;font-family:Consolas,monospace;font-size:12px;margin-top:2px;word-break:break-all;}
+  .ckh-tl{position:relative;padding-left:21px;}
+  .ckh-tl::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:#e2e8f0;}
+  .ckh-ev{position:relative;margin-bottom:16px;}
+  .ckh-ev::before{content:'';position:absolute;left:-20px;top:4px;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid #cbd5e0;}
+  .ckh-ev.now::before{border-color:#c05621;background:#fff5eb;}
+  .ckh-d{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-bottom:3px;}
+  .ckh-date{font-size:13.5px;font-weight:800;color:#1a202c;}
+  .ckh-who{font-size:12px;color:#718096;}
+  .ckh-biz{font-size:12.5px;color:#4a5568;margin-bottom:5px;word-break:keep-all;}
+  .ckh-bdg{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;}
+  .ckh-bdg.oh{background:#ebf4ff;color:#2b6cb0;}
+  .ckh-bdg.rp{background:#f0fff4;color:#276749;}
+  .ckh-bdg.rs{background:#f1f3f6;color:#4a5568;}
+  .ckh-line{font-size:12.5px;line-height:1.6;margin-bottom:2px;word-break:keep-all;overflow-wrap:anywhere;}
+  .ckh-line .k{display:inline-block;min-width:32px;color:#8b95a3;font-size:11px;font-weight:800;margin-right:4px;}
+  .ckh-line .sym{color:#c53030;font-weight:700;}
+  .ckh-cnt{font-size:11.5px;color:#8b95a3;margin-top:4px;font-family:Consolas,monospace;}
+  .ckh-gap{font-size:11px;color:#b7791f;background:#fffbf0;border-radius:5px;padding:1px 7px;display:inline-block;margin-top:4px;font-weight:700;}
+
+  #ckv-modal{display:none;position:fixed;inset:0;z-index:200200;align-items:center;justify-content:center;padding:14px;}
+  #ckv-modal.on{display:flex;}
+  #ckv-modal .ckv-dim{position:absolute;inset:0;background:rgba(26,32,44,.55);}
+  .ckv-box{position:relative;background:#fff;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.3);
+           width:100%;max-width:400px;max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;}
+  .ckv-top{background:#c53030;color:#fff;padding:13px 16px;font-size:15px;font-weight:800;line-height:1.45;word-break:keep-all;}
+  .ckv-top.amber{background:#c05621;}
+  .ckv-body{padding:15px 16px 16px;}
+  .ckv-q{font-size:13.5px;color:#3d4a5c;margin:0 0 11px;line-height:1.6;word-break:keep-all;}
+  .ckv-q b{color:#1a202c;}
+  .ckv-dev{border:1.5px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:9px;background:#fbfcfd;}
+  .ckv-dev.mine{border-color:#feb2b2;background:#fff8f8;}
+  .ckv-dev.this{border-color:#90cdf4;background:#f6fbff;}
+  .ckv-cap{font-size:11px;font-weight:800;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .ckv-dev.mine .ckv-cap{color:#c53030;}
+  .ckv-dev.this .ckv-cap{color:#2b6cb0;}
+  .ckv-biz{font-size:15px;font-weight:800;color:#1a202c;margin-bottom:3px;line-height:1.35;word-break:keep-all;}
+  .ckv-mdl{font-size:13px;color:#4a5568;margin-bottom:6px;word-break:keep-all;}
+  .ckv-kv{display:grid;grid-template-columns:52px 1fr;gap:2px 8px;font-size:12.5px;align-items:baseline;}
+  .ckv-kv .k{color:#8b95a3;font-size:11.5px;font-weight:700;}
+  .ckv-kv .v{font-family:Consolas,monospace;color:#2d3748;font-size:12.5px;word-break:break-all;}
+  .ckv-kv .v.hi{font-weight:800;color:#c53030;}
+  .ckv-kv .v.hb{font-weight:800;color:#2b6cb0;}
+  .ckv-pill{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+  .ckv-pill.on{background:#c6f6d5;color:#276749;}
+  .ckv-pill.off{background:#edf2f7;color:#718096;}
+  .ckv-clue{background:#fffaf0;border:1.5px solid #f6ad55;border-radius:9px;padding:10px 12px;
+            font-size:12.5px;color:#744210;margin-top:10px;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere;}
+  .ckv-clue .hd{font-weight:800;color:#9c4221;display:block;margin-bottom:4px;}
+  .ckv-ask{text-align:center;font-size:15px;font-weight:800;color:#1a202c;margin:14px 0 11px;}
+  .ckv-btns{display:flex;gap:8px;}
+  .ckv-btn{flex:1;padding:13px 8px;border-radius:9px;font-size:13.5px;font-weight:800;text-align:center;
+           border:2px solid;cursor:pointer;line-height:1.35;font-family:inherit;}
+  .ckv-btn.b{background:#2b6cb0;border-color:#2b6cb0;color:#fff;}
+  .ckv-btn.w{background:#fff;border-color:#cbd5e0;color:#4a5568;}
+  .ckv-note{font-size:11.5px;color:#8b95a3;text-align:center;margin-top:9px;line-height:1.55;}
 </style>
 </head>
 <body>
@@ -1044,6 +1127,8 @@
       <label>입고일</label>
       <input type="date" id="ck-indate">
     </div>
+    <!-- 2026-11-24 — 전에 작업한 적 있는 기기면 여기에 띠가 뜬다(없으면 아무것도 안 보인다) -->
+    <div id="ckh-band"></div>
     <div class="field">
       <label>자산번호</label>
       <input type="text" id="f-asset" class="warn-field" placeholder="자산번호(소문자OK) · 업체·모델·시리얼 자동반영" autocomplete="off">
@@ -4466,6 +4551,300 @@ async function dpSubmit(){
   }
 }
 </script>
+<!-- 2026-11-24 — 이력 자세히 보기 / 자산번호 확인 창 (평소엔 숨어 있다) -->
+<div id="ckh-sheet" aria-hidden="true">
+  <div class="ckh-dim" onclick="ckhClose()"></div>
+  <div class="ckh-box">
+    <div class="ckh-hd"><span class="t" id="ckh-sheet-title">이력</span><button type="button" class="x" onclick="ckhClose()">&times;</button></div>
+    <div class="ckh-body" id="ckh-sheet-body"></div>
+  </div>
+</div>
+<div id="ckv-modal" aria-hidden="true">
+  <div class="ckv-dim"></div>
+  <div class="ckv-box" id="ckv-box"></div>
+</div>
+
+<script>
+/* =========================================================================
+   2026-11-24 — ① 재오버홀 이력 띠   ② 자산번호 확인 창
+   기존 함수·변수는 하나도 고치지 않았다. 전부 여기 안에서만 돈다.
+   (기존 자동채움 setupAssetLookup 은 그대로 둔다 — 칸을 채우는 쪽은 건드리지 않는다)
+   ========================================================================= */
+(function(){
+  var band    = document.getElementById('ckh-band');
+  var assetEl = document.getElementById('f-asset');
+  var serialEl= document.getElementById('f-serial');
+  var modelEl = document.getElementById('f-model');
+  if (!band || !assetEl || !serialEl) return;
+
+  var CACHE = null, loading = null;     // 오버홀 기록 (한 번만 받는다)
+  var lastKey = '';                     // 방금 띠를 그린 기기
+  var answered = {};                    // 「실물이 맞다」고 답한 조합 — 다시 묻지 않는다
+  var busy = false;
+  var curRecs = [];                     // 지금 띠에 걸린 기기의 기록들
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function norm(s){ return String(s==null?'':s).replace(/[\s\-]/g,'').toUpperCase(); }
+  function isTemp(sn){ return norm(sn).indexOf('FU') === 0; }
+  var NOT_A_NUMBER = ['미부착','위탁','없음','0','X','-','.'];
+  function realNo(v){ var t=String(v==null?'':v).trim(); if(!t) return '';
+    return NOT_A_NUMBER.indexOf(t.toUpperCase())>=0 ? '' : t; }
+  // '전사벨트'가 '전사'에 먹히지 않게 긴 말을 앞에 둔다
+  var PARTS = ['현상기','정착기','전사벨트','드럼','급지','LSU','로스','ADF','토너비산','흰줄','용지걸림','소음','스캐너','필름'];
+
+  function load(){
+    if (CACHE) return Promise.resolve(CACHE);
+    if (loading) return loading;
+    loading = fetch(RB_SUPA_URL + '/rest/v1/app_config?key=eq.overhaul_checklist&select=value', { headers: RB_SUPA_H })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ CACHE = (j && j[0] && Array.isArray(j[0].value)) ? j[0].value : []; return CACHE; })
+      .catch(function(){ CACHE = []; return CACHE; });
+    return loading;
+  }
+
+  /* 기기를 묶는 키 : 시리얼 우선, 임시(FU-)거나 없으면 자산번호 */
+  function keyOf(sn, an){
+    var s = String(sn||'').trim();
+    if (s && !isTemp(s)) return 'S:' + norm(s);
+    var a = realNo(an);
+    return a ? 'A:' + norm(a) : '';
+  }
+  function curKey(){ return keyOf(serialEl.value, assetEl.value); }
+
+  /* 같은 날·같은 사람·같은 내용으로 두 번 저장된 것은 한 번으로 센다 */
+  function dedupe(list){
+    var seen = {}, out = [];
+    for (var i=0;i<list.length;i++){
+      var r = list[i];
+      var sig = [r.date, r.person, r.work, r.symptom].join('|');
+      if (seen[sig]) continue;
+      seen[sig] = 1; out.push(r);
+    }
+    return out;
+  }
+  function findRecs(key, list){
+    var hit = [];
+    for (var i=0;i<list.length;i++){ if (keyOf(list[i].serial, list[i].asset_no) === key) hit.push(list[i]); }
+    hit.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+    return dedupe(hit);
+  }
+  function repeated(recs){
+    var cnt = {};
+    for (var i=0;i<recs.length;i++){
+      var t = [recs[i].work, recs[i].symptom, recs[i].part].join(' ');
+      var used = {};
+      for (var p=0;p<PARTS.length;p++){
+        var w = PARTS[p];
+        if (used[w]) continue;
+        if (t.indexOf(w) >= 0) { cnt[w] = (cnt[w]||0) + 1; used[w] = 1; }
+      }
+    }
+    var out = [];
+    for (var k in cnt) { if (cnt[k] >= 2) out.push({ w:k, n:cnt[k] }); }
+    out.sort(function(a,b){ return b.n - a.n; });
+    return out.slice(0, 4);
+  }
+  function dayGap(a, b){
+    var x = Date.parse(String(a||'')), y = Date.parse(String(b||''));
+    if (isNaN(x) || isNaN(y)) return null;
+    return Math.round(Math.abs(x - y) / 86400000);
+  }
+
+  /* ---------- 띠 ---------- */
+  function paint(){
+    var key = curKey();
+    if (key === lastKey) return;
+    lastKey = key;
+    if (!key) { band.className=''; band.innerHTML=''; curRecs=[]; return; }
+    load().then(function(list){
+      if (curKey() !== key) return;                 // 그 사이 다른 기기로 바뀌었으면 버린다
+      var recs = findRecs(key, list);
+      curRecs = recs;
+      if (!recs.length) { band.className=''; band.innerHTML=''; return; }
+      var last = recs[0];
+      var reps = repeated(recs);
+      var sym  = String(last.symptom||'').trim();
+      var work = String(last.work||'').trim();
+      var h = '<div class="ckh-top"><span class="ckh-nth">' + (recs.length + 1) + '번째 오버홀</span>'
+            + '<span class="ckh-ttl">전에 작업한 적 있는 기기입니다</span></div>'
+            + '<div class="ckh-recent"><span class="k">직전</span>' + esc(last.date||'') + ' · ' + esc(last.person||'') + '<br>'
+            + '<span class="k">' + (sym ? '증상' : '작업') + '</span>'
+            + esc((sym || work || '적힌 내용 없음').replace(/\s*\n\s*/g, ' / ')) + '</div>';
+      if (reps.length) {
+        h += '<div class="ckh-reps">';
+        for (var i=0;i<reps.length;i++) h += '<span class="ckh-rep">' + esc(reps[i].w) + ' ' + reps[i].n + '회</span>';
+        h += '</div>';
+      }
+      h += '<button type="button" class="ckh-more" onclick="ckhOpen()">이력 자세히 보기 ▾</button>';
+      band.innerHTML = h;
+      band.className = 'on';
+    });
+  }
+
+  /* ---------- 자세히 (시간 순서) ---------- */
+  window.ckhOpen = function(){
+    if (!curRecs.length) return;
+    var recs = curRecs;
+    var first = recs[0];
+    var head = '<div class="ckh-dev"><div class="m">' + esc(first.model || modelEl && modelEl.value || '') + '</div>'
+             + '<div class="s">S/N ' + esc(first.serial || '-') + ' &nbsp;·&nbsp; 자산 ' + esc(realNo(first.asset_no) || '-') + '</div></div>';
+    var h = '<div class="ckh-tl">';
+    for (var i=0;i<recs.length;i++){
+      var r = recs[i];
+      var sym = String(r.symptom||'').trim(), work = String(r.work||'').trim();
+      var co = (r.counterOut && (r.counterOut.sum || r.counterOut.c || r.counterOut.bk)) ? r.counterOut : null;
+      h += '<div class="ckh-ev' + (i===0 ? ' now' : '') + '">'
+         + '<div class="ckh-d"><span class="ckh-date">' + esc(r.date||'') + '</span>'
+         + '<span class="ckh-who">' + esc(r.person||'') + (r.dept ? ' · ' + esc(r.dept) : '') + (r.time ? ' · ' + esc(r.time) + '분' : '') + '</span></div>'
+         + '<div class="ckh-biz">' + esc(r.incoming || '입고처 미기재') + (r.reason ? ' · ' + esc(r.reason) : '')
+         + (r.overhaul ? ' <span class="ckh-bdg oh">' + esc(r.overhaul) + '</span>' : '')
+         + (r.repair ? ' <span class="ckh-bdg rp">' + esc(r.repair) + '</span>' : '')
+         + (r.use ? ' <span class="ckh-bdg rs">' + esc(r.use) + '</span>' : '') + '</div>';
+      h += '<div class="ckh-line"><span class="k">증상</span>'
+         + (sym ? '<span class="sym">' + esc(sym.replace(/\s*\n\s*/g,' / ')) + '</span>'
+                : '<span style="color:#a0aec0">적힌 증상 없음</span>') + '</div>';
+      if (work) h += '<div class="ckh-line"><span class="k">작업</span>' + esc(work.replace(/\s*\n\s*/g,' / ')) + '</div>';
+      if (r.part) h += '<div class="ckh-line"><span class="k">부품</span>' + esc(r.part) + '</div>';
+      if (co) {
+        h += '<div class="ckh-cnt">카운터 ' + (co.sum ? ('합계 ' + esc(co.sum))
+             : ('컬러 ' + esc(co.c || '-') + ' / 흑백 ' + esc(co.bk || '-') + ' · 합계 미기록')) + '</div>';
+      }
+      if (i < recs.length - 1) {
+        var g = dayGap(r.date, recs[i+1].date);
+        if (g !== null) h += '<div class="ckh-gap">직전 작업에서 ' + g + '일 만</div>';
+      }
+      var an = realNo(r.asset_no);
+      if (an && norm(an) !== norm(realNo(first.asset_no))) h += '<div class="ckh-gap">이때 자산번호는 ' + esc(an) + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    document.getElementById('ckh-sheet-title').textContent = '이력 ' + recs.length + '회';
+    document.getElementById('ckh-sheet-body').innerHTML = head + h;
+    document.getElementById('ckh-sheet').className = 'on';
+  };
+  window.ckhClose = function(){ document.getElementById('ckh-sheet').className = ''; };
+
+  /* ---------- 자산번호 확인 창 ---------- */
+  function pickLast(rows){
+    var on = [];
+    for (var i=0;i<rows.length;i++){ if (String(rows[i].rental_status||'').indexOf('임대중') >= 0) on.push(rows[i]); }
+    var pool = (on.length ? on : rows).slice();
+    pool.sort(function(a,b){ return String(b.contract_date||'').localeCompare(String(a.contract_date||'')); });
+    return pool[0];
+  }
+  function devCard(cls, cap, row, hi, label){
+    var st = String(row.rental_status||'').trim();
+    var on = st.indexOf('임대중') >= 0;
+    return '<div class="ckv-dev ' + cls + '"><div class="ckv-cap"><span>' + esc(cap) + '</span>'
+      + (st ? '<span class="ckv-pill ' + (on?'on':'off') + '">' + esc(st) + '</span>' : '') + '</div>'
+      + '<div class="ckv-biz">' + esc(row.name || '거래처 미기재') + '</div>'
+      + '<div class="ckv-mdl">' + esc(row.model_name || '') + (row.region_area ? ' · ' + esc(row.region_area) : '') + '</div>'
+      + '<div class="ckv-kv"><span class="k">시리얼</span><span class="v">' + esc(row.device_sn || '-') + '</span>'
+      + '<span class="k">' + esc(label||'자산') + '</span><span class="v ' + hi + '">' + esc(realNo(row.asset_code) || row.asset_code || '-') + '</span></div></div>';
+  }
+  function sameHead(a, b){
+    var x = norm(a), y = norm(b), n = 0;
+    while (n < x.length && n < y.length && x[n] === y[n]) n++;
+    return n;
+  }
+  function showWarn(sn, an, sRows, cRows){
+    var me = pickLast(sRows);
+    var erpNo = realNo(me.asset_code);
+    var other = cRows.length === 1 ? cRows[0] : null;
+    var amber = !other;
+
+    // 우리 기록이 뭐라고 하는지 (두 번째 근거)
+    var mineSay = '';
+    if (curRecs.length) {
+      var cnt = {}, tot = 0;
+      for (var i=0;i<curRecs.length;i++){ var a = realNo(curRecs[i].asset_no); if (a) { cnt[norm(a)] = (cnt[norm(a)]||0)+1; tot++; } }
+      var best = '', bn = 0;
+      for (var k in cnt) { if (cnt[k] > bn) { bn = cnt[k]; best = k; } }
+      if (tot && best) {
+        mineSay = '<div class="ckv-clue"><span class="hd">우리 작업 기록으로도 확인됩니다</span>'
+          + '이 기기는 <b>' + (curRecs.length + 1) + '번째</b> 작업이고, 지난 ' + tot + '번 중 <b>' + bn + '번을 ' + esc(best) + '</b> 로 적었습니다.</div>';
+      }
+    }
+
+    var h = '<div class="ckv-top' + (amber ? ' amber' : '') + '">'
+          + (amber ? '자산번호가 ERP와 다릅니다' : '⚠️ 이 번호는 다른 기기 번호입니다') + '</div><div class="ckv-body">';
+    h += '<p class="ckv-q">적으신 <b>' + esc(an) + '</b> 은 '
+       + (amber ? '<b>ERP에 없는 번호</b>입니다.' : '<b>다른 기기</b>의 번호입니다.') + '</p>';
+    if (other) h += devCard('mine', '적으신 ' + an + ' 의 기기', other, 'hi');
+    h += devCard('this', '지금 작업 중인 기기', me, 'hb', 'ERP');
+
+    var clue = '';
+    if (other) {
+      var m1 = String(other.model_name||'').trim(), m2 = String(me.model_name||'').trim();
+      if (m1 && m2 && norm(m1) !== norm(m2)) {
+        clue = '기종이 다릅니다 — <b>' + esc(m1) + '</b> 과 <b>' + esc(m2) + '</b>';
+      } else {
+        var k = sameHead(other.device_sn, me.device_sn);
+        clue = '기종이 <b>둘 다 ' + esc(m2 || m1) + '</b> 입니다.'
+             + (k >= 3 ? ' 시리얼도 앞 <b>' + k + '자리</b>가 같아요 — 옆에 있던 기기를 보신 게 아닐까요?' : '');
+      }
+    } else {
+      clue = '<b>' + esc(an) + '</b> 은 ERP 임대리스트 어디에도 없습니다. 실물 라벨을 한 번만 더 봐 주세요.';
+    }
+    h += '<div class="ckv-clue">' + clue + '</div>';
+    h += mineSay;
+    h += '<div class="ckv-ask">지금 입력하신 게 맞습니까?</div><div class="ckv-btns">'
+       + '<button type="button" class="ckv-btn b" onclick="ckvFix(\'' + esc(erpNo).replace(/'/g,'') + '\')">아니요<br>' + esc(erpNo) + ' 로 바꾸기</button>'
+       + '<button type="button" class="ckv-btn w" onclick="ckvKeep()">네<br>실물이 맞습니다</button></div>'
+       + '<div class="ckv-note">「네」를 눌러도 적으신 대로 저장됩니다.<br>저장을 막지 않습니다.</div></div>';
+    document.getElementById('ckv-box').innerHTML = h;
+    document.getElementById('ckv-modal').className = 'on';
+  }
+  window.ckvFix = function(v){
+    if (v) { assetEl.value = v; try { assetEl.dispatchEvent(new Event('change')); } catch(e){} }
+    document.getElementById('ckv-modal').className = '';
+  };
+  window.ckvKeep = function(){
+    answered[norm(serialEl.value) + '|' + norm(assetEl.value)] = 1;
+    document.getElementById('ckv-modal').className = '';
+  };
+
+  function verify(){
+    var sn = String(serialEl.value||'').trim();
+    var an = realNo(assetEl.value);
+    if (!sn || !an || isTemp(sn)) return;
+    if (answered[norm(sn) + '|' + norm(an)]) return;
+    if (busy) return;
+    busy = true;
+    fetch('/api/asset-rows?serial=' + encodeURIComponent(sn) + '&asset_no=' + encodeURIComponent(an))
+      .then(function(r){ return r.ok ? r.json() : null; })   // 503(설정 전) 등은 조용히 넘어간다
+      .then(function(j){
+        if (!j) return;
+        var sRows = j.serialRows || [], cRows = j.codeRows || [];
+        if (!sRows.length) return;                            // ERP에 이 기기가 없다 → 비교 불가
+        for (var i=0;i<sRows.length;i++){                     // 여러 줄 중 하나라도 맞으면 통과
+          if (norm(sRows[i].asset_code) === norm(an) || norm(sRows[i].classification_number) === norm(an)) return;
+        }
+        var hasReal = false;
+        for (var j2=0;j2<sRows.length;j2++){ if (realNo(sRows[j2].asset_code)) { hasReal = true; break; } }
+        if (!hasReal) return;                                 // ERP쪽이 「미부착」뿐 → 비교할 값이 없다
+        if (cRows.length > 1) return;                         // 그 번호가 ERP에 여러 줄 → 어느 기기 것인지 단정 못 한다
+        if (serialEl.value.trim() !== sn || realNo(assetEl.value) !== an) return;  // 그새 바뀌었으면 버린다
+        showWarn(sn, an, sRows, cRows);
+      })
+      .catch(function(){})
+      .then(function(){ busy = false; });
+  }
+
+  /* ---------- 언제 도나 ---------- */
+  var t1 = null, t2 = null;
+  function onEdit(){
+    clearTimeout(t1); t1 = setTimeout(paint, 400);
+    clearTimeout(t2); t2 = setTimeout(verify, 1200);
+  }
+  serialEl.addEventListener('input', onEdit);
+  serialEl.addEventListener('change', onEdit);
+  assetEl.addEventListener('input', onEdit);
+  assetEl.addEventListener('change', onEdit);
+})();
+</script>
+
 <script>
 // PWA 서비스워커 등록 (앱 설치 지원)
 if ('serviceWorker' in navigator) {
