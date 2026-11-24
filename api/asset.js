@@ -31,15 +31,33 @@ const SELECT = [
 // 값 안의 % _ \ 는 와일드카드이므로 막는다.
 function esc(v) { return String(v).replace(/[%_\\]/g, '\\$&'); }
 
+// 2026-11-24 — 전에는 limit=1 로 '아무 줄이나' 가져왔다.
+//   실측: 자산번호 3,070개(28%)가 ERP 에 2줄 이상이고,
+//   그중 임대중 줄이 있는 1,536개 가운데 1,535개는 첫 줄이 임대중이 아니었다.
+//   그래서 B6980 을 치면 「캐리어 냉장고」(2016년 임대종료 줄)가 나오고,
+//   정작 지금 임대중인 줄은 무시됐다.
+//   → 여러 줄을 받아서 '임대중 먼저, 그 다음 계약일이 최근인 것'으로 고른다.
 async function fromMps(column, value) {
   const url = MPS_URL.replace(/\/+$/, '') + '/rest/v1/assets'
     + '?select=' + encodeURIComponent(SELECT)
     + '&' + column + '=ilike.' + encodeURIComponent(esc(value))
-    + '&limit=1';
+    + '&limit=30';
   const r = await fetch(url, { headers: { apikey: MPS_KEY, Authorization: 'Bearer ' + MPS_KEY } });
   if (!r.ok) throw new Error('first_MPS HTTP ' + r.status);
   const rows = await r.json();
-  return Array.isArray(rows) && rows.length ? rows[0] : null;
+  return best(Array.isArray(rows) ? rows : []);
+}
+
+function best(rows) {
+  if (!rows.length) return null;
+  const live = rows.filter(function (r) {
+    return String(r.rental_status || '').indexOf('임대중') >= 0;
+  });
+  const pool = (live.length ? live : rows).slice();
+  pool.sort(function (a, b) {
+    return String(b.contract_date || '').localeCompare(String(a.contract_date || ''));
+  });
+  return pool[0];
 }
 
 // s-link 가 돌려주던 모양 그대로 만든다 (칸 이름·순서·기본값까지 동일)
