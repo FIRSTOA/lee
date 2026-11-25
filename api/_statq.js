@@ -22,6 +22,7 @@
 // 키는 환경변수로만 받는다. 차량 프로젝트 키라 이 저장소에 평문으로 두지 않는다.
 //   CAR_QUEUE_URL = https://<차량 supabase>.supabase.co
 //   CAR_QUEUE_KEY = sb_publishable_...
+// (2026-11-25 환경변수 CAR_QUEUE_URL·CAR_QUEUE_KEY 등록 후 재배포)
 const Q_URL = process.env.CAR_QUEUE_URL || '';
 const Q_KEY = process.env.CAR_QUEUE_KEY || '';
 const ROOM = '\uD1B5\uACC4 \uC601\uC5C5\uBCF4\uACE0 \uBD84\uC11D \uC608\uCE21';   // 통계 영업보고 분석 예측
