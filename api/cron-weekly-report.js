@@ -8,6 +8,7 @@ const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 const BASE = 'https://lee-zeta-one.vercel.app';
 const KEEP = 40;   // 큐 보관 건수 (미발송 추적에 쓰므로 넉넉히)
+const { queueStat } = require('./_statq.js');   // 통계방 발송은 PC 릴레이로 (2026-11-25)
 
 function kst(){ return new Date(Date.now() + 9*3600*1000); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
@@ -87,10 +88,16 @@ module.exports = async (req, res) => {
     // 링크에 주차(w=)를 붙여야 카톡이 지난주 카드를 재사용하지 않고 새로 읽어온다.
     const text = briefOf(sum) + '\n\n📄 부서별 표 · 미달 명단 · AAR 전문\n'
                + BASE + '/report.html?' + linkQs + '&w=' + encodeURIComponent(md);
-    list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: force ? 'manual' : (catchup ? 'cron-sat' : 'cron-fri') });
+    // 2026-11-25 — 통계방 발송을 폰 메신저봇에서 PC 릴레이로 옮겼다 (이유는 api/_statq.js 머리글).
+    //   PC 큐에 들어갔으면 sent:true 로 적재한다 → report-notify.js 가 봇에게 내려보내지 않는다(같은 글 두 번 방지).
+    //   PC 큐 적재가 실패하면 sent:false 그대로 → 예전처럼 봇이 가져간다. 예비 통로는 살려 둔다.
+    const pcId = await queueStat('overhaul_weekly', md + ' 주간 오버홀 보고', text);
+    list.push({ id: Date.now(), text, sent: !!pcId, day: day, createdAt: new Date().toISOString(),
+                src: force ? 'manual' : (catchup ? 'cron-sat' : 'cron-fri'),
+                via: pcId ? 'pc' : 'bot', pcId: pcId || undefined });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
-    res.status(200).json({ ok: true, queued: true, catchup: catchup, day: day, text });
+    res.status(200).json({ ok: true, queued: true, catchup: catchup, day: day, via: pcId ? 'pc' : 'bot', pcId: pcId || null, text });
   } catch (e) {
     res.status(200).json({ ok: false, error: String(e) });
   }
