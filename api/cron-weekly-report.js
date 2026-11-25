@@ -9,6 +9,7 @@ const H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type
 const BASE = 'https://lee-zeta-one.vercel.app';
 const KEEP = 40;   // 큐 보관 건수 (미발송 추적에 쓰므로 넉넉히)
 const { queueStat } = require('./_statq.js');   // 통계방 발송은 PC 릴레이로 (2026-11-25)
+const { maybeQueueMidweek, midKey, targetWed } = require('./_midweek.js');   // 수요일 중간 점검도 이 크론이 만든다 (2026-11-25)
 
 function kst(){ return new Date(Date.now() + 9*3600*1000); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
@@ -70,8 +71,26 @@ module.exports = async (req, res) => {
       });
       return;
     }
-    const dow = k.getUTCDay();                          // KST 요일 (금=5, 토=6)
-    if (!force && dow !== 5 && dow !== 6) { res.status(200).json({ ok: true, skipped: 'not Fri/Sat(KST)' }); return; }
+    const dow = k.getUTCDay();                          // KST 요일 (수=3, 목=4, 금=5, 토=6)
+
+    // 수·목 — 주 중간 점검 (2026-11-25 추가)
+    //   전에는 봇 폴링(report-notify.js)에서만 만들어져서, 봇이 멈추면 보고가 아예 안 만들어졌다.
+    //   크론을 새로 만들지 않고, 이 크론이 금·토가 아니면 그냥 끝내던 자리에 끼웠다(매일 18:00 KST 실행).
+    //   수요일에 요약 조회가 실패하면 목요일 18:00 에 같은 크론이 한 번 더 시도한다.
+    if (!force && (dow === 3 || dow === 4)) {
+      const mlist = await loadQ();
+      await maybeQueueMidweek(mlist, saveQ);
+      const tg = targetWed();
+      const mday = tg ? midKey(tg.wed) : '';
+      const hit = mday ? mlist.find(x => x.day === mday) : null;
+      res.status(200).json({
+        ok: true, midweek: true, day: mday || null, queued: !!hit,
+        src: hit ? hit.src : null, via: hit ? (hit.via || 'bot') : null
+      });
+      return;
+    }
+
+    if (!force && dow !== 5 && dow !== 6) { res.status(200).json({ ok: true, skipped: 'not Wed/Thu/Fri/Sat(KST)' }); return; }
     const catchup = !force && dow === 6;                // 토요일 = 어제(금)분 재시도
 
     // 보고 대상 날짜 — 토요일 재시도면 어제(금요일)
