@@ -4,6 +4,7 @@ const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 
 const BASE = 'https://lee-zeta-one.vercel.app';
+const { queueStat } = require('./_statq.js');   // 통계방 발송은 PC 릴레이로 (2026-11-25)
 function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=>d+=c); req.on('end',()=>resolve(d)); req.on('error',()=>resolve('')); }); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveQ(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'report_queue',value:list})}); }
@@ -79,7 +80,9 @@ async function maybeQueueWeekly(list){
         const warn = '⚠️ ' + md + '(금) 주간보고가 발송되지 않았습니다.\n'
                    + '요약 자동 생성이 계속 실패하고 있습니다. 확인이 필요합니다.\n'
                    + '📋 대시보드: ' + BASE + '/report.html?type=week';
-        list.push({ id: Date.now(), text: warn, sent: false, day: day + '-warn', createdAt: new Date().toISOString(), src: 'poll-warn' });
+        // 경고는 특히 PC 로 보내야 한다 — '봇이 못 보냈다'는 경고를 그 봇으로 보내면 같이 묻힌다.
+        const wId = await queueStat('overhaul_weekly_warn', md + ' 주간보고 미발송 경고', warn);
+        list.push({ id: Date.now(), text: warn, sent: !!wId, day: day + '-warn', createdAt: new Date().toISOString(), src: 'poll-warn', via: wId ? 'pc' : 'bot', pcId: wId || undefined });
         while (list.length > KEEP) list.shift();
         await saveQ(list);
       }
@@ -89,7 +92,9 @@ async function maybeQueueWeekly(list){
     // 링크에 주차(w=)를 붙여야 카톡이 지난주 카드를 재사용하지 않고 새로 읽어온다.
     const text = briefOf(sum) + '\n\n📄 부서별 표 · 미달 명단 · AAR 전문\n'
                + BASE + '/report.html?type=week&w=' + encodeURIComponent(md);
-    list.push({ id: Date.now(), text, sent: false, day: day, createdAt: new Date().toISOString(), src: back ? 'poll-late' : 'poll' });
+    // PC 릴레이(통계방)로 먼저 넣는다. 들어갔으면 sent:true 라 봇에게는 안 내려간다 (api/_statq.js 머리글 참고).
+    const pcId = await queueStat('overhaul_weekly', md + ' 주간 오버홀 보고', text);
+    list.push({ id: Date.now(), text, sent: !!pcId, day: day, createdAt: new Date().toISOString(), src: back ? 'poll-late' : 'poll', via: pcId ? 'pc' : 'bot', pcId: pcId || undefined });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
   } catch (e) {}
@@ -133,7 +138,9 @@ async function maybeQueueMidweek(list){
     if (t.indexOf('⏰') !== 0) return list;
 
     // room 을 붙이지 않는다 = 통계방. (전에는 room:'notice' 였고 그게 운영지원 팀방이었다)
-    list.push({ id: Date.now(), text: t, sent: false, day: day, createdAt: new Date().toISOString(), src: back ? 'mid-late' : 'mid' });
+    const wmd = (wed.getUTCMonth()+1) + '/' + wed.getUTCDate();
+    const pcId = await queueStat('overhaul_midweek', wmd + ' 중간 점검', t);
+    list.push({ id: Date.now(), text: t, sent: !!pcId, day: day, createdAt: new Date().toISOString(), src: back ? 'mid-late' : 'mid', via: pcId ? 'pc' : 'bot', pcId: pcId || undefined });
     while (list.length > KEEP) list.shift();
     await saveQ(list);
   } catch (e) {}
