@@ -57,6 +57,19 @@ module.exports = async (req, res) => {
   try {
     const k = kst();
     const force = req.query && req.query.force === '1';
+
+    // 발송 통로 점검 — ?probe=1
+    //   요약을 만들지 않고 점검 문구 한 줄만 통계방으로 보낸다. 큐(report_queue)에는 넣지 않는다.
+    //   이걸로 ① 환경변수가 들어갔는지 ② PC 릴레이가 집어 통계방에 올리는지 를 한 번에 본다.
+    if (req.query && req.query.probe === '1') {
+      const ptxt = '✅ 주간보고 자동 발송 통로 점검입니다. (시스템 점검 · 조치 불필요)';
+      const pid = await queueStat('overhaul_probe', '발송 통로 점검', ptxt);
+      res.status(200).json({
+        ok: !!pid, probe: true, via: pid ? 'pc' : 'bot', pcId: pid || null,
+        env: { CAR_QUEUE_URL: !!process.env.CAR_QUEUE_URL, CAR_QUEUE_KEY: !!process.env.CAR_QUEUE_KEY }
+      });
+      return;
+    }
     const dow = k.getUTCDay();                          // KST 요일 (금=5, 토=6)
     if (!force && dow !== 5 && dow !== 6) { res.status(200).json({ ok: true, skipped: 'not Fri/Sat(KST)' }); return; }
     const catchup = !force && dow === 6;                // 토요일 = 어제(금)분 재시도
