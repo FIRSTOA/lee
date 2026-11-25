@@ -101,51 +101,10 @@ async function maybeQueueWeekly(list){
   return list;
 }
 
-// 주 중간 점검 — 수요일 18:00 ~ 목요일 23:59 KST 사이에 그 주 수요일분이 없으면 만든다.
-//
-// 2026-11-13 — 보내는 방을 '공지방'에서 '통계방'으로 바꿨다.
-//   봇은 통계방(main)과 공지방(notice) 두 개를 기억하는데, room='notice' 로 나가는 것은
-//   이 중간 점검 하나뿐이었다. 주간보고는 room 이 없어 통계방으로 간다.
-//   10/16·10/23·10/30·11/6 주간보고는 4주 연속 정상이었고, 10/28·11/4·11/11 중간 점검만
-//   운영지원 팀방에 도착했다 → 공지방 등록이 운영지원 팀방으로 되어 있다는 뜻이다.
-//   공지방을 쓰지 않고 통계방으로 보내면 등록이 어떻게 되어 있든 운영지원 팀방으로 가지 않는다.
-//   중간 점검 자체는 그대로 나간다(기능을 끄지 않는다).
-async function maybeQueueMidweek(list){
-  try {
-    const k = new Date(Date.now() + 9*3600*1000);
-    const dow = k.getUTCDay(), hh = k.getUTCHours();   // 수=3, 목=4
-    let back = -1;
-    if (dow === 3 && hh >= 18) back = 0;
-    else if (dow === 4) back = 1;
-    if (back < 0) return list;
-
-    const wed = new Date(k.getTime()); wed.setUTCDate(wed.getUTCDate() - back);
-    const day = wed.getUTCFullYear() + '-' + (wed.getUTCMonth()+1) + '-' + wed.getUTCDate() + '-mid';
-    if (list.some(x => x.day === day)) return list;
-
-    let sum = '';
-    try { const r = await fetch(BASE + '/api/summary?type=midweek'); sum = await r.text(); } catch (e) {}
-    const t = String(sum || '').trim();
-
-    // ✅ = 전원 페이스 유지 → 보낼 내용이 없다. 빈 항목을 sent 처리해 두어 재시도를 멈춘다.
-    if (t.indexOf('✅') === 0) {
-      list.push({ id: Date.now(), text: '', sent: true, day: day, createdAt: new Date().toISOString(), src: 'mid-none' });
-      while (list.length > KEEP) list.shift();
-      await saveQ(list);
-      return list;
-    }
-    // ⏰ 가 아니면 조회 실패 — 적재하지 않고 다음 폴링(30초 뒤)에서 재시도
-    if (t.indexOf('⏰') !== 0) return list;
-
-    // room 을 붙이지 않는다 = 통계방. (전에는 room:'notice' 였고 그게 운영지원 팀방이었다)
-    const wmd = (wed.getUTCMonth()+1) + '/' + wed.getUTCDate();
-    const pcId = await queueStat('overhaul_midweek', wmd + ' 중간 점검', t);
-    list.push({ id: Date.now(), text: t, sent: !!pcId, day: day, createdAt: new Date().toISOString(), src: back ? 'mid-late' : 'mid', via: pcId ? 'pc' : 'bot', pcId: pcId || undefined });
-    while (list.length > KEEP) list.shift();
-    await saveQ(list);
-  } catch (e) {}
-  return list;
-}
+// 주 중간 점검은 api/_midweek.js 로 옮겼다 (2026-11-25).
+//   봇이 멈추면 이 파일 자체가 호출되지 않아 중간 점검이 아예 안 만들어졌다.
+//   그래서 매일 도는 크론(cron-weekly-report)에서도 같은 함수를 부른다. 두 곳이 같은 키로 중복을 막는다.
+const { maybeQueueMidweek } = require('./_midweek.js');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -163,7 +122,7 @@ module.exports = async (req, res) => {
     }
     let list = await loadQ();
     list = await maybeQueueWeekly(list);
-    list = await maybeQueueMidweek(list);
+    list = await maybeQueueMidweek(list, saveQ);
 
     // 2026-11-13 — 내려보내기 전 안전장치 두 가지.
     //
