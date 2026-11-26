@@ -4,7 +4,9 @@ const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 
 const BASE = 'https://lee-zeta-one.vercel.app';
-const { queueStat } = require('./_statq.js');   // 통계방 발송은 PC 릴레이로 (2026-11-25)
+const { queueStat, queueAlert } = require('./_statq.js');   // 발송은 PC 릴레이로 (2026-11-25)
+//   queueStat  → 통계방 (보고 내용만)
+//   queueAlert → 나와의 채팅 (점검·경고)  ※ 2026-11-26 사용자 지시로 통계방에서 분리
 function readBody(req){ return new Promise(resolve=>{ let d=''; req.on('data',c=>d+=c); req.on('end',()=>resolve(d)); req.on('error',()=>resolve('')); }); }
 async function loadQ(){ const r=await fetch(SUPA_URL+'/rest/v1/app_config?key=eq.report_queue&select=value',{headers:H}); const j=await r.json(); return (j&&j[0]&&Array.isArray(j[0].value))?j[0].value:[]; }
 async function saveQ(list){ await fetch(SUPA_URL+'/rest/v1/app_config?on_conflict=key',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates'},body:JSON.stringify({key:'report_queue',value:list})}); }
@@ -81,8 +83,12 @@ async function maybeQueueWeekly(list){
                    + '요약 자동 생성이 계속 실패하고 있습니다. 확인이 필요합니다.\n'
                    + '📋 대시보드: ' + BASE + '/report.html?type=week';
         // 경고는 특히 PC 로 보내야 한다 — '봇이 못 보냈다'는 경고를 그 봇으로 보내면 같이 묻힌다.
-        const wId = await queueStat('overhaul_weekly_warn', md + ' 주간보고 미발송 경고', warn);
-        list.push({ id: Date.now(), text: warn, sent: !!wId, day: day + '-warn', createdAt: new Date().toISOString(), src: 'poll-warn', via: wId ? 'pc' : 'bot', pcId: wId || undefined });
+        // 2026-11-26: 보내는 곳을 통계방 → 「나와의 채팅」으로 옮겼다 (통계방은 보고 전용).
+        const wId = await queueAlert('overhaul_weekly_warn', md + ' 주간보고 미발송 경고', warn);
+        // sent 를 true 로 고정한다. 이 큐(report_queue)는 봇이 통계방으로 올리는 통로라서,
+        // false 로 두면 PC 적재가 실패했을 때 봇이 이 경고를 통계방에 올려 버린다.
+        // 여기 넣는 목적은 발송이 아니라 '이미 경고했다'는 중복 방지 기록(day+'-warn')이다.
+        list.push({ id: Date.now(), text: warn, sent: true, day: day + '-warn', createdAt: new Date().toISOString(), src: 'poll-warn', via: wId ? 'pc' : 'none', pcId: wId || undefined });
         while (list.length > KEEP) list.shift();
         await saveQ(list);
       }
