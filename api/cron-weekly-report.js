@@ -8,7 +8,9 @@ const SUPA_KEY = 'sb_publishable_cLR46tr3ITMdCAR7L74ROQ_JEmErvNE';
 const H = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 const BASE = 'https://lee-zeta-one.vercel.app';
 const KEEP = 40;   // 큐 보관 건수 (미발송 추적에 쓰므로 넉넉히)
-const { queueStat } = require('./_statq.js');   // 통계방 발송은 PC 릴레이로 (2026-11-25)
+const { queueStat, queueAlert } = require('./_statq.js');   // 발송은 PC 릴레이로 (2026-11-25)
+//   queueStat  → 통계방 (보고 내용만)
+//   queueAlert → 나와의 채팅 (점검·경고)  ※ 2026-11-26 사용자 지시로 통계방에서 분리
 const { maybeQueueMidweek, midKey, targetWed } = require('./_midweek.js');   // 수요일 중간 점검도 이 크론이 만든다 (2026-11-25)
 
 function kst(){ return new Date(Date.now() + 9*3600*1000); }
@@ -60,11 +62,13 @@ module.exports = async (req, res) => {
     const force = req.query && req.query.force === '1';
 
     // 발송 통로 점검 — ?probe=1
-    //   요약을 만들지 않고 점검 문구 한 줄만 통계방으로 보낸다. 큐(report_queue)에는 넣지 않는다.
-    //   이걸로 ① 환경변수가 들어갔는지 ② PC 릴레이가 집어 통계방에 올리는지 를 한 번에 본다.
+    //   요약을 만들지 않고 점검 문구 한 줄만 「나와의 채팅」으로 보낸다. 큐(report_queue)에는 넣지 않는다.
+    //   이걸로 ① 환경변수가 들어갔는지 ② PC 릴레이가 집어 올리는지 를 한 번에 본다.
+    //   2026-11-26: 통계방에는 보고만 올리라는 지시에 따라 점검 문구는 통계방으로 보내지 않는다.
+    //   통계방 창이 살아 있는지는 릴레이의 막힘 경고가 따로 알려 준다.
     if (req.query && req.query.probe === '1') {
       const ptxt = '✅ 주간보고 자동 발송 통로 점검입니다. (시스템 점검 · 조치 불필요)';
-      const pid = await queueStat('overhaul_probe', '발송 통로 점검', ptxt);
+      const pid = await queueAlert('overhaul_probe', '발송 통로 점검', ptxt);
       res.status(200).json({
         ok: !!pid, probe: true, via: pid ? 'pc' : 'bot', pcId: pid || null,
         env: { CAR_QUEUE_URL: !!process.env.CAR_QUEUE_URL, CAR_QUEUE_KEY: !!process.env.CAR_QUEUE_KEY }
