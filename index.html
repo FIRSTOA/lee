@@ -9,6 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
+  /* 글자 짤림·한 글자 줄바꿈 방지 (2026-11-27) — 한국어는 띄어쓰기 자리에서만 넘기고,
+     시리얼처럼 긴 영문·숫자는 끊어 준다. 이게 없으면 '수리5=3대'가 '수-리5=3대'로 쪼개진다. */
+  body, body * { word-break: keep-all; overflow-wrap: break-word; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: #f5f7fa; color: #222; -webkit-text-size-adjust: 100%; }

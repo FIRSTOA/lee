@@ -13,6 +13,8 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <title>오버홀 관리 시스템</title>
 <style>
+  /* 한국어는 띄어쓰기 자리에서만 줄을 넘긴다 (2026-11-27) */
+  body, body * { word-break: keep-all; overflow-wrap: break-word; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
