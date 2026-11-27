@@ -100,8 +100,10 @@ module.exports = async (req, res) => {
   const id   = String(user.username || user.sub || '').trim();
   const name = String(user.name || id).trim();
   const dept = String(user.department || '').trim();
-  const gwRole = String(user.role || 'STAFF').toUpperCase();
-  const admin = (gwRole === 'ADMIN') || await isOverhaulAdmin(id);
+  // 오버홀 관리자는 오버홀 명부(app_config.overhaul_admins)로만 정한다.
+  //   그룹웨어의 role=ADMIN 은 '그룹웨어 시스템 관리자'라서, 그걸 그대로 오버홀 관리자로
+  //   인정하면 오버홀과 무관한 사람이 관리자 페이지에 들어간다. 권한은 좁게 잡는다.
+  const admin = await isOverhaulAdmin(id);
 
   const ticket = signToken({ sub: id, name: name, dept: dept, admin: admin }, 60 * 60 * 24 * 30);
 
