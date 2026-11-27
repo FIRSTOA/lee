@@ -21,6 +21,32 @@ const { requireAuth } = require('./_auth.js');
 const OH_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
 const OH_KEY = (process.env.OH_SUPA_KEY || '').trim();
 
+// 백오피스 재고 창구 (2026-11-27)
+//   시작 → 수리실로, 완료 → PM 대기실로, 폐기 → 재고에서 뺀다.
+//   ⚠ 여기서 실패해도 폼 작업은 막지 않는다. 못 넘긴 건 bo_error 에 적어 두고
+//      나중에 따로 모아 보여준다("저장은 됐는데 창고만 안 바뀐" 상태를 숨기지 않는다).
+const BO_URL = 'https://first-as-search.vercel.app/api/overhaul-stock';
+const BO_TOKEN = (process.env.BO_STOCK_TOKEN || '').trim();
+const ROOMS = ['1수리실', '2수리실', '3수리실'];
+const PM_ROOM = 'PM 대기실';
+
+async function boApply(payload) {
+  if (!BO_TOKEN) return { ok: false, error: '백오피스 연결 설정이 없습니다 (BO_STOCK_TOKEN)' };
+  try {
+    const r = await fetch(BO_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-overhaul-token': BO_TOKEN },
+      body: JSON.stringify(payload),
+    });
+    let j = {};
+    try { j = await r.json(); } catch (e) {}
+    if (r.ok && j && j.ok) return { ok: true, data: j };
+    return { ok: false, error: (j && j.error) ? j.error : ('백오피스 응답 ' + r.status) };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+}
+
 const COLS = 'id,asset_no,serial_no,model,incoming,in_date,reason,room,room_etc,' +
              'started_by,started_name,started_dept,started_at,' +
              'done_by,done_name,done_at,state,bo_start_ok,bo_done_ok,bo_error,memo';
@@ -107,7 +133,22 @@ module.exports = async (req, res) => {
         headers: { Prefer: 'return=representation' },
         body: JSON.stringify(row),
       });
-      res.status(200).json({ ok: true, row: (ins && ins[0]) || null });
+      const made = (ins && ins[0]) || null;
+
+      // 백오피스 창고를 그 수리실로 옮긴다 ('기타'는 백오피스에 없는 칸이라 건너뛴다)
+      let bo = { ok: false, error: null };
+      if (made && ROOMS.indexOf(room) >= 0) {
+        bo = await boApply({ serial: serial, asset: asset, warehouse: room, by: me.name || me.sub });
+        try {
+          await sb('overhaul_wip?id=eq.' + encodeURIComponent(made.id), {
+            method: 'PATCH',
+            body: JSON.stringify({ bo_start_ok: bo.ok, bo_error: bo.ok ? null : bo.error, updated_at: new Date().toISOString() }),
+          });
+        } catch (e) {}
+      } else if (made) {
+        bo = { ok: false, error: '기타 위치라 백오피스 창고는 바꾸지 않았습니다' };
+      }
+      res.status(200).json({ ok: true, row: made, bo: bo });
       return;
     }
 
@@ -130,7 +171,32 @@ module.exports = async (req, res) => {
         body: JSON.stringify(patch),
       });
       if (!up || !up.length) { res.status(404).json({ error: '작업 중인 기기가 아닙니다 (이미 끝났거나 취소됨).' }); return; }
-      res.status(200).json({ ok: true, row: up[0] });
+      const done = up[0];
+
+      // 작업이 끝났으니 백오피스 창고를 'PM 대기실'로 옮긴다
+      let bo2 = await boApply({
+        serial: done.serial_no, asset: done.asset_no,
+        warehouse: PM_ROOM, by: me.name || me.sub,
+      });
+      try {
+        await sb('overhaul_wip?id=eq.' + encodeURIComponent(id), {
+          method: 'PATCH',
+          body: JSON.stringify({ bo_done_ok: bo2.ok, bo_error: bo2.ok ? null : bo2.error, updated_at: new Date().toISOString() }),
+        });
+      } catch (e) {}
+      res.status(200).json({ ok: true, row: done, bo: bo2 });
+      return;
+    }
+
+    // ---------------------------------------------------------------- 폐기
+    //   폐기한 내용 자체는 폼(오버홀) 쪽에 그대로 쌓고,
+    //   백오피스는 재고에서 빠지게만 한다 (사용자 지시 2026-11-27).
+    if (action === 'discard') {
+      const serial = S(body.serial_no);
+      const asset  = S(body.asset_no);
+      if (!serial && !asset) { res.status(400).json({ error: '시리얼 또는 자산번호가 있어야 합니다.' }); return; }
+      const bo3 = await boApply({ serial: serial, asset: asset, discard: true, by: me.name || me.sub });
+      res.status(200).json({ ok: bo3.ok, error: bo3.ok ? undefined : bo3.error, bo: bo3 });
       return;
     }
 
