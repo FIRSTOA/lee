@@ -77,6 +77,26 @@
   .rg { background:#e53e3e;color:#fff;font-weight:700; } .ry { background:#d69e2e;color:#fff;font-weight:700; } .rgr { background:#38a169;color:#fff;font-weight:700; }
   .dash { color:#cbd5e0; }
   .wu { color:#2f855a; font-weight:700; } .wd { color:#c53030; font-weight:700; } .wf { color:#cbd5e0; }
+  /* 📦 반출 기기 (2026-11-27 추가) — 통계 화면과 같은 색을 쓴다(빨강=고장, 진회색=단순) */
+  .wd-h { font-size:14.5px; font-weight:800; color:#2d3748; margin:18px 0 2px; }
+  .wd-d { font-size:11.5px; color:#a0aec0; margin-bottom:9px; }
+  .wd-k { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:11px; }
+  .wd-k .k { border:1px solid #e2e8f0; border-left-width:4px; border-radius:10px; padding:9px 12px; background:#f8fafc; }
+  .wd-k .k.t { border-left-color:#2b6cb0; } .wd-k .k.f { border-left-color:#e53e3e; } .wd-k .k.s { border-left-color:#718096; }
+  .wd-k .k .lb { font-size:11.5px; color:#718096; }
+  .wd-k .k .vv { font-size:22px; font-weight:800; letter-spacing:-.5px; line-height:1.3; }
+  .wd-k .k.f .vv { color:#c53030; }
+  .wd-k .k .sub { font-size:11px; color:#a0aec0; }
+  .wd-lg { display:flex; gap:13px; font-size:11.5px; color:#4a5568; margin-bottom:7px; }
+  .wd-lg span { display:flex; align-items:center; gap:5px; }
+  .wd-lg i { width:8px; height:8px; border-radius:2px; display:inline-block; }
+  .wd-bars { display:flex; height:14px; border-radius:3px; overflow:hidden; background:#edf2f7; }
+  .wd-bars i { display:block; height:100%; margin-right:1.5px; }
+  .wd-bars i:last-child { margin-right:0; }
+  .wd-f { background:#e53e3e; } .wd-s { background:#4a5568; } .wd-n { background:#cbd5e0; }
+  .wd-rate.hi { color:#c53030; font-weight:800; } .wd-rate.lo { color:#2f855a; font-weight:800; } .wd-rate.mid { color:#4a5568; font-weight:700; }
+  .wd-note { border-left:4px solid #e53e3e; background:#fff5f5; border-radius:0 8px 8px 0;
+             padding:9px 13px; font-size:12px; color:#9b2c2c; line-height:1.65; margin-top:10px; }
   .foot { padding:10px 18px; background:#f7fafc; color:#a0aec0; font-size:11px; text-align:right; border-top:1px solid #edf2f7; }
   .loading { padding:60px; text-align:center; color:#718096; }
 </style>
@@ -215,6 +235,12 @@ function processRows(allRows){
 }
 
 async function fetchAll(){
+  // 반출 집계는 백오피스까지 다녀와서 느릴 수 있다. 보고가 늦으면 안 되므로
+  //   12초 안에 안 오면 포기하고 그 칸만 빼고 보고를 만든다 (2026-11-27).
+  const wdPromise = Promise.race([
+    fetch('/api/withdrawal-stats').then(r=>r.ok?r.json():null).catch(()=>null),
+    new Promise(rs=>setTimeout(()=>rs(null), 12000))
+  ]);
   const [dashResp, qcRows, hrRows, resignRows] = await Promise.all([
     // 캐시 서버 함수 우선(빠름), 실패 시 Apps Script 직접
     fetch('/api/data').then(r=>r.ok?r.json():Promise.reject()).catch(()=>fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'dashboardData'}),redirect:'follow'}).then(r=>r.json())),
@@ -227,7 +253,87 @@ async function fetchAll(){
   if(!quotaConfig.persons) quotaConfig.persons={}; if(!quotaConfig.excluded) quotaConfig.excluded=[];
   const hrRoster = hrRows.map(r=>({name:r.name, dept:hrPartOf(r.department, r.region)})).filter(p=>p.dept);
   const resigned = new Set(resignRows.map(x=>x.name));
-  return { rows, quotaConfig, hrRoster, resigned };
+  const withdrawal = await wdPromise;
+  return { rows, quotaConfig, hrRoster, resigned, withdrawal };
+}
+
+// ===== 📦 반출 기기 — 임대처에서 빠져 들어온 기기 (2026-11-27 추가) =====
+//   고장으로 빠진 비율이 높은 지역은 오버홀로 들어올 물량이 그만큼 많다는 뜻이다.
+//   집계 기준: 고장 = 반출 사유에 '기기고장'이 들어간 건 · 사유를 안 적은 건은 따로 센다.
+function withdrawalBlock(wd){
+  if(!wd || !wd.ok || !Array.isArray(wd.rows) || !wd.rows.length) return '';
+  const rows = wd.rows;
+  const F = rows.filter(r=>r.fault && !r.noReason).length;
+  const N = rows.filter(r=>r.noReason).length;
+  const S = rows.length - F - N;
+  const BASE = F + S;
+
+  // 지역별로 센다
+  const map = {};
+  rows.forEach(r=>{
+    const k = r.region || '미지정';
+    if(!map[k]) map[k] = { name:k, f:0, s:0, n:0, t:0 };
+    const g = map[k];
+    if(r.noReason) g.n++; else if(r.fault) g.f++; else g.s++;
+    g.t++;
+  });
+  const list = Object.keys(map).map(k=>map[k]).sort((a,b)=>{
+    if(a.name==='미지정') return 1;
+    if(b.name==='미지정') return -1;
+    return a.name < b.name ? -1 : 1;
+  });
+
+  function rate(g){ const b=g.f+g.s; return b ? g.f/b : null; }
+  function rateCell(g){
+    const r = rate(g);
+    if(r===null) return '<td class="dash">—</td>';
+    const cls = r>=0.35 ? 'hi' : (r<=0.2 ? 'lo' : 'mid');
+    const few = (g.f+g.s)<5 ? ' <small style="color:#a0aec0;font-weight:400">'+(g.f+g.s)+'건</small>' : '';
+    return '<td class="wd-rate '+cls+'">'+Math.round(r*100)+'%'+few+'</td>';
+  }
+  function bars(g){
+    function one(c,n){ return n ? '<i class="'+c+'" style="flex:'+n+'"></i>' : ''; }
+    return '<div class="wd-bars">'+one('wd-f',g.f)+one('wd-s',g.s)+one('wd-n',g.n)+'</div>';
+  }
+
+  let h = '<div class="wd-h">📦 반출 기기</div>'
+    + '<div class="wd-d">임대처에서 빠진 기기 · 「반출기기 기번 보고」 자료 '
+    + '(강원도는 수도권E, 강남은 수도권C로 합쳤습니다)</div>';
+
+  h += '<div class="wd-k">'
+    + '<div class="k t"><div class="lb">전체 반출</div><div class="vv">'+rows.length+'건</div>'
+    + '<div class="sub">전체 기간</div></div>'
+    + '<div class="k f"><div class="lb">고장 반출</div><div class="vv">'+F+'건</div>'
+    + '<div class="sub">'+(BASE?('사유가 적힌 '+BASE+'건 중 <b>'+Math.round(F/BASE*100)+'%</b>'):'—')+'</div></div>'
+    + '<div class="k s"><div class="lb">단순 반출</div><div class="vv">'+S+'건</div>'
+    + '<div class="sub">계약종료 · 재계약 · 기기상향 등'+(N?(' (사유 미기재 '+N+'건 별도)'):'')+'</div></div>'
+    + '</div>';
+
+  h += '<div class="wd-lg"><span><i class="wd-f"></i>고장 반출</span>'
+    + '<span><i class="wd-s"></i>단순 반출</span><span><i class="wd-n"></i>사유 미기재</span></div>';
+
+  h += '<table><thead><tr><th class="name">지역</th><th style="width:30%">구성</th>'
+    + '<th>고장</th><th>단순</th><th>미기재</th><th>합계</th><th>고장률</th></tr></thead><tbody>';
+  list.forEach(g=>{
+    h += '<tr><td class="name">'+g.name+'</td>'
+       + '<td>'+bars(g)+'</td>'
+       + '<td'+(g.f?'':' class="dash"')+'>'+g.f+'</td>'
+       + '<td'+(g.s?'':' class="dash"')+'>'+g.s+'</td>'
+       + '<td class="dash">'+g.n+'</td>'
+       + '<td><b>'+g.t+'</b></td>'
+       + rateCell(g) + '</tr>';
+  });
+  h += '</tbody></table>';
+
+  // 고장률이 가장 높은 지역을 한 줄로 짚어 준다 (사유가 적힌 건이 5건 이상인 곳만)
+  const cand = list.filter(g=>g.name!=='미지정' && (g.f+g.s)>=5).sort((a,b)=>rate(b)-rate(a));
+  if(cand.length>=2 && rate(cand[0])>rate(cand[cand.length-1])){
+    const hi=cand[0], lo=cand[cand.length-1];
+    h += '<div class="wd-note"><b>'+hi.name+'</b>가 '+(hi.f+hi.s)+'건 중 '+hi.f+'건('+Math.round(rate(hi)*100)+'%)으로 고장 반출 비율이 가장 높습니다. '
+       + '가장 낮은 <b>'+lo.name+'</b>는 '+(lo.f+lo.s)+'건 중 '+lo.f+'건('+Math.round(rate(lo)*100)+'%)입니다. '
+       + '고장으로 빠진 기기는 오버홀·수리로 들어오므로, 그 지역 물량을 미리 잡아 둘 수 있습니다.</div>';
+  }
+  return h;
 }
 
 function build(data){
@@ -448,6 +554,7 @@ function build(data){
     h+='<tr><td class="name">'+u.person+'</td><td>'+q+'</td>'+cells+wowCell+'<td>'+target+'</td><td><b>'+tot+'</b></td>'+avgCell+rpCell+rate+'</tr>';
   });
   h+='</tbody></table>';
+  h+=withdrawalBlock(data.withdrawal);     // 📦 반출 기기 (2026-11-27 추가)
   h+='</div><div class="foot">2026-11-06부터 포인트를 없애고 <b>대수</b>로만 집계합니다. 오버홀1·2·3=1대 · 오버홀4=2대 · 오버홀5=3대 · 기기폐기=1대 · 수리2·3=1대 · 수리4=2대 · 수리5=3대 (수리1·부품제조·부품정리=0).<br>한 대에 오버홀과 수리를 같이 했으면 둘 다 더합니다. \'평균\'은 오버홀 평균 등급(1~5)으로, 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.<br>오버홀 통계 대시보드 · 자동 생성</div>';
   document.getElementById('report').innerHTML=h;
   document.title = (isQuarter?'분기보고 ':'주간보고 ')+periodSub;
