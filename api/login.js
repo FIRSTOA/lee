@@ -16,6 +16,23 @@
 const { signToken } = require('./_auth.js');
 
 const SSO_LOGIN = 'https://firstoa-works.vercel.app/api/auth/login';
+const OH_URL = 'https://ilppbxhigxnelbnuxwyt.supabase.co';
+const OH_KEY = (process.env.OH_SUPA_KEY || '').trim();
+
+// 관리자 명부 — 기존 폼이 쓰던 app_config.overhaul_admins 를 그대로 본다.
+//   (아이디 배열. 예: ['an.sb','240401'])  새로 만들지 않는다.
+async function isAdmin(id) {
+  if (!OH_KEY) return false;
+  try {
+    const r = await fetch(OH_URL + '/rest/v1/app_config?key=eq.overhaul_admins&select=value', {
+      headers: { apikey: OH_KEY, Authorization: 'Bearer ' + OH_KEY },
+    });
+    if (!r.ok) return false;
+    const j = await r.json();
+    const list = (j && j[0] && j[0].value) || [];
+    return Array.isArray(list) && list.indexOf(id) >= 0;
+  } catch (e) { return false; }
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -58,11 +75,11 @@ module.exports = async (req, res) => {
     const name = String(u.name || u.username || id).trim();
     const dept = String(u.dept || u.department || u.team || '').trim();
 
-    // 관리자 판단 — 기존 폼의 관리자 명부(app_config.overhaul_admins)는 그대로 두고,
-    // 여기서는 아이디만 넘긴다. 화면이 기존 방식으로 관리자 여부를 판단한다.
-    const token = signToken({ sub: id, name: name, dept: dept }, 60 * 60 * 24 * 30);
+    // 관리자 여부는 서버에서 판단해 출입증에 넣는다 (화면에서 고치지 못하게).
+    const admin = await isAdmin(id);
+    const token = signToken({ sub: id, name: name, dept: dept, admin: admin }, 60 * 60 * 24 * 30);
 
-    res.status(200).json({ ok: true, token: token, id: id, name: name, dept: dept });
+    res.status(200).json({ ok: true, token: token, id: id, name: name, dept: dept, admin: admin });
   } catch (e) {
     res.status(502).json({ error: '로그인 확인 중 오류: ' + String(e && e.message ? e.message : e) });
   }

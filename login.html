@@ -43,10 +43,13 @@
 <div class="card">
   <div class="logo">
     <h1>오버홀 시스템</h1>
-    <p>로그인 후 사용하세요</p>
+    <p>그룹웨어 아이디로 들어오세요</p>
   </div>
 
-  <div class="tabs">
+  <!-- 2026-11-27 — 그룹웨어(인사DB) 계정으로 로그인하도록 바꿨다.
+       따로 가입할 필요가 없어 '회원가입' 탭은 감춘다. 코드는 남겨 둔다
+       (예전 계정으로만 들어오던 사람이 있을 수 있어, 로그인도 예전 방식을 뒤에 남겼다). -->
+  <div class="tabs" style="display:none">
     <div class="tab active" data-tab="login">로그인</div>
     <div class="tab" data-tab="signup">회원가입</div>
   </div>
@@ -54,15 +57,22 @@
   <div id="msg-area"></div>
 
   <div class="panel active" id="panel-login">
+    <div class="info-box">
+      그룹웨어에서 쓰시는 <b>아이디와 비밀번호</b> 그대로 들어오시면 됩니다.<br>
+      따로 가입하실 필요 없습니다.
+    </div>
     <div class="field">
-      <label>이메일 / 아이디 <span class="req">*</span></label>
-      <input type="text" id="login-email" placeholder="아이디 또는 이메일" autocomplete="username">
+      <label>아이디 <span class="req">*</span></label>
+      <input type="text" id="login-email" placeholder="그룹웨어 아이디 (예: hong.gd)" autocomplete="username">
     </div>
     <div class="field">
       <label>비밀번호 <span class="req">*</span></label>
-      <input type="password" id="login-password" placeholder="비밀번호" autocomplete="current-password">
+      <input type="password" id="login-password" placeholder="그룹웨어 비밀번호" autocomplete="current-password">
     </div>
     <button class="btn btn-primary" id="login-btn">로그인</button>
+    <div style="font-size:11.5px;color:#a0aec0;text-align:center;margin-top:12px;line-height:1.7">
+      비밀번호를 잊으셨으면 경영지원팀에 문의하세요
+    </div>
   </div>
 
   <div class="panel" id="panel-signup">
@@ -179,23 +189,60 @@ function loadSession() {
 }
 function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
+// 2026-11-27 — 그룹웨어 아이디로 로그인한다.
+//   ① 먼저 /api/login (그룹웨어 인사DB 계정 확인)
+//   ② 안 되면 예전 방식(Apps Script 자체 명부)으로 한 번 더 — 예전 계정만 가진 사람 보호
+//   세션 모양({token, expiresAt, user})은 예전 그대로 두어서
+//   form.html · admin.html 의 기존 코드가 안 깨지게 했다.
+async function loginGroupware(id, password) {
+  const r = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id, password: password }),
+  });
+  let j = {};
+  try { j = await r.json(); } catch (e) {}
+  if (!r.ok || !j.ok) return { ok: false, error: (j && j.error) || '로그인 실패' };
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  return {
+    ok: true,
+    token: j.token,
+    expiresAt: expiresAt,
+    user: {
+      id: j.id,
+      name: j.name || j.id,
+      email: j.id,                       // 예전 화면이 email 을 쓰므로 아이디를 넣는다
+      dept: j.dept || '',
+      role: j.admin ? 'admin' : 'user',  // 관리자 판단은 서버가 한다
+    },
+  };
+}
+
 document.getElementById('login-btn').onclick = async () => {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
-  if (!email || !password) { showMsg('이메일과 비밀번호를 입력하세요'); return; }
+  if (!email || !password) { showMsg('아이디와 비밀번호를 입력하세요'); return; }
   const btn = document.getElementById('login-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>로그인 중...';
   try {
+    // ① 그룹웨어 계정
+    let g = { ok: false };
+    try { g = await loginGroupware(email, password); } catch (e) { g = { ok: false, error: e.message }; }
+    if (g.ok) {
+      saveSession(g.token, g.expiresAt, g.user);
+      window.location.href = destinationFor(g.user.role);
+      return;
+    }
+    // ② 예전 방식 (자체 명부) — 여기서도 안 되면 ①의 안내를 보여준다
     const r = await apiCall('login', { email, password });
     if (r.ok) {
       saveSession(r.token, r.expiresAt, r.user);
       window.location.href = destinationFor(r.user.role);
       return;
-    } else {
-      if (r.locked) switchTab('locked');
-      else if (r.pending) switchTab('pending');
-      else showMsg(r.error || '로그인 실패');
     }
+    if (r.locked) switchTab('locked');
+    else if (r.pending) switchTab('pending');
+    else showMsg(g.error || r.error || '아이디 또는 비밀번호가 맞지 않습니다');
   } catch (e) {
     showMsg('네트워크 오류: ' + e.message);
   } finally {
@@ -235,6 +282,13 @@ document.getElementById('signup-btn').onclick = async () => {
 (async function init() {
   const sess = loadSession();
   if (!sess) return;
+  // 2026-11-27 — 그룹웨어로 받은 출입증은 우리 서버가 서명한 것이라,
+  //   예전 Apps Script 의 validateToken 으로 검사하면 '모르는 토큰'이라 지워진다.
+  //   (= 로그인하자마자 풀려 버린다) 그래서 user.id 가 있으면 그냥 통과시킨다.
+  if (sess.user && sess.user.id) {
+    window.location.href = destinationFor(sess.user.role);
+    return;
+  }
   try {
     const r = await apiCall('validateToken', { token: sess.token });
     if (r.ok && r.user) {
