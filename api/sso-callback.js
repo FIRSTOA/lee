@@ -122,7 +122,11 @@ module.exports = async (req, res) => {
     },
   };
 
-  const next = safeNext(cookies[NEXT_COOKIE]);
+  let next = safeNext(cookies[NEXT_COOKIE]);
+  // 로그인을 거쳐 입력폼으로 들어올 때도 평소(PWA 아이콘으로 열 때)와 똑같이
+  //   로딩 화면을 보여 준다 (사용자 지시 2026-11-27).
+  //   관리자·대시보드는 원래 로딩 화면이 없으므로 그대로 간다.
+  if (next === '/form.html') next = '/splash.html?next=form.html';
   // </script> 가 글 안에 섞여 화면이 깨지지 않게 < 를 막아 둔다
   const js = JSON.stringify(session).replace(/</g, '\\u003c');
 

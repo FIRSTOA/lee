@@ -157,7 +157,9 @@ const SESSION_KEY = 'overhaul_session';
 function destinationFor(role) {
   if (role === 'admin') return 'admin.html';
   if (role === 'viewer') return 'dashboard.html';
-  return 'form.html'; // user 또는 미지정 → 공용 폼
+  // user 또는 미지정 → 공용 폼.
+  //   폼으로 들어갈 때는 평소(PWA 아이콘으로 열 때)와 똑같이 로딩 화면을 거친다.
+  return 'splash.html?next=form.html';
 }
 
 function showMsg(text, type = 'error') {

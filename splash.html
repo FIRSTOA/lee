@@ -96,6 +96,13 @@
 
 <script>
 var NEXT = 'form.html';
+// 로그인을 거쳐 들어올 때도 이 로딩 화면을 그대로 보여 준다 (사용자 지시 2026-11-27).
+//   그때는 ?next=form.html 처럼 갈 곳을 붙여서 부른다.
+//   바깥 주소로 튕겨 보내지 못하게, 같은 폴더의 .html 파일 이름만 받는다.
+try {
+  var _n = (new URLSearchParams(location.search).get('next') || '').replace(/^\/+/, '');
+  if (/^[A-Za-z0-9_-]+\.html$/.test(_n)) NEXT = _n;
+} catch (e) {}
 var HOLD = 2600;      // 로딩 화면 노출 시간 (ms)
 var moved = false;
 

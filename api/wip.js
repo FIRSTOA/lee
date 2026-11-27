@@ -47,7 +47,7 @@ async function boApply(payload) {
   }
 }
 
-const COLS = 'id,asset_no,serial_no,model,incoming,in_date,reason,room,room_etc,' +
+const COLS = 'id,asset_no,serial_no,model,incoming,in_date,reason,room,room_etc,prev_warehouse,' +
              'started_by,started_name,started_dept,started_at,' +
              'done_by,done_name,done_at,state,bo_start_ok,bo_done_ok,bo_error,memo';
 
@@ -139,11 +139,15 @@ module.exports = async (req, res) => {
       let bo = { ok: false, error: null };
       if (made && ROOMS.indexOf(room) >= 0) {
         bo = await boApply({ serial: serial, asset: asset, warehouse: room, by: me.name || me.sub });
+        // 백오피스가 '원래 어느 창고에 있었는지(from)'를 돌려준다. 그만둘 때 그 창고로 되돌린다.
+        const prev = (bo.ok && bo.data && bo.data.from) ? String(bo.data.from) : null;
         try {
           await sb('overhaul_wip?id=eq.' + encodeURIComponent(made.id), {
             method: 'PATCH',
-            body: JSON.stringify({ bo_start_ok: bo.ok, bo_error: bo.ok ? null : bo.error, updated_at: new Date().toISOString() }),
+            body: JSON.stringify({ bo_start_ok: bo.ok, bo_error: bo.ok ? null : bo.error,
+                                   prev_warehouse: prev, updated_at: new Date().toISOString() }),
           });
+          if (made) made.prev_warehouse = prev;
         } catch (e) {}
       } else if (made) {
         bo = { ok: false, error: '기타 위치라 백오피스 창고는 바꾸지 않았습니다' };
@@ -204,13 +208,35 @@ module.exports = async (req, res) => {
     if (action === 'cancel') {
       const id = S(body.id);
       if (!id) { res.status(400).json({ error: '어느 기기인지 알 수 없습니다 (id).' }); return; }
-      const up = await sb('overhaul_wip?id=eq.' + encodeURIComponent(id) + '&state=eq.ing&select=id,started_by', {
+      const patchC = { state: 'cancel', updated_at: new Date().toISOString() };
+      if (S(body.memo)) patchC.memo = S(body.memo);   // 적은 게 없으면 시작할 때 쓴 메모를 지우지 않는다
+      const up = await sb('overhaul_wip?id=eq.' + encodeURIComponent(id) + '&state=eq.ing&select=' + COLS, {
         method: 'PATCH',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ state: 'cancel', updated_at: new Date().toISOString(), memo: S(body.memo) }),
+        body: JSON.stringify(patchC),
       });
       if (!up || !up.length) { res.status(404).json({ error: '작업 중인 기기가 아닙니다.' }); return; }
-      res.status(200).json({ ok: true });
+      const row = up[0];
+
+      // 시작할 때 수리실로 옮겨 놨으면 원래 창고로 되돌린다 (사용자 지시 2026-11-27).
+      //   되돌릴 창고를 모르면(옛 기록 등) 그대로 두고, 화면이 그 사실을 알리게 한다.
+      const back = S(row.prev_warehouse);
+      let bo4;
+      if (!row.bo_start_ok) {
+        bo4 = { ok: true, error: null, skipped: true };        // 애초에 안 옮겼으면 되돌릴 것도 없다
+      } else if (!back) {
+        bo4 = { ok: false, error: '시작 전 창고를 몰라 되돌리지 못했습니다' };
+      } else {
+        bo4 = await boApply({ serial: row.serial_no, asset: row.asset_no, warehouse: back, by: me.name || me.sub });
+      }
+      if (!bo4.ok) {
+        try {
+          await sb('overhaul_wip?id=eq.' + encodeURIComponent(id), {
+            method: 'PATCH', body: JSON.stringify({ bo_error: bo4.error, updated_at: new Date().toISOString() }),
+          });
+        } catch (e) {}
+      }
+      res.status(200).json({ ok: true, back: back || null, room: row.room || null, bo: bo4 });
       return;
     }
 
