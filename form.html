@@ -1828,6 +1828,18 @@ function loadSaveConfig() {
   return { ...DEFAULT_SAVE_CONFIG };
 }
 function saveSaveConfig(c) { localStorage.setItem(SAVE_CONFIG_KEY, JSON.stringify(c)); }
+
+// 저장할 탭은 '입력한 날짜의 해'로 정한다 (사용자 결정 2026-11-27).
+//   예) 2027-01-03 에 적으면 '리스트(27년)' 으로 들어간다.
+//   연말에 12월 31일자를 1월에 늦게 적어도 날짜를 보고 26년 탭으로 들어간다.
+//   ※ 설정에 '리스트(○○년)' 꼴이 아닌 이름을 직접 넣어 두었으면 그 이름을 그대로 쓴다.
+function mainTabFor(dateStr, configured) {
+  const cur = String(configured || '');
+  if (!/^리스트\(\d{2}년\)$/.test(cur)) return cur;
+  const m = /^(\d{4})/.exec(String(dateStr || ''));
+  const yy = m ? m[1].slice(2) : String(new Date().getFullYear()).slice(2);
+  return '리스트(' + yy + '년)';
+}
 function extractSheetId(input) {
   if (!input) return '';
   input = input.trim();
@@ -2954,7 +2966,9 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
     // payload에 저장 경로 설정도 함께 포함 (Apps Script가 동적으로 사용 가능)
     payload._config = {
       mainSheet: saveConfig.mainSheet,
-      mainTab: saveConfig.mainTab,
+      // 해가 바뀌면 그 해 탭으로 (2026-11-27).
+      //   고치는 중이면 '원래 적혀 있던 날짜'의 탭을 가리킨다 — 그 행이 그 탭에 있기 때문이다.
+      mainTab: mainTabFor(editingRow ? ((editingOriginal && editingOriginal.date) || d.date) : d.date, saveConfig.mainTab),
       stockSheet: saveConfig.stockSheet,
       stockTab: saveConfig.stockTab
     };
