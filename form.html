@@ -3048,6 +3048,9 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
       updateTimeDisplay();
       document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
       Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
+      // 2026-11-27 — 바로 위에서 부서 칩까지 지워진다. 담당자 이름도 함께 지워지므로
+      //   로그인 정보로 다시 채워 둔다. 안 그러면 두 번째 기기부터 담당자·부서가 빈 채로 저장된다.
+      if (window.wipAutoFill) { try { window.wipAutoFill(); } catch (e) {} }
       // 저장 완료 → 리스트 화면으로 되돌아가서 출력 버튼 열어주기
       if (window.ckReturnAfterSave) {
         window.ckReturnAfterSave = false;
@@ -3084,6 +3087,8 @@ document.getElementById('btn-reset').onclick = () => {
   document.querySelectorAll('.chip.selected').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.error, .error-border').forEach(el => el.classList.remove('error', 'error-border'));
   Object.keys(photoData).forEach(function(s){ photoData[s] = null; resetPhotoSlot(s); });
+  // 여기서도 부서 칩이 지워지므로 로그인 정보로 다시 채운다 (2026-11-27)
+  if (window.wipAutoFill) { try { window.wipAutoFill(); } catch (e) {} }
   var ep = document.getElementById('edit-photos'); if (ep) ep.style.display = 'none';
 };
 </script>
@@ -5358,6 +5363,7 @@ if ('serviceWorker' in navigator) {
     var row = null;
     for (var i = 0; i < W.rows.length; i++) { if (W.rows[i].id === id) { row = W.rows[i]; break; } }
     if (!row) return;
+    clearDoneFields();            // 앞서 보던 기기의 작업 내용이 남아 섞이지 않게 먼저 비운다
     W.doneId = id; W.doneRow = row;
 
     function set(elid, v) { var e = el(elid); if (e && v) { e.value = v; } }
@@ -5399,6 +5405,7 @@ if ('serviceWorker' in navigator) {
   function exitDone() {
     W.doneId = null; W.doneRow = null;
     var n = el('wip-doing'); if (n) n.remove();
+    clearDoneFields();
     syncBtn();
   }
 
@@ -5492,6 +5499,27 @@ if ('serviceWorker' in navigator) {
 
   // 수정 모드를 켜고 끌 때 폼이 불러준다 (숨긴 칸을 다시 보여 주려고)
   window.wipStep = function () { try { applyStep(); } catch (e) {} };
+
+  // 저장이 끝나면 폼이 불러준다.
+  //   저장 뒤 초기화가 '.chip.selected' 를 전부 지우는데 거기에 부서 칩도 들어 있다.
+  //   담당자 이름도 함께 지워지므로, 다시 채워 두지 않으면 두 번째 기기부터
+  //   담당자·부서가 빈 채로 저장된다 (화면에는 부서가 적혀 있어 더 위험하다).
+  window.wipAutoFill = function () { try { autoFillMe(0); } catch (e) {} };
+
+  // 완료 화면을 벗어날 때 '완료할 때 적는 칸'을 비운다.
+  //   안 비우면 다음 기기를 완료 등록할 때 앞 기기의 작업 항목·증상·사진이 섞여 들어간다.
+  function clearDoneFields() {
+    document.querySelectorAll('.chip[data-overhaul].selected, .chip[data-repair].selected')
+      .forEach(function (c) { c.classList.remove('selected'); });
+    ['f-part', 'f-time', 'ck-work', 'ck-etc'].forEach(function (id) { var e = el(id); if (e) e.value = ''; });
+    document.querySelectorAll('#ck-symptom-cat .sc.on').forEach(function (c) { c.classList.remove('on'); });
+    try {
+      if (typeof photoData !== 'undefined' && typeof resetPhotoSlot === 'function') {
+        Object.keys(photoData).forEach(function (s) { photoData[s] = null; resetPhotoSlot(s); });
+      }
+    } catch (e) {}
+    try { if (typeof updateTimeDisplay === 'function') updateTimeDisplay(); } catch (e) {}
+  }
 
   // ---------------------------------------------- 지난 작업 이력 (조회 화면의 '작업 이력' 탭)
   //   누가 시작하고 누가 끝냈는지, 그만둔 건 어디로 되돌렸는지를 본다.
