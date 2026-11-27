@@ -103,6 +103,17 @@ try {
   var _n = (new URLSearchParams(location.search).get('next') || '').replace(/^\/+/, '');
   if (/^[A-Za-z0-9_-]+\.html$/.test(_n)) NEXT = _n;
 } catch (e) {}
+// 입력폼은 로그인해야 쓸 수 있다. 로그인 전이라면 로딩 화면을 보여 줄 것 없이 바로 로그인 화면으로.
+//   (통계·관리 화면으로 가는 길이면 그대로 둔다)
+if (NEXT === 'form.html') {
+  try {
+    var _s = localStorage.getItem('overhaul_session');
+    var _o = _s ? JSON.parse(_s) : null;
+    var _live = _o && _o.token && (!_o.expiresAt || new Date(_o.expiresAt).getTime() > Date.now());
+    if (!_live) location.replace('/login.html');
+  } catch (e) {}
+}
+
 var HOLD = 2600;      // 로딩 화면 노출 시간 (ms)
 var moved = false;
 

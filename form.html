@@ -12,6 +12,19 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <title>오버홀/수리 입력</title>
+<script>
+// 로그인 필수 (사용자 지시 2026-11-27)
+//   화면을 그리기 전에 검사한다 — 로그인하지 않은 사람에게 폼이 잠깐이라도 보이면 안 된다.
+//   출입증은 브라우저에 30일 남으므로, 한 번 로그인하면 현장에서 인터넷이 끊겨도 쓸 수 있다.
+(function () {
+  try {
+    var s = localStorage.getItem('overhaul_session');
+    var o = s ? JSON.parse(s) : null;
+    var live = o && o.token && (!o.expiresAt || new Date(o.expiresAt).getTime() > Date.now());
+    if (!live) location.replace('/login.html');
+  } catch (e) { location.replace('/login.html'); }
+})();
+</script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 글자 짤림·겹침·한 글자 줄바꿈 방지 (전역)
@@ -1382,6 +1395,8 @@
     <div class="lk-tabs">
       <button type="button" id="lk-tab-list" class="lk-tab on">📋 리스트 재출력</button>
       <button type="button" id="lk-tab-manual" class="lk-tab">🔧 증상·처리내용</button>
+      <!-- 2026-11-27 — 로그인했을 때만 보인다 (작업 이력은 로그인 기록이 있어야 뜻이 있다) -->
+      <button type="button" id="lk-tab-wip" class="lk-tab" style="display:none">🕒 작업 이력</button>
     </div>
     <button type="button" id="lk-close" class="lk-x">✕ 닫기</button>
   </div>
@@ -1391,6 +1406,11 @@
       <div class="lk-kinds" id="lk-kinds"></div>
       <div class="lk-cnt" id="lk-cnt"></div>
       <div id="lk-results-list" class="lk-results"></div>
+    </div>
+    <div id="lk-panel-wip" style="display:none">
+      <input type="text" id="lk-q3" class="lk-search" placeholder="🔍 모델 · 자산번호 · 시리얼 · 담당자 · 수리실 검색" autocomplete="off">
+      <div class="lk-cnt" id="lk-wip-cnt"></div>
+      <div id="lk-wip-list"></div>
     </div>
     <div id="lk-panel-manual" style="display:none">
       <input type="text" id="lk-q2" class="lk-search" placeholder="🔍 증상 · 처리내용 · 모델 검색 (예: 정착, 화상, SC541)" autocomplete="off">
@@ -3788,11 +3808,17 @@ function openRbSheet(rec){
     document.getElementById('lk-tab-manual').classList.toggle('on',which==='manual');
     document.getElementById('lk-panel-list').style.display=which==='list'?'block':'none';
     document.getElementById('lk-panel-manual').style.display=which==='manual'?'block':'none';
+    // 2026-11-27 — 작업 이력 탭 (로그인했을 때만 켜진다)
+    var wt=document.getElementById('lk-tab-wip'), wp=document.getElementById('lk-panel-wip');
+    if(wt) wt.classList.toggle('on',which==='wip');
+    if(wp) wp.style.display=which==='wip'?'block':'none';
+    if(which==='wip' && window.wipHistory){ try{ window.wipHistory(); }catch(e){} }
   }
   var bl=document.getElementById('btn-lookup'); if(bl) bl.onclick=openLk;
   var lc=document.getElementById('lk-close'); if(lc) lc.onclick=closeLk;
   document.getElementById('lk-tab-list').onclick=function(){ showTab('list'); };
   document.getElementById('lk-tab-manual').onclick=function(){ showTab('manual'); };
+  var lw=document.getElementById('lk-tab-wip'); if(lw) lw.onclick=function(){ showTab('wip'); };
   document.getElementById('lk-q1').addEventListener('input', renderList);
   document.getElementById('lk-q2').addEventListener('input', renderManual);
   document.querySelectorAll('#lk-catfilter .lc').forEach(function(c){ c.onclick=function(){ c.classList.toggle('on'); renderManual(); }; });
@@ -5451,6 +5477,59 @@ if ('serviceWorker' in navigator) {
   // 수정 모드를 켜고 끌 때 폼이 불러준다 (숨긴 칸을 다시 보여 주려고)
   window.wipStep = function () { try { applyStep(); } catch (e) {} };
 
+  // ---------------------------------------------- 지난 작업 이력 (조회 화면의 '작업 이력' 탭)
+  //   누가 시작하고 누가 끝냈는지, 그만둔 건 어디로 되돌렸는지를 본다.
+  //   실적 점수는 완료한 사람 것이지만, 시작한 사람도 여기 남는다.
+  var HIST = { rows: null, loading: false };
+
+  function when(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso), p = function (n) { return (n < 10 ? '0' : '') + n; };
+      return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    } catch (e) { return ''; }
+  }
+
+  function histRender() {
+    var box = el('lk-wip-list'), cnt = el('lk-wip-cnt');
+    if (!box) return;
+    if (HIST.loading) { box.innerHTML = '<div class="lk-empty">불러오는 중…</div>'; if (cnt) cnt.textContent = ''; return; }
+    if (!HIST.rows) { box.innerHTML = '<div class="lk-empty">작업 이력을 불러오지 못했습니다</div>'; if (cnt) cnt.textContent = ''; return; }
+    var q = (el('lk-q3') ? String(el('lk-q3').value || '') : '').trim().toLowerCase();
+    var list = HIST.rows.filter(function (r) {
+      if (!q) return true;
+      return [r.model, r.asset_no, r.serial_no, r.started_name, r.done_name, r.room, r.incoming]
+        .join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    if (cnt) cnt.textContent = list.length + '건' + (q ? ' (전체 ' + HIST.rows.length + '건 중)' : '');
+    if (!list.length) { box.innerHTML = '<div class="lk-empty">찾는 작업이 없습니다</div>'; return; }
+    box.innerHTML = list.map(function (r) {
+      var st = r.state === 'done'   ? { t: '완료',    c: '#166534', bg: '#dcfce7' }
+             : r.state === 'cancel' ? { t: '그만둠',  c: '#9a3412', bg: '#fff7ed' }
+             :                        { t: '작업 중', c: '#92400e', bg: '#fef3c7' };
+      var m = '시작 ' + esc(r.started_name || '') + ' · ' + when(r.started_at);
+      if (r.state === 'done') m += '<br>완료 ' + esc(r.done_name || '') + ' · ' + when(r.done_at);
+      if (r.state === 'cancel') m += '<br>' + (r.prev_warehouse ? esc(r.prev_warehouse) + '로 되돌림' : '되돌릴 창고를 몰라 그대로 둠');
+      if (r.bo_error) m += '<br><span style="color:#b91c1c">백오피스 ' + esc(r.bo_error) + '</span>';
+      return '<div class="lk-kb">'
+        + '<div class="s"><span class="tag" style="background:' + st.bg + ';color:' + st.c + '">' + st.t + '</span>'
+        + esc(r.model || '(모델 미기재)') + '</div>'
+        + '<div class="a">' + esc(r.asset_no || '-') + (r.serial_no ? ' · ' + esc(r.serial_no) : '')
+        + (r.room ? ' · ' + esc(r.room) : '') + '</div>'
+        + '<div class="m">' + m + '</div></div>';
+    }).join('');
+  }
+
+  window.wipHistory = function () {
+    if (HIST.loading) return;
+    HIST.loading = true; histRender();
+    api('/api/wip?scope=history').then(function (r) {
+      HIST.loading = false;
+      HIST.rows = (r.ok && r.data && r.data.rows) ? r.data.rows : null;
+      histRender();
+    }).catch(function () { HIST.loading = false; HIST.rows = null; histRender(); });
+  };
+
   // 위치 칩 — 입고 사유 칩과 같은 방식
   window.wipRoomPick = function (node) {
     document.querySelectorAll('#wip-room-chips .sc').forEach(function (c) { c.classList.remove('on'); });
@@ -5492,6 +5571,11 @@ if ('serviceWorker' in navigator) {
 
   var roomField = el('wip-room-field');
   if (roomField) roomField.style.display = '';
+
+  var histTab = el('lk-tab-wip');
+  if (histTab) histTab.style.display = '';          // 조회 화면의 '작업 이력' 탭을 켠다
+  var q3 = el('lk-q3');
+  if (q3) q3.addEventListener('input', histRender);
 
   var btn = el('btn-submit');
   if (btn) {

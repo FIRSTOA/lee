@@ -85,8 +85,14 @@ module.exports = async (req, res) => {
     // ---------------------------------------------------------------- 조회
     if (req.method === 'GET') {
       const scope = String((req.query && req.query.scope) || 'mine');
-      let q = 'overhaul_wip?select=' + COLS + '&state=eq.ing&order=started_at.asc&limit=200';
-      if (scope !== 'all') q += '&started_by=eq.' + encodeURIComponent(me.sub);
+      let q;
+      if (scope === 'history') {
+        // 지난 작업(시작·완료·취소) — '누가 언제 했는지' 보려는 것이라 전원 것을 최근 것부터 본다.
+        q = 'overhaul_wip?select=' + COLS + '&order=started_at.desc&limit=200';
+      } else {
+        q = 'overhaul_wip?select=' + COLS + '&state=eq.ing&order=started_at.asc&limit=200';
+        if (scope !== 'all') q += '&started_by=eq.' + encodeURIComponent(me.sub);
+      }
       const rows = await sb(q);
       res.status(200).json({ ok: true, scope: scope, rows: rows || [] });
       return;
