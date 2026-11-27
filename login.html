@@ -37,6 +37,16 @@
   .footer { text-align: center; font-size: 11px; color: #a0aec0; margin-top: 16px; }
   .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ddd; border-top-color: #2b6cb0; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* 2026-11-27 — 그룹웨어 로그인(주) + 예전 아이디 로그인(접어둠) */
+  .btn-gw { background: #2b6cb0; color: #fff; font-size: 16px; padding: 15px; margin-top: 2px; }
+  .btn-gw:hover { background: #2c5282; }
+  .gw-note { font-size: 11.5px; color: #a0aec0; text-align: center; margin: 10px 0 0; line-height: 1.7; }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 14px; color: #cbd5e0; font-size: 11.5px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #edf2f7; }
+  details.old-login summary { font-size: 12.5px; color: #718096; cursor: pointer; text-align: center; list-style: none; padding: 6px; }
+  details.old-login summary::-webkit-details-marker { display: none; }
+  details.old-login summary:hover { color: #2b6cb0; }
+  details.old-login[open] summary { margin-bottom: 14px; }
 </style>
 </head>
 <body>
@@ -57,22 +67,32 @@
   <div id="msg-area"></div>
 
   <div class="panel active" id="panel-login">
-    <div class="info-box">
-      그룹웨어에서 쓰시는 <b>아이디와 비밀번호</b> 그대로 들어오시면 됩니다.<br>
-      따로 가입하실 필요 없습니다.
+    <!-- 2026-11-27 — 그룹웨어가 '사번으로만' 로그인하도록 바뀌어(2026-11-01),
+         아이디·비밀번호를 우리가 받지 않고 그룹웨어 화면에서 직접 넣게 한다.
+         차량관리·한신다방이 쓰는 방식과 같다. -->
+    <button class="btn btn-gw" id="gw-btn">🏢 그룹웨어로 로그인</button>
+    <div class="gw-note">
+      사번 · 이름 · 비밀번호는 <b>그룹웨어 화면</b>에서 넣습니다<br>
+      따로 가입하실 필요 없습니다
     </div>
-    <div class="field">
-      <label>아이디 <span class="req">*</span></label>
-      <input type="text" id="login-email" placeholder="그룹웨어 아이디 (예: hong.gd)" autocomplete="username">
-    </div>
-    <div class="field">
-      <label>비밀번호 <span class="req">*</span></label>
-      <input type="password" id="login-password" placeholder="그룹웨어 비밀번호" autocomplete="current-password">
-    </div>
-    <button class="btn btn-primary" id="login-btn">로그인</button>
-    <div style="font-size:11.5px;color:#a0aec0;text-align:center;margin-top:12px;line-height:1.7">
-      비밀번호를 잊으셨으면 경영지원팀에 문의하세요
-    </div>
+
+    <div class="divider">또는</div>
+
+    <details class="old-login">
+      <summary>예전 아이디로 로그인</summary>
+      <div class="field">
+        <label>아이디 <span class="req">*</span></label>
+        <input type="text" id="login-email" placeholder="예전에 쓰시던 아이디" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>비밀번호 <span class="req">*</span></label>
+        <input type="password" id="login-password" placeholder="비밀번호" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="login-btn">로그인</button>
+      <div style="font-size:11px;color:#a0aec0;text-align:center;margin-top:10px;line-height:1.7">
+        비밀번호를 잊으셨으면 경영지원팀에 문의하세요
+      </div>
+    </details>
   </div>
 
   <div class="panel" id="panel-signup">
@@ -189,7 +209,27 @@ function loadSession() {
 }
 function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
-// 2026-11-27 — 그룹웨어 아이디로 로그인한다.
+// 2026-11-27 — 그룹웨어 로그인 단추 (주 수단)
+//   아이디·비밀번호를 우리가 받지 않는다. 그룹웨어 화면으로 보냈다가 돌아온다.
+document.getElementById('gw-btn').onclick = function () {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner"></span>그룹웨어로 이동 중…';
+  location.href = '/api/sso-start?next=' + encodeURIComponent('/form.html');
+};
+
+// 그룹웨어에서 돌아올 때 실패 사유가 붙어 있으면 보여준다
+(function () {
+  try {
+    var p = new URLSearchParams(location.search);
+    var err = p.get('sso_error');
+    if (err) {
+      showMsg(err);
+      history.replaceState(null, '', location.pathname);   // 주소창을 깨끗이
+    }
+  } catch (e) {}
+})();
+
+// 2026-11-27 — (예전 길) 아이디·비밀번호로 로그인한다.
 //   ① 먼저 /api/login (그룹웨어 인사DB 계정 확인)
 //   ② 안 되면 예전 방식(Apps Script 자체 명부)으로 한 번 더 — 예전 계정만 가진 사람 보호
 //   세션 모양({token, expiresAt, user})은 예전 그대로 두어서
