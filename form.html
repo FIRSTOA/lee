@@ -5167,13 +5167,14 @@ if ('serviceWorker' in navigator) {
     if (!band) return;
     var mine = W.me && W.me.id;
     var html = '<div class="wip-box">'
-      + '<div class="wip-head"><span>🔧 작업 중인 기기</span><span>' + W.rows.length + '대</span></div>'
+      + '<div class="wip-head"><span>🔧 작업 중인 기기</span><span>' + (W.rows.length ? W.rows.length + '대' : '') + '</span></div>'
       + '<div class="wip-tabs">'
-      + '<button type="button" data-scope="mine" class="' + (W.scope === 'mine' ? 'on' : '') + '">내 것</button>'
+      + '<button type="button" data-scope="mine" class="' + (W.scope === 'mine' ? 'on' : '') + '">내 작업</button>'
       + '<button type="button" data-scope="all" class="' + (W.scope === 'all' ? 'on' : '') + '">전체</button>'
       + '</div>';
     if (!W.rows.length) {
-      html += '<div class="wip-empty">' + (W.scope === 'mine' ? '시작해 둔 기기가 없습니다' : '작업 중인 기기가 없습니다') + '</div>';
+      html += '<div class="wip-empty">' + (W.scope === 'mine' ? '시작해 둔 기기가 없습니다' : '작업 중인 기기가 없습니다')
+            + '<br><span style="font-size:11px">아래에 기기를 적고 <b>[🔧 오버홀 시작]</b>을 누르면 여기에 쌓입니다</span></div>';
     } else {
       W.rows.forEach(function (r) {
         var d = days(r.started_at);
