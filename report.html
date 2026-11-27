@@ -100,7 +100,10 @@
   .wd-rate.hi { color:#c53030; font-weight:800; } .wd-rate.lo { color:#2f855a; font-weight:800; } .wd-rate.mid { color:#4a5568; font-weight:700; }
   .wd-note { border-left:4px solid #e53e3e; background:#fff5f5; border-radius:0 8px 8px 0;
              padding:9px 13px; font-size:12px; color:#9b2c2c; line-height:1.65; margin-top:10px; }
-  .foot { padding:10px 18px; background:#f7fafc; color:#a0aec0; font-size:11px; text-align:right; border-top:1px solid #edf2f7; }
+  .foot { padding:11px 18px 12px; background:#f7fafc; color:#a0aec0; font-size:11px;
+          text-align:left; border-top:1px solid #edf2f7; line-height:1.85; }
+  .foot b { color:#718096; }
+  .foot .src { text-align:right; margin-top:5px; color:#cbd5e0; }
   .loading { padding:60px; text-align:center; color:#718096; }
 </style>
 </head>
@@ -558,7 +561,16 @@ function build(data){
   });
   h+='</tbody></table>';
   h+=withdrawalBlock(data.withdrawal);     // 📦 반출 기기 (2026-11-27 추가)
-  h+='</div><div class="foot">2026-11-06부터 포인트를 없애고 <b>대수</b>로만 집계합니다. 오버홀1·2·3=1대 · 오버홀4=2대 · 오버홀5=3대 · 기기폐기=1대 · 수리2·3=1대 · 수리4=2대 · 수리5=3대 (수리1·부품제조·부품정리=0).<br>한 대에 오버홀과 수리를 같이 했으면 둘 다 더합니다. \'평균\'은 오버홀 평균 등급(1~5)으로, 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.<br>오버홀 통계 대시보드 · 자동 생성</div>';
+  // 맨 아래 설명 — 한 줄에 한 가지만 적는다. 길게 이어 쓰면 줄이 아무 데서나 넘어가
+  //   오른쪽 정렬과 겹쳐 들쭉날쭉해 보인다 (2026-11-27 고침).
+  h+='</div><div class="foot">'
+    + '<div><b>집계 기준</b> — 2026-11-06부터 포인트를 없애고 <b>대수</b>로만 셉니다.</div>'
+    + '<div>오버홀1·2·3 = 1대 · 오버홀4 = 2대 · 오버홀5 = 3대 · 기기폐기 = 1대</div>'
+    + '<div>수리2·3 = 1대 · 수리4 = 2대 · 수리5 = 3대 (수리1 · 부품제조 · 부품정리 = 0)</div>'
+    + '<div>한 대에 오버홀과 수리를 같이 했으면 둘 다 더합니다.</div>'
+    + '<div>‘평균’은 오버홀 평균 등급(1~5)입니다. 대수는 채웠는데 평균이 낮으면 쉬운 등급으로만 채운 것입니다.</div>'
+    + '<div class="src">오버홀 통계 대시보드 · 자동 생성</div>'
+    + '</div>';
   document.getElementById('report').innerHTML=h;
   document.title = (isQuarter?'분기보고 ':'주간보고 ')+periodSub;
   window._reportReady = true; // 메신저봇R 캡처 타이밍용
