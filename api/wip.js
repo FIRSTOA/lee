@@ -144,7 +144,13 @@ module.exports = async (req, res) => {
       // 백오피스 창고를 그 수리실로 옮긴다 ('기타'는 백오피스에 없는 칸이라 건너뛴다)
       let bo = { ok: false, error: null };
       if (made && ROOMS.indexOf(room) >= 0) {
-        bo = await boApply({ serial: serial, asset: asset, warehouse: room, by: me.name || me.sub });
+        // 2026-11-27 — 아직 회수 처리가 안 된 '임대중' 기기도 수리실에 들어가게,
+        //   대장에 없는 기기는 새로 등록되게 '구분 · 고장 여부 · 모델'을 같이 넘긴다.
+        bo = await boApply({
+          serial: serial, asset: asset, warehouse: room, by: me.name || me.sub,
+          use: S(body.use), model: S(body.model), maker: S(body.maker),
+          broken: S(body.reason) === '기기고장',
+        });
         // 백오피스가 '원래 어느 창고에 있었는지(from)'를 돌려준다. 그만둘 때 그 창고로 되돌린다.
         const prev = (bo.ok && bo.data && bo.data.from) ? String(bo.data.from) : null;
         try {
@@ -184,9 +190,11 @@ module.exports = async (req, res) => {
       const done = up[0];
 
       // 작업이 끝났으니 백오피스 창고를 'PM 대기실'로 옮긴다
+      //   시작할 때 백오피스에 못 넣었던 기기도 여기서 한 번 더 들어가게 모델·고장 여부를 같이 넘긴다.
       let bo2 = await boApply({
         serial: done.serial_no, asset: done.asset_no,
         warehouse: PM_ROOM, by: me.name || me.sub,
+        model: done.model, broken: S(done.reason) === '기기고장',
       });
       try {
         await sb('overhaul_wip?id=eq.' + encodeURIComponent(id), {
