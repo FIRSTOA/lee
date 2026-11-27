@@ -5193,6 +5193,13 @@ if ('serviceWorker' in navigator) {
   #wip-ask-no { background:#f1f5f9; border:1.5px solid #cbd5e0; color:#475569; }
   #wip-ask-yes { background:#dc2626; border:none; color:#fff; }
   /* '작업 대상'이 언제 적는 칸인지 알려 주는 배지 */
+  /* 부서 — 로그인으로 정해졌을 때 보여 주는 한 줄 */
+  .wip-dept .wip-dept-in { display:flex; align-items:center; gap:9px; background:#f1f5f9;
+                           border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
+  .wip-dept .wip-dept-in b { font-size:14px; font-weight:700; color:#1e293b; }
+  .wip-dept .wip-dept-in .auto { font-size:11px; color:#94a3b8; }
+  #wip-dept-edit { margin-left:auto; font-size:12px; font-weight:700; background:#fff; border:1px solid #cbd5e0;
+                   color:#475569; border-radius:7px; padding:6px 12px; cursor:pointer; font-family:inherit; }
   .wip-step-tag { margin-left:auto; font-size:10.5px; font-weight:800; letter-spacing:0;
                   background:#e0f2fe; color:#075985; border-radius:999px; padding:3px 9px; text-transform:none; }
 </style>
@@ -5468,6 +5475,8 @@ if ('serviceWorker' in navigator) {
       tg.style.display = '';
       tg.textContent = done ? '오버홀 시작시 작성됨' : '오버홀 시작시 작성';
     }
+    // 지난 기록을 고치는 중이면 부서도 고칠 수 있어야 한다
+    if (editing) deptShow();
   }
 
   // 저장이 끝난 뒤 폼이 불러준다 (성공했을 때만 닫는다)
@@ -5586,10 +5595,37 @@ if ('serviceWorker' in navigator) {
       document.querySelectorAll('#dept-grid .chip').forEach(function (c) {
         if (c.dataset.dept === hit.dept) c.classList.add('selected'); else c.classList.remove('selected');
       });
+      // 엄재현은 주간(CSS)·야간(외부인력)으로 갈린다 — 그 사람만 고를 수 있게 펼쳐 둔다.
+      deptFold(/^엄재현/.test(name) ? '' : hit.dept);
       return;
     }
     if ((tries || 0) < 6) setTimeout(function () { autoFillMe((tries || 0) + 1); }, 700);
   }
+
+  // 부서는 로그인 정보로 정해진다 — 단추 6개를 늘어놓지 않고 한 줄로만 보여 준다.
+  //   (사용자 지시 2026-11-27) 못 정했거나 바꿔야 하면 [바꾸기]로 펼친다.
+  function deptFold(dept) {
+    var grid = el('dept-grid');
+    if (!grid) return;
+    var field = grid.parentNode;                 // 부서 칸 전체
+    var box = el('wip-dept-line');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'wip-dept-line';
+      box.className = 'field wip-dept';
+      box.style.display = 'none';
+      field.parentNode.insertBefore(box, field);
+    }
+    if (!dept) { box.style.display = 'none'; field.style.display = ''; return; }
+    box.innerHTML = '<label>부서</label><div class="wip-dept-in"><b>' + esc(dept) + '</b>'
+                  + '<span class="auto">로그인 정보</span>'
+                  + '<button type="button" id="wip-dept-edit">바꾸기</button></div>';
+    box.style.display = '';
+    field.style.display = 'none';
+    el('wip-dept-edit').onclick = function () { box.style.display = 'none'; field.style.display = ''; };
+  }
+  function deptShow() { var b = el('wip-dept-line'); var g = el('dept-grid');
+    if (b) b.style.display = 'none'; if (g) g.parentNode.style.display = ''; }
 
   // ---------------------------------------------------------------- 켜기
   var s = loadSess();
