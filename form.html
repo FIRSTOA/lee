@@ -1106,6 +1106,8 @@
   </div>
 
   <div id="mode-overhaul">
+  <!-- 2026-11-27 — 작업 중인 기기 띠. 로그인했을 때만 나타난다(비로그인이면 예전 그대로). -->
+  <div id="wip-band" style="display:none"></div>
   <div class="form-card">
     <div class="section-title">기본 정보</div>
     <div class="field">
@@ -1188,6 +1190,21 @@
         <span class="sc" onclick="ckReasonPick(this)">기타</span>
       </div>
       <input type="hidden" id="ck-reason">
+    </div>
+    <!-- 2026-11-27 — 지금 기기가 어느 수리실에 있는지. 로그인했을 때만 보인다.
+         [오버홀 시작]을 누르면 백오피스 창고가 이 수리실로 바뀌고,
+         나중에 [완료]를 누르면 'PM 대기실'로 자동으로 옮겨진다. -->
+    <div class="field" id="wip-room-field" style="display:none">
+      <label>현재 기기 위치 <span class="req">*</span></label>
+      <div class="sym-cat" id="wip-room-chips">
+        <span class="sc" onclick="wipRoomPick(this)">1수리실</span>
+        <span class="sc" onclick="wipRoomPick(this)">2수리실</span>
+        <span class="sc" onclick="wipRoomPick(this)">3수리실</span>
+        <span class="sc" onclick="wipRoomPick(this)">기타</span>
+      </div>
+      <input type="hidden" id="wip-room">
+      <input type="text" id="wip-room-etc" placeholder="보관 장소 직접 입력" style="display:none;margin-top:6px">
+      <div class="wip-hint">완료를 누르면 백오피스 창고가 <b>PM 대기실</b>로 자동으로 바뀝니다</div>
     </div>
     <!-- 2026-11-24 — 전에 작업한 적 있는 기기면 여기에 띠가 뜬다(없으면 아무것도 안 보인다) -->
     <div id="ckh-band"></div>
@@ -2986,6 +3003,9 @@ document.getElementById('btn-confirm-preview').onclick = async () => {
       if (ckOk) { msg += ' | 확인서 ✓'; }
       else { msg += ' | 확인서 ✗ (폰에 보관 — 인터넷 연결 후 자동 재전송)'; }
       const allOk = !result.mainError && result.stockSaved === true && ckOk;
+      // 2026-11-27 — 작업 중이던 기기를 끝낸 것이면 '작업 중' 목록에서도 닫는다.
+      //   저장이 끝난 뒤에만 부른다(저장이 실패하면 작업 중으로 남겨 둬야 다시 할 수 있다).
+      if (window.wipFinish) { try { window.wipFinish(allOk); } catch (e) {} }
       showToast((allOk ? '✅ ' : '⚠️ ') + msg, allOk ? 'success' : 'error');
       if (!ckOk) alert('⚠️ 확인서 저장에 실패했습니다.\n\n작업 기록(시트)은 저장되었습니다.\n확인서는 폰에 보관해두었다가 인터넷이 연결되면 자동으로 다시 보냅니다.\n\n화면 위쪽 노란 띠를 눌러 지금 바로 재전송할 수도 있습니다.');
       console.log('Save response:', result);
@@ -5059,6 +5079,276 @@ async function dpSubmit(){
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
 }
+</script>
+<!-- =========================================================================
+     2026-11-27 — 오버홀 '시작 → 작업 중 → 완료'
+       · 로그인(그룹웨어)했을 때만 켜진다. 로그인 안 하면 예전 그대로 [내용저장].
+       · 기존 저장 흐름은 건드리지 않는다. 완료할 때 그대로 저장되고,
+         저장이 끝난 뒤에만 '작업 중' 목록에서 닫는다(저장 실패 시 작업 중으로 남김).
+     ========================================================================= -->
+<style>
+  #wip-band { margin-bottom: 11px; }
+  .wip-box { background:#fffbeb; border:1.5px solid #fde68a; border-radius:12px; padding:12px 13px; }
+  .wip-head { font-size:13px; font-weight:800; color:#92400e; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; }
+  .wip-tabs { display:flex; gap:5px; margin-bottom:9px; }
+  .wip-tabs button { flex:1; font-size:11.5px; font-weight:700; padding:6px; border-radius:7px;
+                     border:1px solid #fde68a; color:#92400e; background:#fff; font-family:inherit; cursor:pointer; }
+  .wip-tabs button.on { background:#f59e0b; color:#fff; border-color:#f59e0b; }
+  .wip-row { background:#fff; border:1px solid #fde68a; border-radius:9px; padding:9px 11px;
+             margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .wip-row:last-child { margin-bottom:0; }
+  .wip-main { flex:1; min-width:0; }
+  .wip-m1 { font-size:13px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wip-m2 { font-size:11.5px; color:#78716c; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wip-day { font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; background:#f1f5f9; color:#64748b; flex:none; }
+  .wip-day.warn { background:#fef2f2; color:#b91c1c; }
+  .wip-go { font-size:12px; font-weight:800; padding:7px 12px; border-radius:8px; background:#16a34a;
+            color:#fff; border:none; flex:none; font-family:inherit; cursor:pointer; }
+  .wip-x { font-size:15px; color:#d6d3d1; background:none; border:none; cursor:pointer; padding:2px 4px; flex:none; line-height:1; }
+  .wip-empty { font-size:12px; color:#a8a29e; text-align:center; padding:8px 0; }
+  .wip-hint { margin-top:9px; background:#fff; border:1px solid #fed7aa; border-left:3px solid #ff7a18;
+              border-radius:8px; padding:9px 11px; font-size:11.5px; color:#9a3412; line-height:1.65; }
+  .wip-doing { background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:12px; padding:11px 13px;
+               margin-bottom:11px; font-size:12.5px; color:#065f46; line-height:1.75; }
+  .wip-doing b { color:#047857; }
+  .wip-doing button { margin-left:8px; font-size:11px; background:#fff; border:1px solid #6ee7b7;
+                      color:#047857; border-radius:6px; padding:3px 9px; cursor:pointer; font-family:inherit; }
+</style>
+<script>
+(function () {
+  var SESSION_KEY = 'overhaul_session';
+  var W = { token: null, me: null, scope: 'mine', rows: [], doneId: null, doneRow: null };
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function loadSess() {
+    try {
+      var s = localStorage.getItem(SESSION_KEY);
+      if (!s) return null;
+      var o = JSON.parse(s);
+      if (o.expiresAt && new Date(o.expiresAt).getTime() < Date.now()) return null;
+      return (o && o.token) ? o : null;
+    } catch (e) { return null; }
+  }
+
+  function api(path, opt) {
+    var o = opt || {};
+    return fetch(path, {
+      method: o.method || 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + W.token },
+      body: o.body
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, data: j || {} }; });
+    });
+  }
+
+  // 며칠째인지 — 날짜만 센다(오늘 시작했으면 '오늘')
+  function days(iso) {
+    try {
+      var a = new Date(iso); var b = new Date();
+      a.setHours(0,0,0,0); b.setHours(0,0,0,0);
+      var d = Math.round((b - a) / 86400000);
+      if (d <= 0) return { t: '오늘', warn: false };
+      return { t: (d + 1) + '일째', warn: d >= 3 };
+    } catch (e) { return { t: '', warn: false }; }
+  }
+
+  function val(id) { var e = el(id); return e ? String(e.value || '').trim() : ''; }
+  function myDept() {
+    var c = document.querySelector('.dept-grid .chip.selected');
+    return c ? (c.dataset.dept || '') : '';
+  }
+
+  // ---------------------------------------------------------------- 그리기
+  function render() {
+    var band = el('wip-band');
+    if (!band) return;
+    var mine = W.me && W.me.id;
+    var html = '<div class="wip-box">'
+      + '<div class="wip-head"><span>🔧 작업 중인 기기</span><span>' + W.rows.length + '대</span></div>'
+      + '<div class="wip-tabs">'
+      + '<button type="button" data-scope="mine" class="' + (W.scope === 'mine' ? 'on' : '') + '">내 것</button>'
+      + '<button type="button" data-scope="all" class="' + (W.scope === 'all' ? 'on' : '') + '">전체</button>'
+      + '</div>';
+    if (!W.rows.length) {
+      html += '<div class="wip-empty">' + (W.scope === 'mine' ? '시작해 둔 기기가 없습니다' : '작업 중인 기기가 없습니다') + '</div>';
+    } else {
+      W.rows.forEach(function (r) {
+        var d = days(r.started_at);
+        var who = (r.started_by === mine) ? '' : ' · ' + esc(r.started_name || r.started_by) + ' 시작';
+        html += '<div class="wip-row">'
+          + '<div class="wip-main">'
+          + '<div class="wip-m1">' + esc(r.model || '(모델 미기재)') + '</div>'
+          + '<div class="wip-m2">' + esc(r.asset_no || r.serial_no || '') + ' · ' + esc(r.room || '') + who + '</div>'
+          + '</div>'
+          + '<span class="wip-day' + (d.warn ? ' warn' : '') + '">' + d.t + '</span>'
+          + '<button type="button" class="wip-go" data-done="' + esc(r.id) + '">완료</button>'
+          + (r.started_by === mine ? '<button type="button" class="wip-x" data-cancel="' + esc(r.id) + '" title="시작 취소">✕</button>' : '')
+          + '</div>';
+      });
+    }
+    html += '</div>';
+    band.innerHTML = html;
+    band.style.display = '';
+
+    band.querySelectorAll('.wip-tabs button').forEach(function (b) {
+      b.onclick = function () { W.scope = b.dataset.scope; load(); };
+    });
+    band.querySelectorAll('[data-done]').forEach(function (b) {
+      b.onclick = function () { pickDone(b.dataset.done); };
+    });
+    band.querySelectorAll('[data-cancel]').forEach(function (b) {
+      b.onclick = function () { cancelWip(b.dataset.cancel); };
+    });
+  }
+
+  function load() {
+    return api('/api/wip?scope=' + W.scope).then(function (r) {
+      W.rows = (r.ok && r.data && r.data.rows) ? r.data.rows : [];
+      render();
+    }).catch(function () { W.rows = []; render(); });
+  }
+
+  // ---------------------------------------------------------------- 시작
+  function start() {
+    var room = val('wip-room');
+    if (!room) { alert('현재 기기 위치(수리실)를 골라 주세요.'); return; }
+    if (room === '기타' && !val('wip-room-etc')) { alert('보관 장소를 적어 주세요.'); return; }
+    var serial = val('f-serial'), asset = val('f-asset');
+    if (!serial && !asset) { alert('자산번호나 시리얼 번호가 있어야 시작할 수 있습니다.'); return; }
+
+    var btn = el('btn-submit');
+    var old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '시작하는 중…';
+    api('/api/wip', { method: 'POST', body: JSON.stringify({
+      action: 'start',
+      asset_no: asset, serial_no: serial,
+      model: val('f-model'), incoming: val('f-incoming'),
+      in_date: val('ck-indate'), reason: val('ck-reason'),
+      room: room, room_etc: val('wip-room-etc'), dept: myDept()
+    }) }).then(function (r) {
+      btn.disabled = false; btn.innerHTML = old;
+      if (!r.ok) { alert(r.data.error || '시작하지 못했습니다.'); return; }
+      if (window.showToast) showToast('🔧 ' + room + '에서 작업을 시작했습니다', 'success');
+      else alert(room + '에서 작업을 시작했습니다.');
+      clearTarget();
+      W.scope = 'mine';
+      load();
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+    }).catch(function (e) {
+      btn.disabled = false; btn.innerHTML = old;
+      alert('시작하지 못했습니다: ' + (e && e.message ? e.message : e));
+    });
+  }
+
+  // 시작한 뒤 '작업 대상' 칸만 비운다 (날짜·담당자·부서는 그대로 둔다)
+  function clearTarget() {
+    ['f-asset', 'f-serial', 'f-model', 'f-incoming', 'ck-indate', 'wip-room-etc'].forEach(function (id) {
+      var e = el(id); if (e) e.value = '';
+    });
+    var r = el('wip-room'); if (r) r.value = '';
+    document.querySelectorAll('#wip-room-chips .sc.on').forEach(function (c) { c.classList.remove('on'); });
+    var etc = el('wip-room-etc'); if (etc) etc.style.display = 'none';
+  }
+
+  // ---------------------------------------------------------------- 완료 고르기
+  function pickDone(id) {
+    var row = null;
+    for (var i = 0; i < W.rows.length; i++) { if (W.rows[i].id === id) { row = W.rows[i]; break; } }
+    if (!row) return;
+    W.doneId = id; W.doneRow = row;
+
+    function set(elid, v) { var e = el(elid); if (e && v) { e.value = v; } }
+    set('f-asset', row.asset_no); set('f-serial', row.serial_no);
+    set('f-model', row.model); set('f-incoming', row.incoming);
+    set('ck-indate', row.in_date);
+    if (row.reason) {
+      set('ck-reason', row.reason);
+      document.querySelectorAll('#ck-reason-chips .sc').forEach(function (c) {
+        if (c.textContent.trim() === row.reason) c.classList.add('on'); else c.classList.remove('on');
+      });
+    }
+    set('wip-room', row.room);
+    document.querySelectorAll('#wip-room-chips .sc').forEach(function (c) {
+      if (c.textContent.trim() === row.room) c.classList.add('on'); else c.classList.remove('on');
+    });
+
+    var d = days(row.started_at);
+    var band = el('wip-band');
+    var note = document.createElement('div');
+    note.className = 'wip-doing';
+    note.id = 'wip-doing';
+    note.innerHTML = '✅ <b>' + esc(row.model || row.asset_no || row.serial_no) + '</b> 완료 중입니다'
+      + '<br><span style="color:#059669">시작 ' + esc(row.started_name || '') + ' · ' + esc(row.room || '') + ' · ' + d.t + '</span>'
+      + ' <button type="button" id="wip-doing-x">그만두기</button>'
+      + '<br><span style="font-size:11.5px;color:#047857">작업 항목·증상·시간을 적고 아래 <b>[완료]</b>를 누르면,'
+      + ' 저장되고 백오피스 창고가 <b>PM 대기실</b>로 바뀝니다</span>';
+    var old = el('wip-doing'); if (old) old.remove();
+    band.parentNode.insertBefore(note, band.nextSibling);
+    el('wip-doing-x').onclick = function () { exitDone(); };
+
+    syncBtn();
+    try { note.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+  }
+
+  function exitDone() {
+    W.doneId = null; W.doneRow = null;
+    var n = el('wip-doing'); if (n) n.remove();
+    syncBtn();
+  }
+
+  function cancelWip(id) {
+    if (!confirm('시작을 취소할까요?\n\n작업 중 목록에서 사라집니다. (기록은 남습니다)')) return;
+    api('/api/wip', { method: 'POST', body: JSON.stringify({ action: 'cancel', id: id }) })
+      .then(function () { if (W.doneId === id) exitDone(); load(); });
+  }
+
+  // ---------------------------------------------------------------- 단추 문구
+  function syncBtn() {
+    var b = el('btn-submit');
+    if (!b) return;
+    if (W.doneId) { b.innerHTML = '✅ 완료'; b.style.background = '#16a34a'; }
+    else { b.innerHTML = '🔧 오버홀 시작'; b.style.background = ''; }
+  }
+
+  // 저장이 끝난 뒤 폼이 불러준다 (성공했을 때만 닫는다)
+  window.wipFinish = function (ok) {
+    if (!W.doneId || !ok) return;
+    var id = W.doneId;
+    api('/api/wip', { method: 'POST', body: JSON.stringify({ action: 'done', id: id }) })
+      .then(function () { exitDone(); load(); });
+  };
+
+  // 위치 칩 — 입고 사유 칩과 같은 방식
+  window.wipRoomPick = function (node) {
+    document.querySelectorAll('#wip-room-chips .sc').forEach(function (c) { c.classList.remove('on'); });
+    node.classList.add('on');
+    var v = node.textContent.trim();
+    el('wip-room').value = v;
+    var etc = el('wip-room-etc');
+    if (etc) { etc.style.display = (v === '기타') ? '' : 'none'; if (v !== '기타') etc.value = ''; }
+  };
+
+  // ---------------------------------------------------------------- 켜기
+  var s = loadSess();
+  if (!s) return;                       // 로그인 안 했으면 예전 그대로 둔다
+  W.token = s.token; W.me = s.user || {};
+
+  var roomField = el('wip-room-field');
+  if (roomField) roomField.style.display = '';
+
+  var btn = el('btn-submit');
+  if (btn) {
+    var orig = btn.onclick;             // 기존 동작(저장 전 확인창)을 그대로 쓴다
+    btn.onclick = function (ev) {
+      if (W.doneId) { return orig ? orig.call(this, ev) : null; }   // 완료 = 기존 저장 흐름
+      start();                                                      // 시작 = 작업 중 목록에만
+    };
+    syncBtn();
+  }
+  load();
+})();
 </script>
 <!-- build 2026-11-24 18:57 -->
 </body>
