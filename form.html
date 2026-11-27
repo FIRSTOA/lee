@@ -5509,7 +5509,15 @@ if ('serviceWorker' in navigator) {
         .join(' ').toLowerCase().indexOf(q) >= 0;
     });
     if (cnt) cnt.textContent = list.length + '건' + (q ? ' (전체 ' + HIST.rows.length + '건 중)' : '');
-    if (!list.length) { box.innerHTML = '<div class="lk-empty">찾는 작업이 없습니다</div>'; return; }
+    if (!list.length) {
+      // 기록 자체가 없는 것과, 검색어 때문에 안 나오는 것은 다르다 — 섞어서 말하지 않는다.
+      box.innerHTML = HIST.rows.length === 0
+        ? '<div class="lk-empty">아직 오버홀 시작을 누른 기록이 없습니다'
+          + '<br><span style="font-size:11.5px">입력폼에서 <b>[🔧 오버홀 시작]</b>을 누르면 여기에 쌓입니다</span></div>'
+        : '<div class="lk-empty">「' + esc(q) + '」로 찾은 작업이 없습니다'
+          + '<br><span style="font-size:11.5px">모델 · 자산번호 · 시리얼 · 담당자 · 수리실로 찾을 수 있습니다</span></div>';
+      return;
+    }
     box.innerHTML = list.map(function (r) {
       var st = r.state === 'done'   ? { t: '완료',    c: '#166534', bg: '#dcfce7' }
              : r.state === 'cancel' ? { t: '그만둠',  c: '#9a3412', bg: '#fff7ed' }
@@ -5556,6 +5564,19 @@ if ('serviceWorker' in navigator) {
     if (!name) return;
     var p = el('f-person');
     if (p && !p.value) p.value = name;
+
+    // 다른 탭의 '담당자 · 신청인'도 같은 사람이다 — 손으로 다시 적게 하지 않는다.
+    //   이름을 넣으면 각 탭이 알아서 지역까지 정한다.
+    //   ※ 재수리의 '요청자(rb-requester)'는 재수리를 맡긴 다른 사람이라 채우지 않는다.
+    var dp = el('dp-person');
+    if (dp && !dp.value) { dp.value = name; }
+    if (dp && dp.value === name && typeof dpSyncArea === 'function') { try { dpSyncArea(); } catch (e) {} }
+    var rp = el('rp-person');
+    if (rp && !rp.value) { rp.value = name; }
+    if (rp && rp.value === name && typeof rpSyncArea === 'function') { try { rpSyncArea(); } catch (e) {} }
+    var rh = el('rb-handler');
+    if (rh && !rh.value) rh.value = name;
+
     var hit = null;
     try {
       var list = (typeof personsData !== 'undefined' && personsData) ? personsData : [];
