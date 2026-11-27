@@ -4596,6 +4596,28 @@ async function dpSubmit(){
                                     overhaul:'기기폐기', repair:'', time:mins }, true, (jr&&jr.row)||'');
     }catch(e){ workMsg=e.message||String(e); }
 
+    // ③ 백오피스 재고에서 빼기 (2026-11-27)
+    //    폐기 '내용'은 위에서 이미 우리 쪽에 다 남겼다. 백오피스는 재고에서만 빼면 된다.
+    //    로그인했을 때만 부르고, 실패해도 폐기 등록은 그대로 둔다(원본 기록은 우리 쪽이다).
+    dpStep('📦 백오피스 재고에서 빼는 중…', btn, '백오피스', 97);
+    let boLine = '';
+    try{
+      const _s = (window.wipSession && window.wipSession()) || null;
+      if(_s && _s.token){
+        const br = await fetch('/api/wip', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+_s.token },
+          body: JSON.stringify({ action:'discard', serial_no: serial, asset_no: asset })
+        });
+        const bj = await br.json().catch(()=>({}));
+        boLine = (br.ok && bj && bj.ok)
+          ? '백오피스 재고에서 빠짐 ✓'
+          : ('백오피스 재고 ✗ ' + ((bj && bj.error) || ('응답 '+br.status)));
+      } else {
+        boLine = '백오피스 재고 — 로그인 후 등록하면 자동으로 빠집니다';
+      }
+    }catch(e){ boLine = '백오피스 재고 ✗ ' + (e.message||e); }
+
     const sheetLine = DP_SHEET_URL
       ? (rec.sentToSheet ? '폐장비리스트 ✓' : '폐장비리스트 ✗ (나중에 다시 보냅니다)')
       : '폐장비리스트 — 보관됨 (시트 주소 연결 전)';
@@ -4605,12 +4627,13 @@ async function dpSubmit(){
       + 'padding:11px 13px;color:#22543d;font-size:13px;line-height:1.75;text-align:left">'
       + '<b style="font-size:14px">✅ 폐기 등록 완료</b><br>'
       + rbEsc(brand)+' '+rbEsc(model)+' / '+rbEsc(idKey)+'<br>'
-      + rbEsc(sheetLine)+'<br>'+rbEsc(workLine)+'</div>';
+      + rbEsc(sheetLine)+'<br>'+rbEsc(workLine)+'<br>'+rbEsc(boLine)+'</div>';
     btn.textContent='완료!';
     alert('🗑 폐기 등록 완료\n\n'
       + model+' / '+idKey+'\n'
       + sheetLine+'\n'
-      + workLine);
+      + workLine+'\n'
+      + boLine);
 
     // 다음 등록을 위해 비우기 (담당자·지역·날짜는 그대로 둔다 — 연속 등록이 많다)
     ['dp-direct','dp-brand','dp-model','dp-serial','dp-asset','dp-partetc','dp-bw','dp-cl','dp-a3','dp-time'].forEach(id=>{
@@ -5320,6 +5343,9 @@ if ('serviceWorker' in navigator) {
     api('/api/wip', { method: 'POST', body: JSON.stringify({ action: 'done', id: id }) })
       .then(function () { exitDone(); load(); });
   };
+
+  // 폐기 탭에서도 로그인 정보를 쓴다 (백오피스 재고에서 빼려고)
+  window.wipSession = function () { return loadSess(); };
 
   // 위치 칩 — 입고 사유 칩과 같은 방식
   window.wipRoomPick = function (node) {
